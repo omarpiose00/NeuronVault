@@ -10,24 +10,15 @@ dependencies:
   http: ^1.2.1
   google_fonts: ^6.2.1
   provider: ^6.1.2
-
-
-  # Markdown e visualizzazione del codice (compatibile con tutte le piattaforme)
   flutter_markdown: ^0.6.17
-
-  # Supporto immagini (principalmente mobile)
   image_picker: ^1.0.4
   cached_network_image: ^3.3.0
-
-  # Input vocale (principalmente mobile)
   speech_to_text: ^6.3.0
-
-  # Animazioni e UI
-  lottie: ^2.6.0
-  shimmer: ^3.0.0
-
-  # Storage locale
+  lottie: ^2.6.0  # Animazioni Lottie
+  shimmer: ^3.0.0  # Effetto shimmer per caricamento
   shared_preferences: ^2.2.2
+  animate_do: ^3.1.0  # Animazioni semplici
+  flutter_staggered_animations: ^1.1.1  # Animazioni a cascata
 
 dev_dependencies:
   flutter_test:
