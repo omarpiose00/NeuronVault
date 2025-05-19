@@ -1,31 +1,28 @@
-// lib/screens/ai_chat_screen.dart
+// lib/screens/ai_chat_screen_updated.dart
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
-import 'package:speech_to_text/speech_to_text.dart';
 import 'dart:io';
+
 import '../models/ai_agent.dart';
 import '../services/api_service.dart';
-import '../widgets/multimodal_message_bubble.dart';
-import '../widgets/typing_indicator.dart';
-import '../widgets/error_message_widget.dart';
+import '../widgets/messaging/multimodal_message_bubble.dart';
+import '../widgets/input/photo_input_button.dart';
+import '../models/conversation_mode.dart';
 
-class AiChatScreen extends StatefulWidget {
-  const AiChatScreen({super.key});
+class AiChatScreenUpdated extends StatefulWidget {
+  const AiChatScreenUpdated({super.key});
 
   @override
-  State<AiChatScreen> createState() => _AiChatScreenState();
+  State<AiChatScreenUpdated> createState() => _AiChatScreenUpdatedState();
 }
 
-class _AiChatScreenState extends State<AiChatScreen> with TickerProviderStateMixin {
+class _AiChatScreenUpdatedState extends State<AiChatScreenUpdated> with TickerProviderStateMixin {
   final TextEditingController _controller = TextEditingController();
-  final ImagePicker _picker = ImagePicker();
-  final SpeechToText _speechToText = SpeechToText();
   final ScrollController _scrollController = ScrollController();
+  final ImagePicker _picker = ImagePicker();
 
   bool _isLoading = false;
-  bool _isListening = false;
+  bool _isScrolled = false;
   List<AiConversationMessage> _conversation = [];
   String _conversationId = DateTime.now().millisecondsSinceEpoch.toString();
   ConversationMode _currentMode = ConversationMode.chat;
@@ -35,17 +32,9 @@ class _AiChatScreenState extends State<AiChatScreen> with TickerProviderStateMix
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
 
-  // Animazione del pulsante invio
-  late AnimationController _sendButtonPulseController;
-  late Animation<double> _sendButtonPulseAnimation;
-
-  // Animazione modalità
-  OverlayEntry? _modeBannerOverlay;
-
   @override
   void initState() {
     super.initState();
-    _initSpeech();
 
     // Inizializza le animazioni principali
     _animationController = AnimationController(
@@ -66,27 +55,11 @@ class _AiChatScreenState extends State<AiChatScreen> with TickerProviderStateMix
 
     _animationController.forward();
 
-    // Animazione del pulsante di invio
-    _sendButtonPulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    );
-
-    _sendButtonPulseAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _sendButtonPulseController,
-        curve: Curves.easeInOut,
-      ),
-    );
-
-    // Ascolta i cambiamenti nel campo di testo per animare il pulsante
-    _controller.addListener(() {
-      if (_controller.text.trim().isNotEmpty && !_sendButtonPulseController.isAnimating) {
-        _sendButtonPulseController.repeat(reverse: true);
-      } else if (_controller.text.trim().isEmpty) {
-        _sendButtonPulseController.stop();
-        _sendButtonPulseController.reset();
-      }
+    // Aggiungi listener per rilevare lo scroll
+    _scrollController.addListener(() {
+      setState(() {
+        _isScrolled = _scrollController.offset > 10;
+      });
     });
   }
 
@@ -95,51 +68,7 @@ class _AiChatScreenState extends State<AiChatScreen> with TickerProviderStateMix
     _controller.dispose();
     _scrollController.dispose();
     _animationController.dispose();
-    _sendButtonPulseController.dispose();
-    _modeBannerOverlay?.remove();
     super.dispose();
-  }
-
-  void _initSpeech() async {
-    await _speechToText.initialize();
-    setState(() {});
-  }
-
-  void _startListening() async {
-    if (!_isListening) {
-      bool available = await _speechToText.initialize(
-        onStatus: (status) {
-          if (status == 'done') {
-            setState(() {
-              _isListening = false;
-            });
-          }
-        },
-        onError: (errorNotification) {
-          setState(() {
-            _isListening = false;
-          });
-        },
-      );
-
-      if (available) {
-        setState(() {
-          _isListening = true;
-        });
-        _speechToText.listen(
-          onResult: (result) {
-            setState(() {
-              _controller.text = result.recognizedWords;
-            });
-          },
-        );
-      }
-    } else {
-      setState(() {
-        _isListening = false;
-        _speechToText.stop();
-      });
-    }
   }
 
   void _sendPrompt() async {
@@ -149,13 +78,15 @@ class _AiChatScreenState extends State<AiChatScreen> with TickerProviderStateMix
     setState(() {
       _isLoading = true;
       // Aggiungiamo il messaggio dell'utente subito
-      _conversation.add(AiConversationMessage(agent: 'user', message: prompt));
+      _conversation.add(
+          AiConversationMessage(
+            agent: 'user',
+            message: prompt,
+            timestamp: DateTime.now(),
+          )
+      );
       _controller.clear();
     });
-
-    // Interrompi l'animazione del pulsante di invio
-    _sendButtonPulseController.stop();
-    _sendButtonPulseController.reset();
 
     // Scorrimento automatico verso il basso
     _scrollToBottom();
@@ -174,23 +105,12 @@ class _AiChatScreenState extends State<AiChatScreen> with TickerProviderStateMix
       // Assicurati che scorra in basso dopo aver ricevuto la risposta
       _scrollToBottom();
     } catch (e) {
-      // Formatta l'errore in modo più user-friendly
-      String errorMessage = 'Si è verificato un errore';
-
-      if (e.toString().contains('OpenAI')) {
-        errorMessage = 'Errore: Problema di connessione con GPT. Riprova più tardi.';
-      } else if (e.toString().contains('Claude') || e.toString().contains('Anthropic')) {
-        errorMessage = 'Errore: Problema di connessione con Claude. Riprova più tardi.';
-      } else if (e.toString().contains('DeepSeek')) {
-        errorMessage = 'Errore: Problema di connessione con DeepSeek. Riprova più tardi.';
-      } else if (e.toString().contains('quota') || e.toString().contains('exceeded')) {
-        errorMessage = 'Errore: Hai raggiunto il limite di utilizzo. Controlla il tuo piano.';
-      } else if (e.toString().contains('connessione')) {
-        errorMessage = e.toString();
-      }
-
       setState(() {
-        _conversation.add(AiConversationMessage(agent: 'system', message: errorMessage));
+        _conversation.add(AiConversationMessage(
+          agent: 'system',
+          message: 'Errore: Si è verificato un problema durante la comunicazione con i servizi AI. Riprova più tardi.',
+          timestamp: DateTime.now(),
+        ));
         _isLoading = false;
       });
 
@@ -201,86 +121,49 @@ class _AiChatScreenState extends State<AiChatScreen> with TickerProviderStateMix
     }
   }
 
-  void _showErrorSnackbar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.error_outline, color: Colors.white),
-            const SizedBox(width: 12),
-            Expanded(child: Text(message)),
-          ],
-        ),
-        backgroundColor: Colors.red.shade700,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 3),
-        action: SnackBarAction(
-          label: 'OK',
-          onPressed: () {},
-          textColor: Colors.white,
-        ),
-        animation: CurvedAnimation(
-          parent: const AlwaysStoppedAnimation(1),
-          curve: Curves.elasticOut,
-        ),
-      ),
-    );
-  }
+  void _handlePhotoSelected(XFile photo) async {
+    String prompt = _controller.text.trim().isEmpty
+        ? "Descrivi questa immagine"
+        : _controller.text.trim();
 
-  void _pickImage() async {
-    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
-    if (image != null) {
-      String prompt = _controller.text.trim().isEmpty
-          ? "Descrivi questa immagine"
-          : _controller.text.trim();
+    setState(() {
+      _isLoading = true;
+      _conversation.add(AiConversationMessage(
+        agent: 'user',
+        message: prompt,
+        mediaUrl: photo.path,
+        mediaType: 'image/jpeg',
+        timestamp: DateTime.now(),
+      ));
+      _controller.clear();
+    });
 
+    // Scorrimento automatico
+    _scrollToBottom();
+
+    try {
+      final aiResp = await ApiService.uploadImage(
+        prompt,
+        File(photo.path),
+        conversationId: _conversationId,
+      );
       setState(() {
-        _isLoading = true;
-        _conversation.add(AiConversationMessage(
-          agent: 'user',
-          message: prompt,
-          mediaUrl: image.path,
-          mediaType: 'image/jpeg',
-        ));
-        _controller.clear();
+        _conversation = aiResp.conversation;
+        _isLoading = false;
       });
 
-      // Reset dell'animazione pulsante invio
-      _sendButtonPulseController.stop();
-      _sendButtonPulseController.reset();
-
-      // Scorrimento automatico
       _scrollToBottom();
+    } catch (e) {
+      setState(() {
+        _conversation.add(AiConversationMessage(
+          agent: 'system',
+          message: 'Errore: Impossibile elaborare l\'immagine.',
+          timestamp: DateTime.now(),
+        ));
+        _isLoading = false;
+      });
 
-      try {
-        final aiResp = await ApiService.uploadImage(
-          prompt,
-          File(image.path),
-          conversationId: _conversationId,
-        );
-        setState(() {
-          _conversation = aiResp.conversation;
-          _isLoading = false;
-        });
-
-        _scrollToBottom();
-      } catch (e) {
-        // Formatta l'errore per immagini
-        String errorMessage = 'Errore: Impossibile elaborare l\'immagine';
-
-        if (e.toString().contains('size')) {
-          errorMessage = 'Errore: L\'immagine è troppo grande. Prova con un\'immagine più piccola.';
-        } else if (e.toString().contains('format')) {
-          errorMessage = 'Errore: Formato immagine non supportato. Usa JPEG, PNG o GIF.';
-        }
-
-        setState(() {
-          _conversation.add(AiConversationMessage(agent: 'system', message: errorMessage));
-          _isLoading = false;
-        });
-
-        _showErrorSnackbar('Errore durante l\'elaborazione dell\'immagine');
-      }
+      _showErrorSnackbar('Errore durante l\'elaborazione dell\'immagine');
     }
   }
 
@@ -306,119 +189,6 @@ class _AiChatScreenState extends State<AiChatScreen> with TickerProviderStateMix
       });
       _animationController.forward();
     });
-
-    // Mostra un messaggio che spiega la modalità con un banner animato
-    String modeTitle = "";
-    String modeExplanation = "";
-    IconData modeIcon;
-
-    switch(mode) {
-      case ConversationMode.chat:
-        modeTitle = "Modalità Chat";
-        modeExplanation = "Le AI risponderanno una dopo l'altra alle tue domande.";
-        modeIcon = Icons.chat_bubble_outline;
-        break;
-      case ConversationMode.debate:
-        modeTitle = "Modalità Dibattito";
-        modeExplanation = "Le AI discuteranno il tema proposto, ciascuna offrendo un punto di vista diverso.";
-        modeIcon = Icons.compare_arrows;
-        break;
-      case ConversationMode.brainstorm:
-        modeTitle = "Modalità Brainstorming";
-        modeExplanation = "Le AI collaboreranno per generare idee creative sul tema proposto.";
-        modeIcon = Icons.lightbulb_outline;
-        break;
-    }
-
-    // Mostra il banner animato con l'informazione sulla modalità
-    _showModeBanner(modeTitle, modeExplanation, modeIcon);
-  }
-
-  void _showModeBanner(String title, String description, IconData icon) {
-    // Rimuovi eventuale overlay precedente
-    _modeBannerOverlay?.remove();
-
-    final overlay = Overlay.of(context);
-    final renderBox = context.findRenderObject() as RenderBox;
-    final size = renderBox.size;
-
-    // Crea il nuovo overlay
-    _modeBannerOverlay = OverlayEntry(
-      builder: (context) {
-        return Positioned(
-          top: 100,
-          left: (MediaQuery.of(context).size.width - 300) / 2,
-          child: Material(
-            color: Colors.transparent,
-            child: TweenAnimationBuilder<double>(
-              duration: const Duration(milliseconds: 500),
-              curve: Curves.easeInOut,
-              tween: Tween<double>(begin: 0.0, end: 1.0),
-              builder: (context, value, child) {
-                return Opacity(
-                  opacity: value,
-                  child: Transform.translate(
-                    offset: Offset(0, (1 - value) * -50),
-                    child: Container(
-                      width: 300,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.9),
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.2),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                icon,
-                                color: Theme.of(context).colorScheme.primary,
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                title,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Theme.of(context).colorScheme.primary,
-                                  fontSize: 18,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            description,
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.onPrimaryContainer,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              },
-              onEnd: () {
-                Future.delayed(const Duration(seconds: 3), () {
-                  _modeBannerOverlay?.remove();
-                  _modeBannerOverlay = null;
-                });
-              },
-            ),
-          ),
-        );
-      },
-    );
-
-    overlay.insert(_modeBannerOverlay!);
   }
 
   void _scrollToBottom() {
@@ -431,6 +201,28 @@ class _AiChatScreenState extends State<AiChatScreen> with TickerProviderStateMix
         );
       }
     });
+  }
+
+  void _showErrorSnackbar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.white),
+            const SizedBox(width: 12),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: Colors.red.shade700,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 3),
+        action: SnackBarAction(
+          label: 'OK',
+          onPressed: () {},
+          textColor: Colors.white,
+        ),
+      ),
+    );
   }
 
   @override
@@ -552,234 +344,253 @@ class _AiChatScreenState extends State<AiChatScreen> with TickerProviderStateMix
                     return FadeTransition(
                       opacity: _fadeAnimation,
                       child: SlideTransition(
-                        position: _slideAnimation as Animation<Offset>, // Cast esplicito
+                        position: _slideAnimation,
                         child: child,
                       ),
                     );
                   },
                   child: _conversation.isEmpty && !_isLoading
-                      ? Center(
-                    child: Container(
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.surface,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.08),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            _currentMode == ConversationMode.chat
-                                ? Icons.chat_outlined
-                                : (_currentMode == ConversationMode.debate
-                                ? Icons.compare_arrows
-                                : Icons.lightbulb_outline),
-                            size: 48,
-                            color: theme.colorScheme.primary.withOpacity(0.7),
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            _getModeWelcomeText(),
-                            style: GoogleFonts.montserrat(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w500,
-                              color: isDark ? Colors.white70 : Colors.black87,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Scrivi la tua richiesta per iniziare',
-                            style: GoogleFonts.montserrat(
-                              fontSize: 14,
-                              color: isDark ? Colors.white60 : Colors.black54,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                      : ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    itemCount: _conversation.length + (_isLoading ? 1 : 0),
-                    itemBuilder: (context, i) {
-                      // Mostra lo spinner di caricamento come ultimo elemento se isLoading
-                      if (_isLoading && i == _conversation.length) {
-                        return Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Center(
-                            child: Column(
-                              children: [
-                                const CircularProgressIndicator(),
-                                const SizedBox(height: 12),
-                                Text(
-                                  "Le AI stanno pensando...",
-                                  style: TextStyle(
-                                    fontStyle: FontStyle.italic,
-                                    color: isDark ? Colors.white70 : Colors.black54,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      }
-
-                      final message = _conversation[i];
-                      final aiAgent = message.toAiAgent();
-
-                      return MultimodalMessageBubble(
-                        agent: aiAgent,
-                        text: message.message,
-                        selectable: true,
-                        mediaUrl: message.mediaUrl,
-                        mediaType: message.mediaType,
-                      );
-                    },
-                  ),
+                      ? _buildWelcomeSection()
+                      : _buildConversationList(),
                 ),
               ),
             ),
 
             // Area di input migliorata
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surface,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, -2),
-                  ),
-                ],
+            _buildInputSection(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWelcomeSection() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        margin: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              _currentMode == ConversationMode.chat
+                  ? Icons.chat_outlined
+                  : (_currentMode == ConversationMode.debate
+                  ? Icons.compare_arrows
+                  : Icons.lightbulb_outline),
+              size: 48,
+              color: theme.colorScheme.primary.withOpacity(0.7),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _getModeWelcomeText(),
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w500,
+                color: isDark ? Colors.white70 : Colors.black87,
               ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Scrivi la tua richiesta per iniziare',
+              style: TextStyle(
+                fontSize: 14,
+                color: isDark ? Colors.white60 : Colors.black54,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildConversationList() {
+    return ListView.builder(
+      controller: _scrollController,
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      itemCount: _conversation.length + (_isLoading ? 1 : 0),
+      itemBuilder: (context, i) {
+        // Mostra lo spinner di caricamento come ultimo elemento se isLoading
+        if (_isLoading && i == _conversation.length) {
+          return Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Center(
               child: Column(
                 children: [
-                  // Indicatore modalità
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    margin: const EdgeInsets.only(bottom: 12),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.primaryContainer.withOpacity(0.5),
-                      borderRadius: BorderRadius.circular(12),
+                  const CircularProgressIndicator(),
+                  const SizedBox(height: 12),
+                  Text(
+                    "Le AI stanno pensando...",
+                    style: TextStyle(
+                      fontStyle: FontStyle.italic,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.white70
+                          : Colors.black54,
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          _currentMode == ConversationMode.chat
-                              ? Icons.chat_bubble_outline
-                              : (_currentMode == ConversationMode.debate
-                              ? Icons.compare_arrows
-                              : Icons.lightbulb_outline),
-                          size: 16,
-                          color: theme.colorScheme.primary,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          _currentMode == ConversationMode.chat
-                              ? 'Modalità Chat'
-                              : (_currentMode == ConversationMode.debate
-                              ? 'Modalità Dibattito'
-                              : 'Modalità Brainstorming'),
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: theme.colorScheme.primary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Campo di input con pulsanti
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _controller,
-                          enabled: !_isLoading,
-                          decoration: InputDecoration(
-                            hintText: _getModePlaceholderText(),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(24),
-                              borderSide: BorderSide.none,
-                            ),
-                            filled: true,
-                            fillColor: isDark
-                                ? Colors.grey.shade800
-                                : Colors.grey.shade100,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 16,
-                            ),
-                            prefixIcon: IconButton(
-                              icon: Icon(
-                                Icons.image,
-                                color: theme.colorScheme.secondary,
-                              ),
-                              onPressed: _isLoading ? null : _pickImage,
-                              tooltip: 'Allega immagine',
-                            ),
-                            suffixIcon: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: Icon(
-                                    _isListening ? Icons.mic : Icons.mic_none,
-                                    color: _isListening
-                                        ? Colors.red
-                                        : theme.colorScheme.secondary,
-                                  ),
-                                  onPressed: _isLoading ? null : _startListening,
-                                  tooltip: 'Input vocale',
-                                ),
-                                AnimatedBuilder(
-                                  animation: _sendButtonPulseController,
-                                  builder: (context, child) {
-                                    return Transform.scale(
-                                      scale: 1.0 + (_sendButtonPulseAnimation.value * 0.2),
-                                      child: IconButton(
-                                        icon: Icon(
-                                          Icons.send,
-                                          color: _controller.text.trim().isNotEmpty
-                                              ? theme.colorScheme.primary
-                                              : theme.colorScheme.primary.withOpacity(0.5),
-                                        ),
-                                        onPressed: _isLoading || _controller.text.trim().isEmpty
-                                            ? null
-                                            : _sendPrompt,
-                                        tooltip: 'Invia messaggio',
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ],
-                            ),
-                          ),
-                          onSubmitted: (_) => _controller.text.trim().isNotEmpty ? _sendPrompt() : null,
-                          maxLines: 3,
-                          minLines: 1,
-                          textInputAction: TextInputAction.send,
-                        ),
-                      ),
-                    ],
                   ),
                 ],
               ),
             ),
-          ],
-        ),
+          );
+        }
+
+        final message = _conversation[i];
+        final aiAgent = message.toAiAgent();
+
+        return MultimodalMessageBubble(
+          agent: aiAgent,
+          text: message.message,
+          selectable: true,
+          mediaUrl: message.mediaUrl,
+          mediaType: message.mediaType,
+          timestamp: message.timestamp,
+        );
+      },
+    );
+  }
+
+  Widget _buildInputSection() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Indicatore modalità
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primaryContainer.withOpacity(0.5),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  _currentMode == ConversationMode.chat
+                      ? Icons.chat_bubble_outline
+                      : (_currentMode == ConversationMode.debate
+                      ? Icons.compare_arrows
+                      : Icons.lightbulb_outline),
+                  size: 16,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  _currentMode == ConversationMode.chat
+                      ? 'Modalità Chat'
+                      : (_currentMode == ConversationMode.debate
+                      ? 'Modalità Dibattito'
+                      : 'Modalità Brainstorming'),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Campo di input con pulsanti
+          Row(
+            children: [
+              // Pulsante selezione foto
+              PhotoInputButton(
+                onPhotoSelected: _handlePhotoSelected,
+                isLoading: _isLoading,
+              ),
+              const SizedBox(width: 12),
+
+              // Campo di testo
+              Expanded(
+                child: TextField(
+                  controller: _controller,
+                  enabled: !_isLoading,
+                  decoration: InputDecoration(
+                    hintText: _getModePlaceholderText(),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(24),
+                      borderSide: BorderSide.none,
+                    ),
+                    filled: true,
+                    fillColor: isDark
+                        ? Colors.grey.shade800
+                        : Colors.grey.shade100,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 16,
+                    ),
+                  ),
+                  maxLines: 3,
+                  minLines: 1,
+                  textInputAction: TextInputAction.send,
+                  onSubmitted: (_) => _sendPrompt(),
+                ),
+              ),
+              const SizedBox(width: 12),
+
+              // Pulsante invio
+              GestureDetector(
+                onTap: _controller.text.trim().isNotEmpty ? _sendPrompt : null,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  height: 48,
+                  width: 48,
+                  decoration: BoxDecoration(
+                    color: _controller.text.trim().isNotEmpty
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.primary.withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: _controller.text.trim().isNotEmpty
+                        ? [
+                      BoxShadow(
+                        color: theme.colorScheme.primary.withOpacity(0.3),
+                        blurRadius: 8,
+                        spreadRadius: 1,
+                        offset: const Offset(0, 2),
+                      ),
+                    ]
+                        : [],
+                  ),
+                  child: Icon(
+                    Icons.send,
+                    color: theme.colorScheme.onPrimary,
+                    size: 24,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

@@ -1,7 +1,8 @@
-// lib/main.dart
+// lib/main.dart - versione aggiornata
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'screens/splash_screen.dart';
+import 'package:google_fonts/google_fonts.dart';  // Aggiungi l'import
+import 'screens/splash_screen.dart';  // Usa la splash screen
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -42,7 +43,8 @@ class MultiAiTeamApp extends StatelessWidget {
           background: const Color(0xFFF5F5F5),
           surface: Colors.white,
         ),
-        fontFamily: 'Roboto',
+        // Utilizziamo GoogleFonts.roboto invece di specificare un fontFamily
+        textTheme: GoogleFonts.robotoTextTheme(Theme.of(context).textTheme),
         cardTheme: CardTheme(
           elevation: 2,
           shape: RoundedRectangleBorder(
@@ -74,7 +76,8 @@ class MultiAiTeamApp extends StatelessWidget {
           background: const Color(0xFF121212),
           surface: const Color(0xFF1E1E1E),
         ),
-        fontFamily: 'Roboto',
+        // Utilizziamo GoogleFonts.roboto invece di specificare un fontFamily
+        textTheme: GoogleFonts.robotoTextTheme(ThemeData(brightness: Brightness.dark).textTheme),
         cardTheme: CardTheme(
           elevation: 2,
           shape: RoundedRectangleBorder(
@@ -95,7 +98,7 @@ class MultiAiTeamApp extends StatelessWidget {
         ),
       ),
       themeMode: ThemeMode.system,
-      home: const SplashScreen(), // Usa la splash screen anziché AiChatScreen direttamente
+      home: const SplashScreen(),  // Usa la SplashScreen per avviare l'app
       debugShowCheckedModeBanner: false,
     );
   }

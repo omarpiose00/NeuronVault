@@ -1,10 +1,16 @@
 // lib/screens/splash_screen.dart
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
-import 'ai_chat_screen.dart';
+import 'ai_chat_screen.dart';  // Importiamo la versione aggiornata
 
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key});
+  // Parametro opzionale per specificare la schermata successiva
+  final Widget? nextScreen;
+
+  const SplashScreen({
+    super.key,
+    this.nextScreen,
+  });
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
@@ -43,7 +49,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
         Navigator.of(context).pushReplacement(
           PageRouteBuilder(
             pageBuilder: (context, animation, secondaryAnimation) =>
-            const AiChatScreen(),
+            widget.nextScreen ?? const AiChatScreenUpdated(),  // Usa AiChatScreenUpdated
             transitionsBuilder: (context, animation, secondaryAnimation, child) {
               return FadeTransition(
                 opacity: animation,

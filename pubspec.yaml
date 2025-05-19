@@ -1,29 +1,36 @@
 name: multi_ai_flutter
 description: Chat multi-AI (Claude, GPT, DeepSeek) con backend orchestratore
-version: 1.0.1
+version: 1.0.2
 environment:
-  sdk: ">=3.7.0 <4.0.0"
+  sdk: ">=2.19.0 <4.0.0"
 
 dependencies:
   flutter:
     sdk: flutter
-  http: ^1.2.1
-  google_fonts: ^6.2.1
-  provider: ^6.1.2
-  flutter_markdown: ^0.6.17
-  image_picker: ^1.0.4
-  cached_network_image: ^3.3.0
-  speech_to_text: ^6.3.0
-  lottie: ^2.6.0  # Animazioni Lottie
-  shimmer: ^3.0.0  # Effetto shimmer per caricamento
-  shared_preferences: ^2.2.2
-  animate_do: ^3.1.0  # Animazioni semplici
-  flutter_staggered_animations: ^1.1.1  # Animazioni a cascata
+  # Networking
+  http: ^0.13.5
+
+  # UI e styling
+  google_fonts: ^4.0.4  # Questo pacchetto include già Roboto
+  flutter_markdown: ^0.6.15
+  cached_network_image: ^3.2.3
+
+  # Gestione stato
+  provider: ^6.0.5
+  shared_preferences: ^2.1.1
+
+  # Funzionalità multimediali
+  image_picker: ^0.8.7+5
+  speech_to_text: ^6.1.1
+  path_provider: ^2.0.15
+
+  # Animazioni
+  lottie: ^2.3.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^2.0.3
+  flutter_lints: ^2.0.1
 
 flutter:
   uses-material-design: true
@@ -31,3 +38,15 @@ flutter:
   assets:
     - assets/images/
     - assets/animations/
+
+  # Rimosso il blocco dei font, dato che useremo google_fonts
+  # fonts:
+  #  - family: Roboto
+  #    fonts:
+  #      - asset: assets/fonts/Roboto-Regular.ttf
+  #      - asset: assets/fonts/Roboto-Bold.ttf
+  #        weight: 700
+  #      - asset: assets/fonts/Roboto-Light.ttf
+  #        weight: 300
+  #      - asset: assets/fonts/Roboto-Medium.ttf
+  #        weight: 500

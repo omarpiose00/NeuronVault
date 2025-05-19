@@ -1,8 +1,9 @@
-// lib/services/api_service.dart
+// lib/services/api_service.dart - versione aggiornata
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import '../models/ai_agent.dart';
+import '../models/conversation_mode.dart';
 
 class AiConversationMessage {
   final String agent; // "user", "claude", "gpt", "deepseek", "system"
@@ -106,10 +107,6 @@ class AiServiceResponse {
           .toList(),
     );
   }
-}
-
-enum ConversationMode {
-  chat, debate, brainstorm
 }
 
 class ApiService {
