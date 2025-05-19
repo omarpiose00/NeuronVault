@@ -1,7 +1,8 @@
-// lib/widgets/utils/demo_messages.dart
+// lib/widgets/utils/demo_messages.dart - Make sure this file exists with this content
+
 import 'package:flutter/material.dart';
-import '../../models/conversation_mode.dart';  // Corretto: due livelli su
-import '../../services/api_service.dart';      // Corretto: due livelli su
+import '../../models/conversation_mode.dart';
+import '../../services/api_service.dart';
 
 /// Genera messaggi demo di esempio per ciascuna modalità di conversazione
 class DemoMessages {

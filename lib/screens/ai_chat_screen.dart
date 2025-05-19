@@ -1,15 +1,26 @@
-// lib/screens/ai_chat_screen_updated.dart
+// lib/screens/ai_chat_screen.dart - Versione completa corretta con animazioni
+
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import 'dart:math' as math;
 
 import '../models/ai_agent.dart';
+import '../models/conversation_mode.dart';
 import '../services/api_service.dart';
 import '../widgets/messaging/multimodal_message_bubble.dart';
 import '../widgets/input/photo_input_button.dart';
+import '../widgets/utils/demo_messages.dart';
+import '../widgets/ui/glass_container.dart';
+import '../widgets/ui/dynamic_background.dart';
 
 class AiChatScreenUpdated extends StatefulWidget {
-  const AiChatScreenUpdated({super.key});
+  final bool showDemoMessages;
+
+  const AiChatScreenUpdated({
+    super.key,
+    this.showDemoMessages = false,
+  });
 
   @override
   State<AiChatScreenUpdated> createState() => _AiChatScreenUpdatedState();
@@ -30,6 +41,19 @@ class _AiChatScreenUpdatedState extends State<AiChatScreenUpdated> with TickerPr
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
+
+  // Controllori per le nuove animazioni
+  late AnimationController _pulseController;
+  late Animation<double> _pulseAnimation;
+
+  late AnimationController _rotateController;
+  late Animation<double> _rotateAnimation;
+
+  late AnimationController _backgroundAnimController;
+  late Animation<double> _backgroundAnimation;
+
+  // Indice della modalità attiva per animazioni tra tab
+  int _activeTabIndex = 0;
 
   @override
   void initState() {
@@ -52,7 +76,49 @@ class _AiChatScreenUpdatedState extends State<AiChatScreenUpdated> with TickerPr
       CurvedAnimation(parent: _animationController, curve: Curves.easeOutQuad),
     );
 
+    // Inizializza animazione di pulsazione
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    );
+
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.08).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+
+    // Avvia la pulsazione dopo l'inizializzazione
+    _pulseController.repeat(reverse: true);
+
+    // Inizializza animazione di rotazione
+    _rotateController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 20),
+    );
+
+    _rotateAnimation = Tween<double>(begin: 0, end: 2 * math.pi).animate(
+      CurvedAnimation(parent: _rotateController, curve: Curves.linear),
+    );
+
+    // Avvia la rotazione dopo l'inizializzazione
+    _rotateController.repeat();
+
+    // Inizializza animazione di background
+    _backgroundAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 8),
+    );
+
+    _backgroundAnimation = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(parent: _backgroundAnimController, curve: Curves.easeInOut),
+    );
+
+    // Avvia l'animazione dopo l'inizializzazione
+    _backgroundAnimController.repeat(reverse: true);
+
     _animationController.forward();
+
+    // Imposta l'indice attivo iniziale in base alla modalità corrente
+    _activeTabIndex = _currentMode.index;
 
     // Aggiungi listener per rilevare lo scroll
     _scrollController.addListener(() {
@@ -84,6 +150,9 @@ class _AiChatScreenUpdatedState extends State<AiChatScreenUpdated> with TickerPr
     _controller.dispose();
     _scrollController.dispose();
     _animationController.dispose();
+    _pulseController.dispose();
+    _rotateController.dispose();
+    _backgroundAnimController.dispose();
     super.dispose();
   }
 
@@ -210,10 +279,15 @@ class _AiChatScreenUpdatedState extends State<AiChatScreenUpdated> with TickerPr
   void _changeMode(ConversationMode mode) {
     if (_currentMode == mode) return;
 
+    // Salva l'indice della precedente modalità per l'animazione
+    final newIndex = mode.index;
+
     // Animazione di transizione
     _animationController.reverse().then((_) {
       setState(() {
         _currentMode = mode;
+        _activeTabIndex = newIndex;
+
         // Carica i messaggi demo per la nuova modalità se l'opzione è attiva
         if (widget.showDemoMessages) {
           _conversation = DemoMessages.getForMode(mode);
@@ -264,141 +338,252 @@ class _AiChatScreenUpdatedState extends State<AiChatScreenUpdated> with TickerPr
     );
   }
 
+  // NUOVO METODO: Costruisce il selettore di modalità dinamico
+  Widget _buildDynamicModeSelector() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return GlassContainer(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      borderRadius: 20,
+      blur: 10,
+      backgroundColor: isDark
+          ? theme.colorScheme.primary.withOpacity(0.1)
+          : theme.colorScheme.primary.withOpacity(0.05),
+      border: Border.all(
+        color: theme.colorScheme.primary.withOpacity(0.2),
+        width: 1.5,
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+        child: Stack(
+          children: [
+            // Indicatore animato che scorre tra le opzioni
+            AnimatedPositioned(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOutQuint,
+              left: (_activeTabIndex * (MediaQuery.of(context).size.width - 60)) / 3,
+              width: (MediaQuery.of(context).size.width - 60) / 3,
+              top: 0,
+              bottom: 0,
+              child: Padding(
+                padding: const EdgeInsets.all(4.0),
+                child: AnimatedBuilder(
+                    animation: _pulseAnimation,
+                    builder: (context, child) {
+                      return Transform.scale(
+                        scale: _pulseAnimation.value,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? theme.colorScheme.primary.withOpacity(0.3)
+                                : theme.colorScheme.primaryContainer.withOpacity(0.8),
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: theme.colorScheme.primary.withOpacity(0.3),
+                                blurRadius: 8,
+                                spreadRadius: 1,
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }
+                ),
+              ),
+            ),
+
+            // Opzioni del selettore
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildModeOption(
+                  ConversationMode.chat,
+                  'Chat',
+                  Icons.chat_bubble_outline,
+                ),
+                _buildModeOption(
+                  ConversationMode.debate,
+                  'Dibattito',
+                  Icons.compare_arrows,
+                ),
+                _buildModeOption(
+                  ConversationMode.brainstorm,
+                  'Brainstorm',
+                  Icons.lightbulb_outline,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // NUOVO METODO: Costruisce un'opzione del selettore di modalità
+  Widget _buildModeOption(ConversationMode mode, String label, IconData icon) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final isSelected = _currentMode == mode;
+
+    return GestureDetector(
+      onTap: () {
+        if (_currentMode != mode) {
+          _changeMode(mode);
+        }
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Icona
+            Icon(
+              icon,
+              size: 20,
+              color: isSelected
+                  ? (isDark ? Colors.white : theme.colorScheme.onPrimaryContainer)
+                  : theme.colorScheme.onSurface.withOpacity(0.7),
+            ),
+            const SizedBox(width: 8),
+            // Testo con animazione di fade quando cambia
+            AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 200),
+              style: TextStyle(
+                fontSize: isSelected ? 14 : 13,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                color: isSelected
+                    ? (isDark ? Colors.white : theme.colorScheme.onPrimaryContainer)
+                    : theme.colorScheme.onSurface.withOpacity(0.7),
+              ),
+              child: Text(label),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Metodo per creare un effetto particelle in background
+  Widget _buildBackgroundParticles() {
+    return AnimatedBuilder(
+      animation: _backgroundAnimController,
+      builder: (context, child) {
+        return CustomPaint(
+          painter: ParticlesPainter(
+            progress: _backgroundAnimController.value,
+            isDark: Theme.of(context).brightness == Brightness.dark,
+            primaryColor: Theme.of(context).colorScheme.primary,
+          ),
+          child: Container(),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          children: [
-            const Text('Team AI'),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(12),
+    return DynamicBackground(
+      child: Stack(
+        children: [
+          // Effetto particelle in background
+          Positioned.fill(child: _buildBackgroundParticles()),
+
+          Scaffold(
+            backgroundColor: Colors.transparent,
+            appBar: AppBar(
+              title: Row(
+                children: [
+                  // Logo animato che pulsa quando si caricano dati
+                  AnimatedBuilder(
+                      animation: _isLoading ? _pulseController : const AlwaysStoppedAnimation(0),
+                      builder: (context, child) {
+                        return Transform.scale(
+                          scale: _isLoading ? (_pulseAnimation.value * 0.1 + 0.9) : 1.0,
+                          child: const Text('Team AI'),
+                        );
+                      }
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      _currentMode == ConversationMode.chat
+                          ? 'Chat'
+                          : (_currentMode == ConversationMode.debate
+                          ? 'Dibattito'
+                          : 'Brainstorming'),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.onPrimaryContainer,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              child: Text(
-                _currentMode == ConversationMode.chat
-                    ? 'Chat'
-                    : (_currentMode == ConversationMode.debate
-                    ? 'Dibattito'
-                    : 'Brainstorming'),
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: theme.colorScheme.onPrimaryContainer,
+              backgroundColor: isDark
+                  ? theme.colorScheme.surface.withOpacity(0.8)
+                  : theme.colorScheme.surface,
+              elevation: 0,
+              actions: [
+                // Pulsante reset
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  color: theme.colorScheme.primary,
+                  onPressed: _resetChat,
+                  tooltip: 'Nuova conversazione',
                 ),
+              ],
+            ),
+            body: SafeArea(
+              child: Column(
+                children: [
+                  // Mode Selector animato
+                  _buildDynamicModeSelector(),
+
+                  // Area della conversazione
+                  Expanded(
+                    child: GlassContainer(
+                      borderRadius: 24,
+                      blur: 5,
+                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      backgroundColor: isDark
+                          ? Colors.black.withOpacity(0.2)
+                          : Colors.white.withOpacity(0.15),
+                      child: AnimatedBuilder(
+                        animation: _animationController,
+                        builder: (context, child) {
+                          return FadeTransition(
+                            opacity: _fadeAnimation,
+                            child: SlideTransition(
+                              position: _slideAnimation,
+                              child: child,
+                            ),
+                          );
+                        },
+                        child: _conversation.isEmpty && !_isLoading
+                            ? _buildWelcomeSection()
+                            : _buildConversationList(),
+                      ),
+                    ),
+                  ),
+
+                  // Area di input migliorata
+                  _buildInputSection(),
+                ],
               ),
             ),
-          ],
-        ),
-        backgroundColor: theme.colorScheme.surface,
-        elevation: 0,
-        actions: [
-          PopupMenuButton<ConversationMode>(
-            icon: Icon(
-              Icons.mode_edit,
-              color: theme.colorScheme.primary,
-            ),
-            onSelected: _changeMode,
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: ConversationMode.chat,
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.chat_bubble_outline,
-                      color: _currentMode == ConversationMode.chat
-                          ? theme.colorScheme.primary
-                          : theme.colorScheme.onSurface,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 12),
-                    const Text('Modalità Chat'),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: ConversationMode.debate,
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.compare_arrows,
-                      color: _currentMode == ConversationMode.debate
-                          ? theme.colorScheme.primary
-                          : theme.colorScheme.onSurface,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 12),
-                    const Text('Modalità Dibattito'),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: ConversationMode.brainstorm,
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.lightbulb_outline,
-                      color: _currentMode == ConversationMode.brainstorm
-                          ? theme.colorScheme.primary
-                          : theme.colorScheme.onSurface,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 12),
-                    const Text('Modalità Brainstorming'),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            color: theme.colorScheme.primary,
-            onPressed: _resetChat,
-            tooltip: 'Nuova conversazione',
           ),
         ],
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Area della conversazione
-            Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.black : Colors.grey.shade50,
-                  borderRadius: const BorderRadius.only(
-                    bottomLeft: Radius.circular(24),
-                    bottomRight: Radius.circular(24),
-                  ),
-                ),
-                child: AnimatedBuilder(
-                  animation: _animationController,
-                  builder: (context, child) {
-                    return FadeTransition(
-                      opacity: _fadeAnimation,
-                      child: SlideTransition(
-                        position: _slideAnimation,
-                        child: child,
-                      ),
-                    );
-                  },
-                  child: _conversation.isEmpty && !_isLoading
-                      ? _buildWelcomeSection()
-                      : _buildConversationList(),
-                ),
-              ),
-            ),
-
-            // Area di input migliorata
-            _buildInputSection(),
-          ],
-        ),
       ),
     );
   }
@@ -408,31 +593,33 @@ class _AiChatScreenUpdatedState extends State<AiChatScreenUpdated> with TickerPr
     final isDark = theme.brightness == Brightness.dark;
 
     return Center(
-      child: Container(
+      child: GlassContainer(
         padding: const EdgeInsets.all(24),
         margin: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
+        borderRadius: 16,
+        backgroundColor: isDark
+            ? theme.colorScheme.surface.withOpacity(0.5)
+            : theme.colorScheme.surface.withOpacity(0.7),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              _currentMode == ConversationMode.chat
-                  ? Icons.chat_outlined
-                  : (_currentMode == ConversationMode.debate
-                  ? Icons.compare_arrows
-                  : Icons.lightbulb_outline),
-              size: 48,
-              color: theme.colorScheme.primary.withOpacity(0.7),
+            // Icona modalità con animazione di pulse
+            AnimatedBuilder(
+                animation: _pulseController,
+                builder: (context, child) {
+                  return Transform.scale(
+                    scale: _pulseAnimation.value,
+                    child: Icon(
+                      _currentMode == ConversationMode.chat
+                          ? Icons.chat_outlined
+                          : (_currentMode == ConversationMode.debate
+                          ? Icons.compare_arrows
+                          : Icons.lightbulb_outline),
+                      size: 48,
+                      color: theme.colorScheme.primary.withOpacity(0.7),
+                    ),
+                  );
+                }
             ),
             const SizedBox(height: 16),
             Text(
@@ -492,15 +679,51 @@ class _AiChatScreenUpdatedState extends State<AiChatScreenUpdated> with TickerPr
         final message = _conversation[i];
         final aiAgent = message.toAiAgent();
 
-        return MultimodalMessageBubble(
-          agent: aiAgent,
-          text: message.message,
-          selectable: true,
-          mediaUrl: message.mediaUrl,
-          mediaType: message.mediaType,
-          timestamp: message.timestamp,
+        // Animazione per i messaggi
+        return AnimatedOpacity(
+          duration: const Duration(milliseconds: 300),
+          opacity: 1.0,
+          child: MultimodalMessageBubble(
+            agent: aiAgent,
+            text: message.message,
+            selectable: true,
+            mediaUrl: message.mediaUrl,
+            mediaType: message.mediaType,
+            timestamp: message.timestamp,
+          ),
         );
       },
+    );
+  }
+
+  // Indicatore di digitazione animato
+  Widget _buildTypingIndicator(String text) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          text,
+          style: TextStyle(
+            fontStyle: FontStyle.italic,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.white70
+                : Colors.black54,
+          ),
+        ),
+        const SizedBox(width: 8),
+        ...List.generate(
+          3,
+              (index) => Container(
+            margin: const EdgeInsets.only(right: 4),
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primary.withOpacity(0.7),
+              borderRadius: BorderRadius.circular(3),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -508,126 +731,79 @@ class _AiChatScreenUpdatedState extends State<AiChatScreenUpdated> with TickerPr
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    return Container(
+    return GlassContainer(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: Column(
+      borderRadius: 0,
+      blur: 8,
+      backgroundColor: isDark
+          ? theme.colorScheme.surface.withOpacity(0.7)
+          : theme.colorScheme.surface.withOpacity(0.8),
+      child: Row(
         children: [
-          // Indicatore modalità
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            margin: const EdgeInsets.only(bottom: 12),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.primaryContainer.withOpacity(0.5),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  _currentMode == ConversationMode.chat
-                      ? Icons.chat_bubble_outline
-                      : (_currentMode == ConversationMode.debate
-                      ? Icons.compare_arrows
-                      : Icons.lightbulb_outline),
-                  size: 16,
-                  color: theme.colorScheme.primary,
+          // Pulsante selezione foto
+          PhotoInputButton(
+            onPhotoSelected: _handlePhotoSelected,
+            isLoading: _isLoading,
+          ),
+          const SizedBox(width: 12),
+
+          // Campo di testo
+          Expanded(
+            child: TextField(
+              controller: _controller,
+              enabled: !_isLoading,
+              decoration: InputDecoration(
+                hintText: _getModePlaceholderText(),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(24),
+                  borderSide: BorderSide.none,
                 ),
-                const SizedBox(width: 6),
-                Text(
-                  _currentMode == ConversationMode.chat
-                      ? 'Modalità Chat'
-                      : (_currentMode == ConversationMode.debate
-                      ? 'Modalità Dibattito'
-                      : 'Modalità Brainstorming'),
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: theme.colorScheme.primary,
-                  ),
+                filled: true,
+                fillColor: isDark
+                    ? Colors.grey.shade800.withOpacity(0.6)
+                    : Colors.grey.shade100.withOpacity(0.8),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 16,
                 ),
-              ],
+              ),
+              maxLines: 3,
+              minLines: 1,
+              textInputAction: TextInputAction.send,
+              onSubmitted: (_) => _sendPrompt(),
             ),
           ),
+          const SizedBox(width: 12),
 
-          // Campo di input con pulsanti
-          Row(
-            children: [
-              // Pulsante selezione foto
-              PhotoInputButton(
-                onPhotoSelected: _handlePhotoSelected,
-                isLoading: _isLoading,
-              ),
-              const SizedBox(width: 12),
-
-              // Campo di testo
-              Expanded(
-                child: TextField(
-                  controller: _controller,
-                  enabled: !_isLoading,
-                  decoration: InputDecoration(
-                    hintText: _getModePlaceholderText(),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(24),
-                      borderSide: BorderSide.none,
-                    ),
-                    filled: true,
-                    fillColor: isDark
-                        ? Colors.grey.shade800
-                        : Colors.grey.shade100,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 16,
-                    ),
+          // Pulsante invio
+          GestureDetector(
+            onTap: _controller.text.trim().isNotEmpty ? _sendPrompt : null,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              height: 48,
+              width: 48,
+              decoration: BoxDecoration(
+                color: _controller.text.trim().isNotEmpty
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.primary.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: _controller.text.trim().isNotEmpty
+                    ? [
+                  BoxShadow(
+                    color: theme.colorScheme.primary.withOpacity(0.3),
+                    blurRadius: 8,
+                    spreadRadius: 1,
+                    offset: const Offset(0, 2),
                   ),
-                  maxLines: 3,
-                  minLines: 1,
-                  textInputAction: TextInputAction.send,
-                  onSubmitted: (_) => _sendPrompt(),
-                ),
+                ]
+                    : [],
               ),
-              const SizedBox(width: 12),
-
-              // Pulsante invio
-              GestureDetector(
-                onTap: _controller.text.trim().isNotEmpty ? _sendPrompt : null,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  height: 48,
-                  width: 48,
-                  decoration: BoxDecoration(
-                    color: _controller.text.trim().isNotEmpty
-                        ? theme.colorScheme.primary
-                        : theme.colorScheme.primary.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: _controller.text.trim().isNotEmpty
-                        ? [
-                      BoxShadow(
-                        color: theme.colorScheme.primary.withOpacity(0.3),
-                        blurRadius: 8,
-                        spreadRadius: 1,
-                        offset: const Offset(0, 2),
-                      ),
-                    ]
-                        : [],
-                  ),
-                  child: Icon(
-                    Icons.send,
-                    color: theme.colorScheme.onPrimary,
-                    size: 24,
-                  ),
-                ),
+              child: Icon(
+                Icons.send,
+                color: theme.colorScheme.onPrimary,
+                size: 24,
               ),
-            ],
+            ),
           ),
         ],
       ),
@@ -655,4 +831,45 @@ class _AiChatScreenUpdatedState extends State<AiChatScreenUpdated> with TickerPr
         return 'Su cosa vuoi fare brainstorming?';
     }
   }
+}
+
+// Painter per effetto particelle in background
+class ParticlesPainter extends CustomPainter {
+  final double progress;
+  final bool isDark;
+  final Color primaryColor;
+
+  ParticlesPainter({
+    required this.progress,
+    required this.isDark,
+    required this.primaryColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final particleCount = 30; // Numero ridotto di particelle
+    final paint = Paint()..style = PaintingStyle.fill;
+
+    for (int i = 0; i < particleCount; i++) {
+      final seed = i * 0.1;
+      // Calcoli semplificati per le posizioni
+      final x = (math.sin(seed + progress * math.pi) * 0.5 + 0.5) * size.width;
+      final y = (math.cos(seed * 1.5 + progress * math.pi) * 0.5 + 0.5) * size.height;
+
+      // Dimensione fissa per evitare calcoli complessi
+      final particleSize = 2.0;
+
+      // Opacità fissa per evitare calcoli complessi
+      paint.color = primaryColor.withOpacity(0.1);
+
+      canvas.drawCircle(
+        Offset(x, y),
+        particleSize,
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(ParticlesPainter oldDelegate) => true;
 }
