@@ -7,7 +7,6 @@ import '../models/ai_agent.dart';
 import '../services/api_service.dart';
 import '../widgets/messaging/multimodal_message_bubble.dart';
 import '../widgets/input/photo_input_button.dart';
-import '../models/conversation_mode.dart';
 
 class AiChatScreenUpdated extends StatefulWidget {
   const AiChatScreenUpdated({super.key});
@@ -60,6 +59,23 @@ class _AiChatScreenUpdatedState extends State<AiChatScreenUpdated> with TickerPr
       setState(() {
         _isScrolled = _scrollController.offset > 10;
       });
+    });
+
+    // Carica i messaggi demo se richiesto
+    if (widget.showDemoMessages) {
+      _loadDemoMessages();
+    }
+  }
+
+  /// Carica i messaggi demo per la modalità corrente
+  void _loadDemoMessages() {
+    setState(() {
+      _conversation = DemoMessages.getForMode(_currentMode);
+    });
+
+    // Scorrimento automatico dopo un breve delay per dare tempo al layout di renderizzare
+    Future.delayed(const Duration(milliseconds: 100), () {
+      _scrollToBottom();
     });
   }
 
@@ -171,11 +187,23 @@ class _AiChatScreenUpdatedState extends State<AiChatScreenUpdated> with TickerPr
     // Animazione per la pulizia della chat
     _animationController.reverse().then((_) {
       setState(() {
-        _conversation.clear();
+        // Se la modalità demo è attiva, carica i messaggi demo per la modalità corrente
+        if (widget.showDemoMessages) {
+          _conversation = DemoMessages.getForMode(_currentMode);
+        } else {
+          _conversation.clear();
+        }
         _controller.clear();
         _conversationId = DateTime.now().millisecondsSinceEpoch.toString();
       });
       _animationController.forward();
+
+      // Scrolling dopo un breve delay
+      if (widget.showDemoMessages) {
+        Future.delayed(const Duration(milliseconds: 100), () {
+          _scrollToBottom();
+        });
+      }
     });
   }
 
@@ -186,8 +214,19 @@ class _AiChatScreenUpdatedState extends State<AiChatScreenUpdated> with TickerPr
     _animationController.reverse().then((_) {
       setState(() {
         _currentMode = mode;
+        // Carica i messaggi demo per la nuova modalità se l'opzione è attiva
+        if (widget.showDemoMessages) {
+          _conversation = DemoMessages.getForMode(mode);
+        } else {
+          _conversation.clear();
+        }
       });
       _animationController.forward();
+
+      // Scrolling dopo un breve delay
+      Future.delayed(const Duration(milliseconds: 100), () {
+        _scrollToBottom();
+      });
     });
   }
 

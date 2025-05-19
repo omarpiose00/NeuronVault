@@ -49,7 +49,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
         Navigator.of(context).pushReplacement(
           PageRouteBuilder(
             pageBuilder: (context, animation, secondaryAnimation) =>
-            widget.nextScreen ?? const AiChatScreenUpdated(),  // Usa AiChatScreenUpdated
+            widget.nextScreen ?? const AiChatScreenUpdated(showDemoMessages: true),  // Abilita i messaggi demo
             transitionsBuilder: (context, animation, secondaryAnimation, child) {
               return FadeTransition(
                 opacity: animation,
