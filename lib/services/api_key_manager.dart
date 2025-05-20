@@ -13,6 +13,9 @@ class ApiKeyManager extends ChangeNotifier {
   final Map<String, String> _apiKeys = {};
   final Map<String, bool> _enabledModels = {};
 
+  // Configurazioni aggiuntive per modelli locali
+  final Map<String, Map<String, dynamic>> _additionalConfigs = {};
+
   // Lista dei provider supportati
   final List<String> supportedProviders = [
     'openai',    // OpenAI (GPT)
@@ -23,6 +26,8 @@ class ApiKeyManager extends ChangeNotifier {
     'mistral',   // Mistral AI
     'meta',      // Meta AI (Llama)
     'ollama',    // Ollama (endpoint locale)
+    'llama',     // llama.cpp diretto
+    'mini_llm',  // Mini-LLM per sintesi
   ];
 
   // URL base per test di connessione
@@ -45,13 +50,23 @@ class ApiKeyManager extends ChangeNotifier {
       .map((entry) => entry.key)
       .toList();
 
+  // Getter e setter per configurazioni aggiuntive
+  Map<String, dynamic>? getAdditionalConfig(String provider) => _additionalConfigs[provider];
+
+  Future<void> setAdditionalConfig(String provider, Map<String, dynamic> config) async {
+    _additionalConfigs[provider] = config;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('config_$provider', jsonEncode(config));
+    notifyListeners();
+  }
+
   // Verifica se è il primo avvio
   Future<bool> isFirstRun() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getBool('is_first_run') ?? true;
   }
 
-  // Carica le chiavi API
+  // Carica le chiavi API e le configurazioni aggiuntive
   Future<void> loadKeys() async {
     try {
       // Carica le chiavi da Secure Storage
@@ -66,6 +81,18 @@ class ApiKeyManager extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       for (final provider in supportedProviders) {
         _enabledModels[provider] = prefs.getBool('enabled_$provider') ?? false;
+      }
+
+      // Carica le configurazioni aggiuntive
+      for (final provider in supportedProviders) {
+        final configJson = prefs.getString('config_$provider');
+        if (configJson != null) {
+          try {
+            _additionalConfigs[provider] = jsonDecode(configJson);
+          } catch (e) {
+            debugPrint('Errore nel parsing della configurazione di $provider: $e');
+          }
+        }
       }
 
       notifyListeners();
@@ -119,6 +146,11 @@ class ApiKeyManager extends ChangeNotifier {
         await prefs.setBool('enabled_${entry.key}', entry.value);
       }
 
+      // Salva le configurazioni aggiuntive
+      for (final entry in _additionalConfigs.entries) {
+        await prefs.setString('config_${entry.key}', jsonEncode(entry.value));
+      }
+
       // Segna che l'app non è più al primo avvio
       await prefs.setBool('is_first_run', false);
 
@@ -133,6 +165,11 @@ class ApiKeyManager extends ChangeNotifier {
   Future<bool> testKey(String provider) async {
     if (!supportedProviders.contains(provider)) {
       throw Exception('Provider non supportato: $provider');
+    }
+
+    // Per llama.cpp e mini-llm, verifichiamo l'esistenza dei file
+    if (provider == 'llama' || provider == 'mini_llm') {
+      return await _testLocalModelConfig(provider);
     }
 
     if (!_apiKeys.containsKey(provider) || _apiKeys[provider]!.isEmpty) {
@@ -158,6 +195,40 @@ class ApiKeyManager extends ChangeNotifier {
       debugPrint('Errore nel test della chiave API $provider: $e');
       return false;
     }
+  }
+
+  // Test configurazione modelli locali
+  Future<bool> _testLocalModelConfig(String provider) async {
+    if (!_additionalConfigs.containsKey(provider)) {
+      return false;
+    }
+
+    final config = _additionalConfigs[provider]!;
+
+    // Verifica l'esistenza dei file
+    if (provider == 'llama') {
+      final executablePath = config['executable_path'];
+      final modelPath = config['model_path'];
+
+      if (executablePath == null || modelPath == null) {
+        return false;
+      }
+
+      return await File(executablePath).exists() &&
+          await File(modelPath).exists();
+    } else if (provider == 'mini_llm') {
+      final executablePath = config['executable_path'];
+      final modelPath = config['model_path'];
+
+      if (executablePath == null || modelPath == null) {
+        return false;
+      }
+
+      return await File(executablePath).exists() &&
+          await File(modelPath).exists();
+    }
+
+    return false;
   }
 
   // Test per endpoint personalizzato
@@ -237,10 +308,20 @@ class ApiKeyManager extends ChangeNotifier {
   Map<String, dynamic> getBackendConfig() {
     final config = <String, dynamic>{};
 
+    // Configurazioni base (API keys)
     for (final provider in supportedProviders) {
       if (_enabledModels[provider] == true && _apiKeys.containsKey(provider)) {
         config[provider.toUpperCase() + '_API_KEY'] = _apiKeys[provider];
       }
+    }
+
+    // Configurazioni aggiuntive per modelli locali
+    if (_enabledModels['llama'] == true && _additionalConfigs.containsKey('llama')) {
+      config['LLAMA_CONFIG'] = _additionalConfigs['llama'];
+    }
+
+    if (_enabledModels['mini_llm'] == true && _additionalConfigs.containsKey('mini_llm')) {
+      config['MINI_LLM_CONFIG'] = _additionalConfigs['mini_llm'];
     }
 
     return config;
@@ -254,10 +335,12 @@ class ApiKeyManager extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       for (final provider in supportedProviders) {
         await prefs.remove('enabled_$provider');
+        await prefs.remove('config_$provider');
       }
 
       _apiKeys.clear();
       _enabledModels.clear();
+      _additionalConfigs.clear();
 
       notifyListeners();
     } catch (e) {

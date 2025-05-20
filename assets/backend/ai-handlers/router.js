@@ -1,4 +1,4 @@
-// assets/backend/ai-handlers/router.js
+// assets/backend/ai-handlers/router.js (ulteriore aggiornamento)
 
 const gptHandler = require('./gpt_handler');
 const claudeHandler = require('./claude_handler');
@@ -6,7 +6,9 @@ const deepseekHandler = require('./deepseek_handler');
 const mistralHandler = require('./mistral_handler');
 const geminiHandler = require('./gemini_handler');
 const ollamaHandler = require('./ollama_handler');
-const synthesizer = require('./synthesizer');
+const llamaHandler = require('./llama_handler');
+// const synthesizer = require('./synthesizer'); // Commentiamo il vecchio synthesizer
+const synthesizer = require('./mini_llm_synthesizer');
 
 /**
  * Router per le richieste AI
@@ -21,6 +23,7 @@ class AIRouter {
       'mistral': mistralHandler,
       'gemini': geminiHandler,
       'ollama': ollamaHandler,
+      'llama': llamaHandler,   // Aggiungiamo il nuovo handler
       // Altri handler potranno essere aggiunti in seguito
     };
 

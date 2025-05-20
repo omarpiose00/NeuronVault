@@ -40,6 +40,18 @@ class _ApiConfigScreenState extends State<ApiConfigScreen> with SingleTickerProv
       _controllers[provider] = TextEditingController();
       _enabledModels[provider] = false;
     }
+
+    // Aggiungi controller per le opzioni di llama.cpp
+    _controllers['llama_executable'] = TextEditingController();
+    _controllers['llama_model'] = TextEditingController();
+    _controllers['llama_context_size'] = TextEditingController(text: '2048');
+    _controllers['llama_threads'] = TextEditingController(text: '4');
+    _controllers['llama_temperature'] = TextEditingController(text: '0.7');
+    _controllers['llama_top_p'] = TextEditingController(text: '0.9');
+
+    // Aggiungi controller per il Mini-LLM
+    _controllers['mini_llm_executable'] = TextEditingController();
+    _controllers['mini_llm_model'] = TextEditingController();
   }
 
   Future<void> _loadSettings() async {
@@ -53,6 +65,24 @@ class _ApiConfigScreenState extends State<ApiConfigScreen> with SingleTickerProv
       for (final provider in apiKeyManager.supportedProviders) {
         _controllers[provider]?.text = apiKeyManager.getKey(provider) ?? '';
         _enabledModels[provider] = apiKeyManager.isEnabled(provider);
+      }
+
+      // Carica configurazioni llama.cpp
+      final llamaConfig = apiKeyManager.getAdditionalConfig('llama');
+      if (llamaConfig != null) {
+        _controllers['llama_executable']?.text = llamaConfig['executable_path'] ?? '';
+        _controllers['llama_model']?.text = llamaConfig['model_path'] ?? '';
+        _controllers['llama_context_size']?.text = llamaConfig['context_size']?.toString() ?? '2048';
+        _controllers['llama_threads']?.text = llamaConfig['threads']?.toString() ?? '4';
+        _controllers['llama_temperature']?.text = llamaConfig['temperature']?.toString() ?? '0.7';
+        _controllers['llama_top_p']?.text = llamaConfig['top_p']?.toString() ?? '0.9';
+      }
+
+      // Carica configurazioni Mini-LLM
+      final miniLlmConfig = apiKeyManager.getAdditionalConfig('mini_llm');
+      if (miniLlmConfig != null) {
+        _controllers['mini_llm_executable']?.text = miniLlmConfig['executable_path'] ?? '';
+        _controllers['mini_llm_model']?.text = miniLlmConfig['model_path'] ?? '';
       }
     } catch (e) {
       _showErrorSnackbar('Errore nel caricamento delle configurazioni: $e');
@@ -81,6 +111,28 @@ class _ApiConfigScreenState extends State<ApiConfigScreen> with SingleTickerProv
 
           await apiKeyManager.setEnabled(provider, _enabledModels[provider] ?? false);
         }
+      }
+
+      // Salva configurazione llama.cpp
+      if (_enabledModels['llama'] == true) {
+        final llamaConfig = {
+          'executable_path': _controllers['llama_executable']!.text,
+          'model_path': _controllers['llama_model']!.text,
+          'context_size': int.tryParse(_controllers['llama_context_size']!.text) ?? 2048,
+          'threads': int.tryParse(_controllers['llama_threads']!.text) ?? 4,
+          'temperature': double.tryParse(_controllers['llama_temperature']!.text) ?? 0.7,
+          'top_p': double.tryParse(_controllers['llama_top_p']!.text) ?? 0.9,
+        };
+        await apiKeyManager.setAdditionalConfig('llama', llamaConfig);
+      }
+
+      // Salva configurazione Mini-LLM
+      if (_enabledModels['mini_llm'] == true) {
+        final miniLlmConfig = {
+          'executable_path': _controllers['mini_llm_executable']!.text,
+          'model_path': _controllers['mini_llm_model']!.text,
+        };
+        await apiKeyManager.setAdditionalConfig('mini_llm', miniLlmConfig);
       }
 
       await apiKeyManager.saveKeys();
@@ -123,6 +175,21 @@ class _ApiConfigScreenState extends State<ApiConfigScreen> with SingleTickerProv
 
         // Salva temporaneamente la chiave per il test
         await apiKeyManager.setKey(provider, _controllers[provider]!.text);
+
+        // Salva temporaneamente le configurazioni aggiuntive per il test
+        if (provider == 'llama') {
+          final llamaConfig = {
+            'executable_path': _controllers['llama_executable']!.text,
+            'model_path': _controllers['llama_model']!.text,
+          };
+          await apiKeyManager.setAdditionalConfig('llama', llamaConfig);
+        } else if (provider == 'mini_llm') {
+          final miniLlmConfig = {
+            'executable_path': _controllers['mini_llm_executable']!.text,
+            'model_path': _controllers['mini_llm_model']!.text,
+          };
+          await apiKeyManager.setAdditionalConfig('mini_llm', miniLlmConfig);
+        }
 
         // Esegui test della chiave
         results[provider] = await apiKeyManager.testKey(provider);
@@ -185,6 +252,8 @@ class _ApiConfigScreenState extends State<ApiConfigScreen> with SingleTickerProv
       case 'mistral': return 'Mistral AI';
       case 'meta': return 'Meta AI (Llama)';
       case 'ollama': return 'Ollama (Locale)';
+      case 'llama': return 'llama.cpp (Locale)';
+      case 'mini_llm': return 'Mini-LLM (Sintesi)';
       default: return provider.toUpperCase();
     }
   }
@@ -481,6 +550,12 @@ class _ApiConfigScreenState extends State<ApiConfigScreen> with SingleTickerProv
             isUrlField: true,
           ),
 
+          // NUOVO: llama.cpp
+          _buildLlamaConfigField(),
+
+          // NUOVO: Mini-LLM per sintesi
+          _buildMiniLLMConfigField(),
+
           const SizedBox(height: 24),
 
           // Informazioni sui modelli locali
@@ -506,20 +581,250 @@ class _ApiConfigScreenState extends State<ApiConfigScreen> with SingleTickerProv
                 ),
                 SizedBox(height: 8),
                 Text(
-                  'Multi-AI Team supporta la connessione con server locali di modelli, come Ollama. '
-                      'Per utilizzare Ollama, assicurati che sia in esecuzione sul tuo sistema prima di avviare l\'app.',
-                ),
-                SizedBox(height: 16),
-                Text(
-                  'Esempio: localhost:11434 o 192.168.1.100:11434',
-                  style: TextStyle(
-                    fontFamily: 'monospace',
-                    fontSize: 12,
-                  ),
+                  'Multi-AI Team supporta diversi tipi di modelli locali:\n'
+                      '• Ollama: server locale che gestisce modelli tramite API\n'
+                      '• llama.cpp: interfaccia diretta con i modelli tramite binario\n'
+                      '• Mini-LLM: modello leggero per la sintesi delle risposte',
                 ),
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  // Metodo per configurare llama.cpp
+  Widget _buildLlamaConfigField() {
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Switch(
+                value: _enabledModels['llama'] ?? false,
+                onChanged: (value) {
+                  setState(() {
+                    _enabledModels['llama'] = value;
+                  });
+                },
+                activeColor: theme.colorScheme.primary,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'llama.cpp (Modelli diretti)',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: (_enabledModels['llama'] ?? false)
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.onBackground.withOpacity(0.6),
+                ),
+              ),
+            ],
+          ),
+
+          if (_enabledModels['llama'] ?? false) ...[
+            Text(
+              'Interfaccia diretta con i modelli locali tramite llama.cpp',
+              style: TextStyle(
+                fontSize: 14,
+                color: theme.colorScheme.onBackground.withOpacity(0.7),
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            // Campo per l'eseguibile
+            TextFormField(
+              controller: _controllers['llama_executable'],
+              decoration: InputDecoration(
+                labelText: 'Percorso eseguibile llama.cpp',
+                hintText: 'Es. /usr/local/bin/llama',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                prefixIcon: const Icon(Icons.terminal),
+              ),
+              validator: (value) {
+                if ((_enabledModels['llama'] ?? false) && (value == null || value.isEmpty)) {
+                  return 'Inserisci il percorso dell\'eseguibile llama.cpp';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 12),
+
+            // Campo per il modello
+            TextFormField(
+              controller: _controllers['llama_model'],
+              decoration: InputDecoration(
+                labelText: 'Percorso modello',
+                hintText: 'Es. /home/user/models/mistral-7b.gguf',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                prefixIcon: const Icon(Icons.folder_open),
+              ),
+              validator: (value) {
+                if ((_enabledModels['llama'] ?? false) && (value == null || value.isEmpty)) {
+                  return 'Inserisci il percorso del modello';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 12),
+
+            // Opzioni avanzate
+            ExpansionTile(
+              title: const Text('Opzioni avanzate'),
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _controllers['llama_context_size'],
+                        decoration: const InputDecoration(
+                          labelText: 'Dimensione contesto',
+                          hintText: '2048',
+                        ),
+                        keyboardType: TextInputType.number,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _controllers['llama_threads'],
+                        decoration: const InputDecoration(
+                          labelText: 'Thread',
+                          hintText: '4',
+                        ),
+                        keyboardType: TextInputType.number,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _controllers['llama_temperature'],
+                        decoration: const InputDecoration(
+                          labelText: 'Temperatura',
+                          hintText: '0.7',
+                        ),
+                        keyboardType: TextInputType.number,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _controllers['llama_top_p'],
+                        decoration: const InputDecoration(
+                          labelText: 'Top-P',
+                          hintText: '0.9',
+                        ),
+                        keyboardType: TextInputType.number,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // Metodo per configurare il Mini-LLM
+  Widget _buildMiniLLMConfigField() {
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Switch(
+                value: _enabledModels['mini_llm'] ?? false,
+                onChanged: (value) {
+                  setState(() {
+                    _enabledModels['mini_llm'] = value;
+                  });
+                },
+                activeColor: theme.colorScheme.primary,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Mini-LLM per Sintesi',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: (_enabledModels['mini_llm'] ?? false)
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.onBackground.withOpacity(0.6),
+                ),
+              ),
+            ],
+          ),
+
+          if (_enabledModels['mini_llm'] ?? false) ...[
+            Text(
+              'Usa un modello LLM piccolo e veloce per sintetizzare le risposte',
+              style: TextStyle(
+                fontSize: 14,
+                color: theme.colorScheme.onBackground.withOpacity(0.7),
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            // Campo per l'eseguibile
+            TextFormField(
+              controller: _controllers['mini_llm_executable'],
+              decoration: InputDecoration(
+                labelText: 'Percorso eseguibile Mini-LLM',
+                hintText: 'Es. /usr/local/bin/llama',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                prefixIcon: const Icon(Icons.terminal),
+              ),
+              validator: (value) {
+                if ((_enabledModels['mini_llm'] ?? false) && (value == null || value.isEmpty)) {
+                  return 'Inserisci il percorso dell\'eseguibile mini-LLM';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 12),
+
+            // Campo per il modello
+            TextFormField(
+              controller: _controllers['mini_llm_model'],
+              decoration: InputDecoration(
+                labelText: 'Percorso modello Mini-LLM',
+                hintText: 'Es. /home/user/models/phi-2.gguf',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                prefixIcon: const Icon(Icons.folder_open),
+                helperText: 'Consigliato: Phi-2, TinyLlama o Mistral-7B',
+              ),
+              validator: (value) {
+                if ((_enabledModels['mini_llm'] ?? false) && (value == null || value.isEmpty)) {
+                  return 'Inserisci il percorso del modello Mini-LLM';
+                }
+                return null;
+              },
+            ),
+          ],
         ],
       ),
     );
@@ -540,66 +845,65 @@ class _ApiConfigScreenState extends State<ApiConfigScreen> with SingleTickerProv
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Switch(
-                value: _enabledModels[provider] ?? false,
-                onChanged: (value) {
-                  setState(() {
-                    _enabledModels[provider] = value;
-                  });
-                },
-                activeColor: theme.colorScheme.primary,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: (_enabledModels[provider] ?? false)
-                      ? theme.colorScheme.primary
-                      : theme.colorScheme.onBackground.withOpacity(0.6),
-                ),
-              ),
-            ],
-          ),
+      Row(
+      children: [
+      Switch(
+      value: _enabledModels[provider] ?? false,
+        onChanged: (value) {
+          setState(() {
+            _enabledModels[provider] = value;
+          });
+        },
+        activeColor: theme.colorScheme.primary,
+      ),
+      const SizedBox(width: 8),
+      Text(
+        label,
+        style: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+          color: (_enabledModels[provider] ?? false)
+              ? theme.colorScheme.primary
+              : theme.colorScheme.onBackground.withOpacity(0.6),
+        ),
+      ),
+      ],
+    ),
 
-          if (_enabledModels[provider] ?? false) ...[
-            Text(
-              description,
-              style: TextStyle(
-                fontSize: 14,
-                color: theme.colorScheme.onBackground.withOpacity(0.7),
-              ),
-            ),
-            const SizedBox(height: 8),
+    if (_enabledModels[provider] ?? false) ...[
+    Text(
+    description,
+    style: TextStyle(
+    fontSize: 14,
+    color: theme.colorScheme.onBackground.withOpacity(0.7),
+    ),
+    ),
+    const SizedBox(height: 8),
 
-            TextFormField(
-              controller: _controllers[provider],
-              decoration: InputDecoration(
-                hintText: hint,
-                helperText: helpText,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                prefixIcon: Icon(isUrlField ? Icons.link : Icons.key),
-                suffixIcon: IconButton(
-                  icon: const Icon(Icons.visibility_off),
-                  onPressed: () {
-                    // Toggle visibility (da implementare)
-                  },
-                ),
-              ),
-              obscureText: !isUrlField,
-              validator: (value) {
-                if ((_enabledModels[provider] ?? false) && (value == null || value.isEmpty)) {
-                  return 'Inserisci un valore valido';
-                }
-                return null;
-              },
-            ),
-          ],
+    TextFormField(
+    controller: _controllers[provider],
+    decoration: InputDecoration(
+    hintText: hint,
+    helperText: helpText,
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
+    ),
+      prefixIcon: Icon(isUrlField ? Icons.link : Icons.key),
+      suffixIcon: IconButton(
+        icon: const Icon(Icons.visibility_off),
+        onPressed: () {
+          // Toggle visibility (da implementare)
+        },
+      ),
+    ),
+      obscureText: !isUrlField,
+      validator: (value) {
+        if ((_enabledModels[provider] ?? false) && (value == null || value.isEmpty)) {
+          return 'Inserisci un valore valido';
+        }
+        return null;
+      },
+    ),
+    ],
         ],
       ),
     );
