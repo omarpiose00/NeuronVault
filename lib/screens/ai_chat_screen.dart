@@ -1,4 +1,4 @@
-// lib/screens/ai_chat_screen.dart - Versione completa corretta con animazioni
+// lib/screens/ai_chat_screen.dart - Versione completa con icone animate
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -13,6 +13,11 @@ import '../widgets/input/photo_input_button.dart';
 import '../widgets/utils/demo_messages.dart';
 import '../widgets/ui/glass_container.dart';
 import '../widgets/ui/dynamic_background.dart';
+import '../widgets/ui/mode_icon.dart';  // Nuovo import per le icone di modalità animate
+import '../widgets/team_collaboration_view.dart';
+import '../widgets/synthesis_visualizer.dart';
+import '../desktop/services/ipc_service.dart';
+import '../services/api_key_manager.dart';
 
 class AiChatScreenUpdated extends StatefulWidget {
   final bool showDemoMessages;
@@ -31,6 +36,11 @@ class _AiChatScreenUpdatedState extends State<AiChatScreenUpdated> with TickerPr
   final ScrollController _scrollController = ScrollController();
   final ImagePicker _picker = ImagePicker();
 
+  bool _showCollaborationView = true;
+  bool _showSynthesisDetails = false;
+  Map<String, String> _currentResponses = {};
+  Map<String, double> _currentWeights = {};
+  String _synthesizedResponse = '';
   bool _isLoading = false;
   bool _isScrolled = false;
   List<AiConversationMessage> _conversation = [];
@@ -348,72 +358,31 @@ class _AiChatScreenUpdatedState extends State<AiChatScreenUpdated> with TickerPr
       borderRadius: 20,
       blur: 10,
       backgroundColor: isDark
-          ? theme.colorScheme.primary.withOpacity(0.1)
-          : theme.colorScheme.primary.withOpacity(0.05),
+          ? theme.colorScheme.surface.withOpacity(0.2)
+          : theme.colorScheme.surface.withOpacity(0.1),
       border: Border.all(
         color: theme.colorScheme.primary.withOpacity(0.2),
         width: 1.5,
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-        child: Stack(
+        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            // Indicatore animato che scorre tra le opzioni
-            AnimatedPositioned(
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeOutQuint,
-              left: (_activeTabIndex * (MediaQuery.of(context).size.width - 60)) / 3,
-              width: (MediaQuery.of(context).size.width - 60) / 3,
-              top: 0,
-              bottom: 0,
-              child: Padding(
-                padding: const EdgeInsets.all(4.0),
-                child: AnimatedBuilder(
-                    animation: _pulseAnimation,
-                    builder: (context, child) {
-                      return Transform.scale(
-                        scale: _pulseAnimation.value,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: isDark
-                                ? theme.colorScheme.primary.withOpacity(0.3)
-                                : theme.colorScheme.primaryContainer.withOpacity(0.8),
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: theme.colorScheme.primary.withOpacity(0.3),
-                                blurRadius: 8,
-                                spreadRadius: 1,
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    }
-                ),
-              ),
+            _buildModeOption(
+              ConversationMode.chat,
+              'Chat',
+              Icons.chat_bubble_outline,
             ),
-
-            // Opzioni del selettore
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildModeOption(
-                  ConversationMode.chat,
-                  'Chat',
-                  Icons.chat_bubble_outline,
-                ),
-                _buildModeOption(
-                  ConversationMode.debate,
-                  'Dibattito',
-                  Icons.compare_arrows,
-                ),
-                _buildModeOption(
-                  ConversationMode.brainstorm,
-                  'Brainstorm',
-                  Icons.lightbulb_outline,
-                ),
-              ],
+            _buildModeOption(
+              ConversationMode.debate,
+              'Dibattito',
+              Icons.compare_arrows,
+            ),
+            _buildModeOption(
+              ConversationMode.brainstorm,
+              'Brainstorm',
+              Icons.lightbulb_outline,
             ),
           ],
         ),
@@ -427,34 +396,57 @@ class _AiChatScreenUpdatedState extends State<AiChatScreenUpdated> with TickerPr
     final isDark = theme.brightness == Brightness.dark;
     final isSelected = _currentMode == mode;
 
+    // Colori basati sulla modalità
+    final baseColor = mode.getBaseColor(isDark);
+    final glowColor = mode.getGlowColor(isDark);
+
     return GestureDetector(
       onTap: () {
         if (_currentMode != mode) {
           _changeMode(mode);
         }
       },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? (isDark ? baseColor.withOpacity(0.2) : glowColor.withOpacity(0.2))
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: isSelected
+              ? [
+            BoxShadow(
+              color: baseColor.withOpacity(0.2),
+              blurRadius: 8,
+              spreadRadius: 1,
+            ),
+          ]
+              : null,
+          border: isSelected
+              ? Border.all(
+            color: baseColor.withOpacity(0.3),
+            width: 1.5,
+          )
+              : null,
+        ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Icona
-            Icon(
-              icon,
-              size: 20,
-              color: isSelected
-                  ? (isDark ? Colors.white : theme.colorScheme.onPrimaryContainer)
-                  : theme.colorScheme.onSurface.withOpacity(0.7),
+            // Icona animata
+            AnimatedModeIcon(
+              mode: mode,
+              isSelected: isSelected,
+              size: 24,
             ),
             const SizedBox(width: 8),
-            // Testo con animazione di fade quando cambia
+            // Testo con animazione
             AnimatedDefaultTextStyle(
               duration: const Duration(milliseconds: 200),
               style: TextStyle(
                 fontSize: isSelected ? 14 : 13,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 color: isSelected
-                    ? (isDark ? Colors.white : theme.colorScheme.onPrimaryContainer)
+                    ? baseColor
                     : theme.colorScheme.onSurface.withOpacity(0.7),
               ),
               child: Text(label),
@@ -576,6 +568,32 @@ class _AiChatScreenUpdatedState extends State<AiChatScreenUpdated> with TickerPr
                       ),
                     ),
                   ),
+                  if (_showCollaborationView && _currentResponses.isNotEmpty)
+                    SizedBox(
+                      height: 300, // Altezza fissa per la visualizzazione
+                      child: TeamCollaborationView(
+                        prompt: _conversation.isNotEmpty && _conversation.last.agent == 'user'
+                            ? _conversation.last.message
+                            : '',
+                        responses: _currentResponses,
+                        weights: _currentWeights,
+                        synthesizedResponse: _synthesizedResponse,
+                        isProcessing: _isLoading,
+                      ),
+                    ),
+                  if (_showSynthesisDetails && _currentResponses.isNotEmpty)
+                    SizedBox(
+                      height: 350, // Altezza fissa per la visualizzazione dettagliata
+                      child: SynthesisVisualizer(
+                        inputTexts: _currentResponses,
+                        weights: _currentWeights,
+                        outputText: _synthesizedResponse,
+                        isProcessing: _isLoading,
+                        progress: 0.8, // Valore fisso per ora, da rendere dinamico
+                      ),
+                    ),
+
+
 
                   // Area di input migliorata
                   _buildInputSection(),
@@ -603,23 +621,11 @@ class _AiChatScreenUpdatedState extends State<AiChatScreenUpdated> with TickerPr
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Icona modalità con animazione di pulse
-            AnimatedBuilder(
-                animation: _pulseController,
-                builder: (context, child) {
-                  return Transform.scale(
-                    scale: _pulseAnimation.value,
-                    child: Icon(
-                      _currentMode == ConversationMode.chat
-                          ? Icons.chat_outlined
-                          : (_currentMode == ConversationMode.debate
-                          ? Icons.compare_arrows
-                          : Icons.lightbulb_outline),
-                      size: 48,
-                      color: theme.colorScheme.primary.withOpacity(0.7),
-                    ),
-                  );
-                }
+            // Icona modalità con animazione
+            AnimatedModeIcon(
+              mode: _currentMode,
+              isSelected: true,
+              size: 48,
             ),
             const SizedBox(height: 16),
             Text(

@@ -1,16 +1,50 @@
-// lib/main.dart - versione aggiornata
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';  // Aggiungi l'import
-import 'screens/splash_screen.dart';  // Usa la splash screen
+import 'package:provider/provider.dart';
+import 'package:window_manager/window_manager.dart';
+import 'dart:io';
 
-void main() {
+// Import dei servizi e provider
+import 'desktop/services/node_service.dart';
+import 'desktop/services/ipc_service.dart';
+import 'providers/app_state_provider.dart';
+import 'providers/theme_provider.dart';
+import 'services/api_key_manager.dart';
+
+// Import delle schermate
+import 'screens/splash_screen.dart';
+import 'screens/api_config_screen.dart';
+
+void main() async {
+  // Assicurati che Flutter sia inizializzato
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Configurazione per desktop
+  if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+    await windowManager.ensureInitialized();
+
+    WindowOptions windowOptions = WindowOptions(
+        size: Size(1200, 800),
+        center: true,
+        backgroundColor: Colors.transparent,
+        skipTaskbar: false,
+        titleBarStyle: TitleBarStyle.hidden,
+        title: "Multi-AI Team",
+        minimumSize: Size(800, 600)
+    );
+
+    await windowManager.waitUntilReadyToShow(windowOptions, () async {
+      await windowManager.show();
+      await windowManager.focus();
+    });
+  }
+
   // Imposta l'orientamento preferito
-  SystemChrome.setPreferredOrientations([
+  await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
+    DeviceOrientation.landscapeLeft,
+    DeviceOrientation.landscapeRight,
   ]);
 
   // Imposta lo stile della status bar
@@ -22,84 +56,58 @@ void main() {
     ),
   );
 
-  runApp(const MultiAiTeamApp());
+  // Inizializza i servizi principali
+  final nodeService = NodeService();
+  final apiKeyManager = ApiKeyManager();
+
+  // Carica le preferenze e le chiavi API
+  await apiKeyManager.loadKeys();
+  final isFirstRun = await apiKeyManager.isFirstRun();
+
+  // Avvia il backend Node.js
+  await nodeService.startBackend();
+
+  // Avvia l'app
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => nodeService),
+        ChangeNotifierProvider(create: (_) => apiKeyManager),
+        ChangeNotifierProvider(create: (_) => AppStateProvider()),
+        ChangeNotifierProvider(create: (_) => ThemeProvider(false)),
+        Provider(create: (_) => IPCService()),
+      ],
+      child: MultiAiTeamApp(isFirstRun: isFirstRun),
+    ),
+  );
 }
 
 class MultiAiTeamApp extends StatelessWidget {
-  const MultiAiTeamApp({super.key});
+  final bool isFirstRun;
+
+  const MultiAiTeamApp({
+    Key? key,
+    required this.isFirstRun,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+
     return MaterialApp(
       title: 'Multi-AI Team',
-      theme: ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.light,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF6750A4),
-          primary: const Color(0xFF6750A4),
-          secondary: const Color(0xFF03DAC6),
-          tertiary: const Color(0xFFEFB8C8),
-          background: const Color(0xFFF5F5F5),
-          surface: Colors.white,
-        ),
-        // Utilizziamo GoogleFonts.roboto invece di specificare un fontFamily
-        textTheme: GoogleFonts.robotoTextTheme(Theme.of(context).textTheme),
-        cardTheme: CardTheme(
-          elevation: 2,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: Colors.grey.shade100,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(18),
-            borderSide: BorderSide.none,
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(18),
-            borderSide: const BorderSide(color: Color(0xFF6750A4), width: 2),
-          ),
-        ),
-      ),
-      darkTheme: ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.dark,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF6750A4),
-          brightness: Brightness.dark,
-          primary: const Color(0xFFD0BCFF),
-          secondary: const Color(0xFF03DAC6),
-          tertiary: const Color(0xFFEFB8C8),
-          background: const Color(0xFF121212),
-          surface: const Color(0xFF1E1E1E),
-        ),
-        // Utilizziamo GoogleFonts.roboto invece di specificare un fontFamily
-        textTheme: GoogleFonts.robotoTextTheme(ThemeData(brightness: Brightness.dark).textTheme),
-        cardTheme: CardTheme(
-          elevation: 2,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: Colors.grey.shade900,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(18),
-            borderSide: BorderSide.none,
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(18),
-            borderSide: const BorderSide(color: Color(0xFFD0BCFF), width: 2),
-          ),
-        ),
-      ),
-      themeMode: ThemeMode.system,
-      home: const SplashScreen(),  // Usa la SplashScreen per avviare l'app
+      theme: themeProvider.lightTheme,
+      darkTheme: themeProvider.darkTheme,
+      themeMode: themeProvider.themeMode,
       debugShowCheckedModeBanner: false,
+
+      // Determina la schermata iniziale in base al primo avvio
+      initialRoute: isFirstRun ? '/setup' : '/',
+
+      routes: {
+        '/': (context) => const SplashScreen(),
+        '/setup': (context) => const ApiConfigScreen(isInitialSetup: true),
+      },
     );
   }
 }
