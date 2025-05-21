@@ -5,6 +5,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../models/ai_agent.dart';
 import '../widgets/ui/glass_container.dart';
 import 'ai_weight_controller.dart';
+import '../services/api_service.dart';
 
 class TeamCollaborationView extends StatefulWidget {
   final String prompt;
@@ -43,6 +44,13 @@ class _TeamCollaborationViewState extends State<TeamCollaborationView> with Tick
     super.initState();
     _initAnimations();
     _calculatePositions();
+
+    // Aggiungi questo all'initState esistente per gestire gli errori di rendering
+    FlutterError.onError = (FlutterErrorDetails details) {
+      print('Errore di Flutter catturato: ${details.exception}');
+      // Non interrompere il flusso normale di gestione degli errori
+      FlutterError.presentError(details);
+    };
   }
 
   void _initAnimations() {
@@ -60,7 +68,21 @@ class _TeamCollaborationViewState extends State<TeamCollaborationView> with Tick
   void _calculatePositions() {
     _positions.clear();
     final models = widget.responses.keys.toList();
+
+    // Se non ci sono modelli in risposta e siamo in modalità demo,
+    // crea modelli fittizi per la visualizzazione
+    if (models.isEmpty && ApiService.useMockData) {
+      // Crea modelli fittizi per la demo
+      _positions['gpt'] = const Offset(0.3, 0.3);
+      _positions['claude'] = const Offset(0.7, 0.3);
+      _positions['deepseek'] = const Offset(0.3, 0.7);
+      _positions['gemini'] = const Offset(0.7, 0.7);
+      return;
+    }
+
     final count = models.length;
+    if (count == 0) return;
+
     final center = const Offset(0.5, 0.5);
     const radius = 0.35;
 
@@ -76,10 +98,32 @@ class _TeamCollaborationViewState extends State<TeamCollaborationView> with Tick
   @override
   void didUpdateWidget(TeamCollaborationView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.responses.keys.toList().toString() != oldWidget.responses.keys.toList().toString()) {
-      _calculatePositions();
+
+    // Gestione migliorata della modalità demo
+    if (widget.isProcessing) {
+      _pulseController.repeat(reverse: true);
+    } else if (widget.responses.isNotEmpty) {
+      // Verifica se siamo in modalità demo usando un approccio più diretto
+      final isDemoMode = widget.responses.containsKey('gpt') &&
+          widget.responses['gpt']!.contains('mock');
+
+      if (isDemoMode && _positions.isNotEmpty) {
+        // Assicurati che il controller di animazione sia in esecuzione per l'effetto demo
+        if (!_flowController.isAnimating) {
+          _flowController.repeat();
+        }
+
+        // Aggiungi effetto pulsante all'hub di sintesi in modalità demo
+        _pulseController.repeat(reverse: true);
+
+        // Ri-calcola le posizioni se necessario
+        if (oldWidget.responses.length != widget.responses.length) {
+          _calculatePositions();
+        }
+      }
     }
   }
+
 
   @override
   void dispose() {
@@ -92,6 +136,11 @@ class _TeamCollaborationViewState extends State<TeamCollaborationView> with Tick
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+
+    // Assicurati che le posizioni siano calcolate anche se non ci sono dati
+    if (_positions.isEmpty) {
+      _calculatePositions();
+    }
 
     return GlassContainer(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -177,21 +226,45 @@ class _TeamCollaborationViewState extends State<TeamCollaborationView> with Tick
     );
   }
 
+  // lib/widgets/team_collaboration_view.dart - metodo _buildCollaborationVisualization
   Widget _buildCollaborationVisualization(ThemeData theme) {
     return Expanded(
       child: Stack(
         alignment: Alignment.center,
         children: [
-          CustomPaint(
-            painter: ConnectionsPainter(
-              positions: _positions,
-              animation: _flowController,
-              weights: widget.weights,
-              theme: theme,
-            ),
-            child: Container(),
+          // Proteggi il CustomPaint con try-catch
+          Builder(
+            builder: (context) {
+              try {
+                return CustomPaint(
+                  painter: ConnectionsPainter(
+                    positions: _positions,
+                    animation: _flowController,
+                    weights: widget.weights,
+                    theme: theme,
+                  ),
+                  child: Container(),
+                );
+              } catch (e) {
+                // In caso di errore, mostra un messaggio
+                return Container(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(
+                    'Visualizzazione temporaneamente non disponibile',
+                    style: TextStyle(color: theme.colorScheme.error),
+                  ),
+                );
+              }
+            },
           ),
+
+          // Posizionamento degli avatar con controllo di validità
           ..._positions.entries.map((entry) {
+            // Verifica le posizioni prima di posizionare
+            if (entry.value.dx.isNaN || entry.value.dy.isNaN) {
+              return const SizedBox.shrink(); // Salta posizioni invalide
+            }
+
             return Positioned(
               left: entry.value.dx * MediaQuery.of(context).size.width - 25,
               top: entry.value.dy * MediaQuery.of(context).size.height - 25,
@@ -389,23 +462,37 @@ class ConnectionsPainter extends CustomPainter {
     // Disegna le connessioni
     for (final entry in positions.entries) {
       final model = entry.key;
+
+      // Calcola posizione assoluta
+      final posRelative = entry.value;
       final position = Offset(
-        entry.value.dx * size.width,
-        entry.value.dy * size.height,
+        posRelative.dx * size.width,
+        posRelative.dy * size.height,
       );
 
-      // Calcola il peso della connessione
+      // Calcola il peso della connessione (default a 1.0 se non specificato)
       final weight = weights[model] ?? 1.0;
 
-      // Disegna la connessione
-      _drawConnection(canvas, position, center, weight);
-
-      // Disegna le particelle che fluiscono verso il centro
-      _drawFlowingParticles(canvas, position, center, weight);
+      try {
+        // Disegna la connessione con gestione errori
+        if (!position.dx.isNaN && !position.dy.isNaN &&
+            !center.dx.isNaN && !center.dy.isNaN) {
+          _drawConnection(canvas, position, center, weight);
+          _drawFlowingParticles(canvas, position, center, weight);
+        }
+      } catch (e) {
+        print('Errore nel disegno connessione per $model: $e');
+        // Continua con il prossimo modello
+      }
     }
   }
 
   void _drawConnection(Canvas canvas, Offset start, Offset end, double weight) {
+    // Ignora connessioni invalide
+    if (start.dx.isNaN || start.dy.isNaN || end.dx.isNaN || end.dy.isNaN) {
+      return;
+    }
+
     final paint = Paint()
       ..color = theme.colorScheme.primary.withOpacity(0.3 * weight)
       ..strokeWidth = 2.0 * weight
@@ -415,29 +502,54 @@ class ConnectionsPainter extends CustomPainter {
   }
 
   void _drawFlowingParticles(Canvas canvas, Offset start, Offset end, double weight) {
-    final distance = (end - start).distance;
-    final direction = (end - start) / distance;
+    // Ignora particelle invalide
+    if (start.dx.isNaN || start.dy.isNaN || end.dx.isNaN || end.dy.isNaN) {
+      return;
+    }
 
-    // Numero di particelle basato sul peso
-    final particleCount = (5 * weight).round();
+    try {
+      final distance = (end - start).distance;
 
-    for (int i = 0; i < particleCount; i++) {
-      // Calcola la posizione della particella
-      final progress = (animation.value + i / particleCount) % 1.0;
-      final position = start + direction * distance * progress;
+      // Evita divisione per zero
+      if (distance < 0.001) return;
 
-      // Dimensione della particella basata sul peso
-      final size = 4.0 * weight;
+      final direction = Offset(
+          (end.dx - start.dx) / distance,
+          (end.dy - start.dy) / distance
+      );
 
-      // Opacità che si intensifica verso il centro
-      final opacity = 0.3 + 0.7 * progress;
+      // Numero di particelle basato sul peso (limiti sicuri)
+      final particleCount = (5 * weight).round().clamp(1, 10);
 
-      // Disegna la particella
-      final paint = Paint()
-        ..color = theme.colorScheme.primary.withOpacity(opacity)
-        ..style = PaintingStyle.fill;
+      for (int i = 0; i < particleCount; i++) {
+        // Calcolo progresso con correttezza matematica
+        final progressValue = animation.value;
+        final offset = i / particleCount;
+        final progress = (progressValue + offset) % 1.0;
 
-      canvas.drawCircle(position, size, paint);
+        // Calcolo posizione
+        final particleDx = start.dx + direction.dx * distance * progress;
+        final particleDy = start.dy + direction.dy * distance * progress;
+
+        // Verifica validità
+        if (particleDx.isNaN || particleDy.isNaN) continue;
+
+        final position = Offset(particleDx, particleDy);
+
+        // Dimensione e opacità con range limitati
+        final size = 4.0 * weight.clamp(0.5, 2.0);
+        final opacity = 0.3 + 0.7 * progress.clamp(0.0, 1.0);
+
+        // Disegna particella
+        final paint = Paint()
+          ..color = theme.colorScheme.primary.withOpacity(opacity)
+          ..style = PaintingStyle.fill;
+
+        canvas.drawCircle(position, size, paint);
+      }
+    } catch (e) {
+      // Cattura qualsiasi errore nelle particelle
+      print('Errore nel disegno particelle: $e');
     }
   }
 

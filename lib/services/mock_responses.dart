@@ -1,16 +1,20 @@
 // lib/services/mock_responses.dart
 import '../models/conversation_mode.dart';
+import 'dart:math';
 
 class MockResponses {
   static Map<String, String> getMockResponses(String prompt, ConversationMode mode) {
-    return {
+    // Invece di utilizzare Random, che richiede l'import, usiamo valori fissi
+    final responses = {
       'gpt': _generateMockGptResponse(prompt, mode),
       'claude': _generateMockClaudeResponse(prompt, mode),
       'deepseek': _generateMockDeepseekResponse(prompt, mode),
       'gemini': _generateMockGeminiResponse(prompt, mode),
       'mistral': _generateMockMistralResponse(prompt, mode),
     };
+    return responses;
   }
+
 
   static Map<String, double> getMockWeights() {
     return {
@@ -25,7 +29,7 @@ class MockResponses {
   static String getMockSynthesizedResponse(String prompt, ConversationMode mode) {
     switch (mode) {
       case ConversationMode.chat:
-        return "Ecco una risposta sintetizzata per la tua domanda: \"$prompt\". "
+        return "Sintesi della risposta alla tua domanda: \"$prompt\". "
             "Ho combinato le intuizioni di diversi modelli AI per offrirti la risposta più completa. "
             "Spero che questa informazione ti sia utile!";
       case ConversationMode.debate:

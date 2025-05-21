@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import '../models/ai_agent.dart';
 import '../models/conversation_mode.dart';
 import 'dart:async';
+import 'dart:math';
 
 class AiConversationMessage {
   final String agent; // "user", "system", o nome modello (openai, anthropic, etc.)
@@ -159,11 +160,14 @@ class AiServiceResponse {
 
 class MockResponses {
   static Map<String, String> getMockResponses(String prompt, ConversationMode mode) {
+    // Aggiungi un ritardo casuale per simulare risposte reali
+    final random = Random();
+
     final responses = {
-      'openai': 'OpenAI response to: "$prompt" (${_modeToString(mode)})',
-      'anthropic': 'Claude response to: "$prompt" (${_modeToString(mode)})',
-      'deepseek': 'DeepSeek response to: "$prompt" (${_modeToString(mode)})',
-      'google': 'Gemini response to: "$prompt" (${_modeToString(mode)})',
+      'gpt': 'Risposta GPT a: "$prompt" (${_modeToString(mode)}) [Peso: ${0.8 + random.nextDouble() * 0.4}]',
+      'claude': 'Risposta Claude a: "$prompt" (${_modeToString(mode)}) [Peso: ${0.8 + random.nextDouble() * 0.4}]',
+      'deepseek': 'Risposta DeepSeek a: "$prompt" (${_modeToString(mode)}) [Peso: ${0.8 + random.nextDouble() * 0.4}]',
+      'gemini': 'Risposta Gemini a: "$prompt" (${_modeToString(mode)}) [Peso: ${0.8 + random.nextDouble() * 0.4}]',
     };
     return responses;
   }
@@ -200,14 +204,21 @@ class ApiService {
         Map<String, double>? weights,
         Map<String, dynamic>? options,
       }) async {
-
     // Use mock data if in demo mode
     if (useMockData) {
       // Simulate a short delay
       await Future.delayed(const Duration(seconds: 2));
 
+      // Usa i valori fissi per evitare errori con Random
       final responses = MockResponses.getMockResponses(prompt, mode);
-      final mockWeights = weights ?? MockResponses.getMockWeights();
+      final mockWeights = weights ?? {
+        'gpt': 1.0,
+        'claude': 1.0,
+        'deepseek': 1.0,
+        'gemini': 1.0,
+        'mistral': 1.0
+      };
+
       final synthesizedResponse = MockResponses.getMockSynthesizedResponse(prompt, mode);
 
       final conversation = [
