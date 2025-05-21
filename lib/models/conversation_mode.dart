@@ -49,4 +49,28 @@ extension ConversationModeExtension on ConversationMode {
         return Icons.lightbulb_outline;
     }
   }
+
+  /// Restituisce il testo di placeholder per l'input
+  String get placeholderText {
+    switch (this) {
+      case ConversationMode.chat:
+        return 'Chiedi qualcosa al team AI...';
+      case ConversationMode.debate:
+        return 'Inserisci un tema per il dibattito...';
+      case ConversationMode.brainstorm:
+        return 'Su cosa vuoi fare brainstorming?';
+    }
+  }
+
+  /// Restituisce il messaggio di benvenuto
+  String get welcomeMessage {
+    switch (this) {
+      case ConversationMode.chat:
+        return 'Inizia una conversazione con il team AI';
+      case ConversationMode.debate:
+        return 'Proponi un tema per un dibattito tra le AI';
+      case ConversationMode.brainstorm:
+        return 'Avvia una sessione di brainstorming creativo';
+    }
+  }
 }

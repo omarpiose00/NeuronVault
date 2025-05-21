@@ -35,6 +35,16 @@ class AgentChip extends StatelessWidget {
             ? const Color(0xFFFFEB3B)
             : const Color(0xFFFFF59D);
         break;
+      case AiAgent.gemini:
+        chipColor = theme.brightness == Brightness.dark
+            ? const Color(0xFF7C4DFF)
+            : const Color(0xFFD1C4E9);
+        break;
+      case AiAgent.mistral:
+        chipColor = theme.brightness == Brightness.dark
+            ? const Color(0xFFFF7043)
+            : const Color(0xFFFFCCBC);
+        break;
     }
 
     return GestureDetector(

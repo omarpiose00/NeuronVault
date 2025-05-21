@@ -3,7 +3,7 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 
-enum AiAgent { claude, gpt, deepseek }
+enum AiAgent { claude, gpt, deepseek, gemini, mistral }
 
 String agentName(AiAgent agent) {
   switch (agent) {
@@ -13,6 +13,10 @@ String agentName(AiAgent agent) {
       return 'GPT-4';
     case AiAgent.deepseek:
       return 'DeepSeek';
+    case AiAgent.gemini:
+      return 'Gemini';
+    case AiAgent.mistral:
+      return 'Mistral';
   }
 }
 
@@ -84,6 +88,10 @@ class _AnimatedAgentIconState extends State<AnimatedAgentIcon> with SingleTicker
         return _buildGptIcon();
       case AiAgent.deepseek:
         return _buildDeepseekIcon();
+      case AiAgent.gemini:
+        return _buildGeminiIcon();
+      case AiAgent.mistral:
+        return _buildMistralIcon();
     }
   }
 
@@ -228,6 +236,100 @@ class _AnimatedAgentIconState extends State<AnimatedAgentIcon> with SingleTicker
     );
   }
 
+  // Icona animata per Gemini
+  Widget _buildGeminiIcon() {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Transform.scale(
+          scale: _pulseAnimation.value,
+          child: Container(
+            width: widget.size,
+            height: widget.size,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF4285F4), Color(0xFF0D47A1)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(widget.size / 2),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF4285F4).withOpacity(0.4),
+                  blurRadius: 12,
+                  spreadRadius: 2,
+                  offset: const Offset(0, 3),
+                )
+              ],
+            ),
+            child: Stack(
+              children: [
+                // Effetto stelle rotanti
+                _buildStarsEffect(const Color(0xFFBBDAFF), 8),
+
+                // Icona stella/gemma
+                Center(
+                  child: Icon(
+                    Icons.star,
+                    color: Colors.white,
+                    size: widget.size * 0.6,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // Icona animata per Mistral
+  Widget _buildMistralIcon() {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Transform.scale(
+          scale: _pulseAnimation.value,
+          child: Container(
+            width: widget.size,
+            height: widget.size,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFFF5722), Color(0xFFE64A19)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(widget.size / 2),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFFF5722).withOpacity(0.4),
+                  blurRadius: 12,
+                  spreadRadius: 2,
+                  offset: const Offset(0, 3),
+                )
+              ],
+            ),
+            child: Stack(
+              children: [
+                // Effetto vortice
+                _buildSwirlEffect(const Color(0xFFFFCCBC)),
+
+                // Icona vento/vortice
+                Center(
+                  child: Icon(
+                    Icons.air,
+                    color: Colors.white,
+                    size: widget.size * 0.6,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   // Effetto particelle per l'icona Claude
   Widget _buildParticles(Color color, int count) {
     return AnimatedBuilder(
@@ -325,6 +427,98 @@ class _AnimatedAgentIconState extends State<AnimatedAgentIcon> with SingleTicker
       },
     );
   }
+
+  // Effetto stelle per Gemini
+  Widget _buildStarsEffect(Color color, int count) {
+    return AnimatedBuilder(
+      animation: _rotateAnimation,
+      builder: (context, child) {
+        return Stack(
+          children: List.generate(count, (index) {
+            final angle = (index / count) * 2 * math.pi;
+            final rotation = _rotateAnimation.value + angle;
+            final distance = widget.size * 0.35;
+            final size = 4 + 2 * math.sin(_controller.value * 2 * math.pi);
+
+            return Positioned(
+              left: widget.size / 2 + distance * math.cos(rotation) - size / 2,
+              top: widget.size / 2 + distance * math.sin(rotation) - size / 2,
+              child: Transform.rotate(
+                angle: rotation,
+                child: Icon(
+                  Icons.star,
+                  color: color.withOpacity(0.8),
+                  size: size,
+                ),
+              ),
+            );
+          }),
+        );
+      },
+    );
+  }
+
+  // Effetto vortice per Mistral
+  Widget _buildSwirlEffect(Color color) {
+    return AnimatedBuilder(
+      animation: _rotateAnimation,
+      builder: (context, child) {
+        return Transform.rotate(
+          angle: _rotateAnimation.value,
+          child: CustomPaint(
+            size: Size(widget.size, widget.size),
+            painter: _SwirlPainter(color: color),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// Custom painter per l'effetto vortice di Mistral
+class _SwirlPainter extends CustomPainter {
+  final Color color;
+
+  _SwirlPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final paint = Paint()
+      ..color = color.withOpacity(0.6)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0;
+
+    for (int i = 0; i < 3; i++) {
+      final radius = size.width * 0.3 + i * 10;
+      canvas.drawCircle(center, radius, paint);
+    }
+
+    // Disegna linee a spirale
+    final spiralPaint = Paint()
+      ..color = color.withOpacity(0.8)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+
+    final path = Path();
+    final turns = 2;
+    final maxRadius = size.width * 0.4;
+
+    for (double angle = 0; angle < turns * 2 * math.pi; angle += 0.1) {
+      final radius = maxRadius * angle / (turns * 2 * math.pi);
+      final x = center.dx + radius * math.cos(angle);
+      final y = center.dy + radius * math.sin(angle);
+      if (angle == 0) {
+        path.moveTo(x, y);
+      } else {
+        path.lineTo(x, y);
+      }
+    }
+    canvas.drawPath(path, spiralPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
 
 Color agentColor(AiAgent agent) {
@@ -335,6 +529,10 @@ Color agentColor(AiAgent agent) {
       return const Color(0xFFB2DFDB); // Teal for GPT
     case AiAgent.deepseek:
       return const Color(0xFFFFF59D); // Yellow for DeepSeek
+    case AiAgent.gemini:
+      return const Color(0xFF4285F4); // Google Blue for Gemini
+    case AiAgent.mistral:
+      return const Color(0xFFFF5722); // Orange for Mistral
   }
 }
 
@@ -346,5 +544,9 @@ Color agentDarkColor(AiAgent agent) {
       return const Color(0xFF00695C); // Darker Teal for GPT
     case AiAgent.deepseek:
       return const Color(0xFFFFEB3B); // Darker Yellow for DeepSeek
+    case AiAgent.gemini:
+      return const Color(0xFF0D47A1); // Darker Blue for Gemini
+    case AiAgent.mistral:
+      return const Color(0xFFE64A19); // Darker Orange for Mistral
   }
 }

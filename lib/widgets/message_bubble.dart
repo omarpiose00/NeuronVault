@@ -40,6 +40,12 @@ class MultimodalMessageBubble extends StatelessWidget {
         case AiAgent.deepseek:
           bg = const Color(0xFFFFF59D);
           break;
+        case AiAgent.gemini:
+          bg = const Color(0xFFD1C4E9);
+          break;
+        case AiAgent.mistral:
+          bg = const Color(0xFFFFCCBC);
+          break;
         default:
           bg = Colors.grey.shade200;
       }
@@ -177,6 +183,11 @@ class MultimodalMessageBubble extends StatelessWidget {
         return '🤖';
       case AiAgent.deepseek:
         return '💻';
+      case AiAgent.gemini:
+        return '✨';
+      case AiAgent.mistral:
+        return '🌬️';
     }
   }
 }
+

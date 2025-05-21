@@ -110,7 +110,8 @@ class AIRouter {
       const synthesizedResponse = await synthesizer.synthesize(
         responses,
         modelConfig,
-        customWeights
+        prompt,
+        customWeights  // Usa i pesi personalizzati se forniti
       );
 
       // Costruisci la conversazione
