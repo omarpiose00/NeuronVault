@@ -9,15 +9,15 @@ class AppStateProvider extends ChangeNotifier {
 
   // Pesi dei modelli AI con valori iniziali
   final Map<String, double> _modelWeights = {
-    'openai': 1.0,     // GPT
-    'anthropic': 1.0,  // Claude
+    'openai': 1.0,
+    'anthropic': 1.0,
     'deepseek': 1.0,
-    'google': 1.0,     // Gemini
+    'google': 1.0,
     'mistral': 1.0,
     'ollama': 1.0,
     'llama': 1.0,
     'cohere': 1.0,
-    'meta': 1.0,       // Meta AI
+    'meta': 1.0,
   };
 
   // Configurazioni presettate
