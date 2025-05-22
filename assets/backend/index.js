@@ -1,4 +1,4 @@
-// assets/backend/index.js - Convertito a CommonJS per consistenza
+// assets/backend/index.js - Enhanced with streaming support
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
@@ -8,18 +8,26 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-// Import dei moduli AI
+// Import dei moduli AI e streaming
 const router = require('./ai-handlers/router');
+const streamingHandler = require('./streaming/streaming_handler');
+const advancedOrchestrator = require('./ai-handlers/advanced_streaming_orchestrator');
+const { router: streamingRoutes, setupWebSocketStreaming } = require('./routes/streaming_routes');
 
 // Configurazione ambiente
 dotenv.config();
 const app = express();
 const server = http.createServer(app);
+
+// Setup Socket.IO con configurazioni avanzate
 const io = new Server(server, {
   cors: {
     origin: "*",
     methods: ["GET", "POST"]
-  }
+  },
+  transports: ['websocket', 'polling'],
+  pingTimeout: 60000,
+  pingInterval: 25000
 });
 
 // Configurazione middleware
@@ -27,13 +35,12 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Configurazione directory uploads
+// Configurazione multer per file uploads
 const uploadsDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-// Configurazione multer per l'upload dei file
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, uploadsDir);
@@ -44,28 +51,20 @@ const storage = multer.diskStorage({
   }
 });
 
-const fileFilter = (req, file, cb) => {
-  const allowedTypes = (process.env.ALLOWED_FILE_TYPES || 'image/jpeg,image/png,image/gif,image/webp').split(',');
-  if (allowedTypes.includes(file.mimetype)) {
-    cb(null, true);
-  } else {
-    cb(new Error('Tipo di file non supportato'), false);
-  }
-};
-
 const upload = multer({
   storage: storage,
-  fileFilter: fileFilter,
-  limits: {
-    fileSize: parseInt(process.env.MAX_FILE_SIZE || '10485760') // 10MB default
-  }
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    cb(null, allowedTypes.includes(file.mimetype));
+  },
+  limits: { fileSize: 10485760 } // 10MB
 });
 
-// Memorizzazione delle conversazioni con TTL
+// Memorizzazione conversazioni con TTL
 const conversations = new Map();
 const CONVERSATION_TTL = 24 * 60 * 60 * 1000; // 24 ore
 
-// Cleanup automatico delle conversazioni vecchie
+// Cleanup automatico conversazioni
 setInterval(() => {
   const now = Date.now();
   for (const [id, conversation] of conversations.entries()) {
@@ -73,75 +72,49 @@ setInterval(() => {
       conversations.delete(id);
     }
   }
-}, 60 * 60 * 1000); // Ogni ora
+}, 60 * 60 * 1000);
 
-// Inizializzazione dei modelli AI con le chiavi API dall'ambiente
-const initializeAI = () => {
-  const apiKeys = {
-    'openai': process.env.OPENAI_API_KEY,
-    'anthropic': process.env.ANTHROPIC_API_KEY,
-    'deepseek': process.env.DEEPSEEK_API_KEY,
-    'google': process.env.GOOGLE_API_KEY,
-    'mistral': process.env.MISTRAL_API_KEY,
-    'ollama': process.env.OLLAMA_ENDPOINT || 'localhost:11434'
-  };
-
-  router.initialize(apiKeys);
-
-  // Log delle API disponibili
-  console.log('🤖 AI Models Status:');
-  Object.keys(router.handlers).forEach(model => {
-    const status = router.handlers[model].checkAvailability() ? '✅' : '❌';
-    console.log(`   ${status} ${model.toUpperCase()}`);
-  });
-};
-
-// Funzione di utility per il debug e logging
+// Logger avanzato con livelli
 const logger = {
-  info: (message, data = null) => {
-    if (process.env.NODE_ENV !== 'test') {
-      console.log(`[INFO] ${message}`, data ? JSON.stringify(data, null, 2) : '');
+  debug: (message, data = null) => {
+    if (process.env.DEBUG_LOGS === 'true') {
+      console.log(`🔍 [DEBUG] ${message}`, data ? JSON.stringify(data, null, 2) : '');
     }
+  },
+  info: (message, data = null) => {
+    console.log(`ℹ️  [INFO] ${message}`, data ? JSON.stringify(data, null, 2) : '');
+  },
+  warn: (message, data = null) => {
+    console.warn(`⚠️  [WARN] ${message}`, data ? JSON.stringify(data, null, 2) : '');
   },
   error: (message, error = null) => {
-    console.error(`[ERROR] ${message}`, error ? error.stack || error : '');
-  },
-  debug: (message, data = null) => {
-    if (process.env.ENABLE_DEBUG_LOGS === 'true') {
-      console.log(`[DEBUG] ${message}`, data ? JSON.stringify(data, null, 2) : '');
-    }
+    console.error(`🔥 [ERROR] ${message}`, error ? error.stack || error : '');
   }
 };
 
-// Middleware per logging delle richieste
+// Middleware per request logging con performance tracking
 app.use((req, res, next) => {
   const start = Date.now();
+  const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+  req.requestId = requestId;
+  req.startTime = start;
+
   res.on('finish', () => {
     const duration = Date.now() - start;
-    logger.info(`${req.method} ${req.url} - ${res.statusCode} (${duration}ms)`);
+    const logLevel = res.statusCode >= 400 ? 'error' : 'info';
+
+    logger[logLevel](`${req.method} ${req.url} - ${res.statusCode} (${duration}ms) [${requestId}]`);
   });
+
   next();
 });
 
-// Middleware per gestione errori
-const errorHandler = (err, req, res, next) => {
-  logger.error('Unhandled error:', err);
-
-  // Non esporre dettagli di errore in produzione
-  const isDevelopment = process.env.NODE_ENV === 'development';
-
-  res.status(err.status || 500).json({
-    error: isDevelopment ? err.message : 'Errore interno del server',
-    ...(isDevelopment && { stack: err.stack })
-  });
-};
-
-// Endpoint principale per il chat multi-agent
+// Enhanced multi-agent endpoint with streaming fallback
 app.post("/multi-agent", async (req, res) => {
-  const startTime = Date.now();
-  const { prompt, conversationId = 'default', mode = 'chat', modelConfig = null, customWeights = null } = req.body;
+  const { prompt, conversationId = 'default', mode = 'chat', modelConfig = null, customWeights = null, streamingEnabled = false } = req.body;
 
-  // Validazione input
+  // Input validation
   if (!prompt || typeof prompt !== 'string' || prompt.trim() === '') {
     return res.status(400).json({
       error: 'Prompt richiesto e deve essere una stringa non vuota',
@@ -149,14 +122,7 @@ app.post("/multi-agent", async (req, res) => {
     });
   }
 
-  if (prompt.length > 10000) {
-    return res.status(400).json({
-      error: 'Prompt troppo lungo (massimo 10000 caratteri)',
-      code: 'PROMPT_TOO_LONG'
-    });
-  }
-
-  // Inizializza o recupera la conversazione
+  // Initialize conversation
   if (!conversations.has(conversationId)) {
     conversations.set(conversationId, {
       messages: [],
@@ -168,42 +134,36 @@ app.post("/multi-agent", async (req, res) => {
   const conversation = conversations.get(conversationId);
   conversation.lastActivity = Date.now();
 
-  // Aggiungi il messaggio dell'utente alla conversazione
+  // Add user message
   const userMessage = {
     agent: "user",
     message: prompt,
     timestamp: new Date().toISOString(),
-    metadata: {
-      mode,
-      modelConfig: modelConfig || {},
-      customWeights
-    }
+    metadata: { mode, modelConfig: modelConfig || {}, customWeights }
   };
 
   conversation.messages.push(userMessage);
 
-  const socketId = req.headers['x-socket-id'];
-  const socket = socketId ? io.sockets.sockets.get(socketId) : null;
-
-  // Emetti evento di inizio elaborazione
-  if (socket) {
-    socket.emit('processing_started', { conversationId, prompt });
-  }
-
   try {
-    // Configurazione predefinita se non specificata
-    const defaultConfig = {
-      'gpt': true,
-      'claude': true
-    };
+    // Check if streaming is requested and supported
+    if (streamingEnabled && (req.headers.accept?.includes('text/event-stream') || req.headers['x-stream-mode'])) {
+      logger.info(`🔄 Initiating streaming mode for conversation ${conversationId}`);
+      return await handleStreamingRequest(req, res, {
+        prompt,
+        conversationId,
+        modelConfig: modelConfig || { gpt: true, claude: true },
+        customWeights,
+        mode
+      });
+    }
 
-    // Usa la configurazione fornita o quella predefinita
-    const config = modelConfig || defaultConfig;
+    // Standard processing
+    const config = modelConfig || { gpt: true, claude: true };
 
-    // Rate limiting semplice
+    // Rate limiting
     const userRequests = conversation.messages.filter(m =>
       m.agent === 'user' &&
-      Date.now() - new Date(m.timestamp).getTime() < 60000 // ultimi 60 secondi
+      Date.now() - new Date(m.timestamp).getTime() < 60000
     );
 
     if (userRequests.length > 10) {
@@ -214,61 +174,44 @@ app.post("/multi-agent", async (req, res) => {
       });
     }
 
-    // Richiesta al router AI
+    // Process request
     const request = {
       prompt,
       conversationId,
       modelConfig: config,
       customWeights,
       mode,
-      context: conversation.messages.slice(-5) // Ultimi 5 messaggi per context
+      context: conversation.messages.slice(-5)
     };
 
-    logger.debug('Processing AI request', {
+    logger.debug('Processing standard AI request', {
       conversationId,
-      prompt: prompt.substring(0, 100) + '...',
-      models: Object.keys(config).filter(k => config[k])
+      models: Object.keys(config).filter(k => config[k]),
+      requestId: req.requestId
     });
 
-    // Elabora la richiesta
     const result = await router.processRequest(request);
 
     if (result.error) {
       throw new Error(result.error);
     }
 
-    // Aggiorna la conversazione con le nuove risposte
+    // Update conversation
     if (result.conversation && result.conversation.length > 0) {
-      // Filtra i messaggi per evitare duplicati dell'utente
       const newMessages = result.conversation.filter(msg =>
         msg.agent !== 'user' || msg.message !== prompt
       );
-
       conversation.messages.push(...newMessages);
     }
 
-    const processingTime = Date.now() - startTime;
+    const processingTime = Date.now() - req.startTime;
 
-    // Emetti evento di completamento
-    if (socket) {
-      socket.emit('processing_completed', {
-        conversationId,
-        result,
-        processingTime
-      });
-    }
-
-    // Statistiche per monitoring
-    const stats = {
+    logger.info(`✅ Request ${req.requestId} completed successfully`, {
       processingTime,
       modelsUsed: Object.keys(result.responses || {}),
-      messageCount: conversation.messages.length,
-      conversationAge: Date.now() - conversation.createdAt
-    };
+      messageCount: conversation.messages.length
+    });
 
-    logger.info('Request processed successfully', stats);
-
-    // Rispondi con la conversazione aggiornata
     res.json({
       conversation: conversation.messages,
       responses: result.responses || {},
@@ -276,288 +219,307 @@ app.post("/multi-agent", async (req, res) => {
       synthesizedResponse: result.synthesizedResponse || '',
       metadata: {
         processingTime,
-        modelsUsed: stats.modelsUsed,
-        messageCount: stats.messageCount,
-        mode
+        modelsUsed: Object.keys(result.responses || {}),
+        messageCount: conversation.messages.length,
+        mode,
+        requestId: req.requestId
       }
     });
 
   } catch (error) {
-    logger.error('Error during processing:', error);
+    logger.error(`Request ${req.requestId} failed:`, error);
 
-    // Categorizza l'errore per una risposta più specifica
-    let errorResponse = {
+    const errorResponse = {
       conversation: conversation.messages,
       error: 'Errore durante l\'elaborazione della richiesta',
       code: 'PROCESSING_ERROR',
-      processingTime: Date.now() - startTime
+      processingTime: Date.now() - req.startTime,
+      requestId: req.requestId
     };
 
-    if (error.message) {
-      if (error.message.includes('API key')) {
-        errorResponse.error = 'Configurazione API non valida';
-        errorResponse.code = 'API_KEY_ERROR';
-      } else if (error.message.includes('quota') || error.message.includes('exceeded')) {
-        errorResponse.error = 'Hai raggiunto il limite di utilizzo API';
-        errorResponse.code = 'QUOTA_EXCEEDED';
-      } else if (error.message.includes('rate limit')) {
-        errorResponse.error = 'Troppe richieste. Riprova più tardi';
-        errorResponse.code = 'RATE_LIMITED';
-      } else if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
-        errorResponse.error = 'Impossibile connettersi ai servizi AI';
-        errorResponse.code = 'CONNECTION_ERROR';
-      }
+    // Categorize error
+    if (error.message?.includes('API key')) {
+      errorResponse.error = 'Configurazione API non valida';
+      errorResponse.code = 'API_KEY_ERROR';
+    } else if (error.message?.includes('quota')) {
+      errorResponse.error = 'Limite di utilizzo API raggiunto';
+      errorResponse.code = 'QUOTA_EXCEEDED';
     }
 
-    // Aggiungi messaggio di errore alla conversazione
+    // Add error message to conversation
     const errorMessage = {
       agent: "system",
       message: `Errore: ${errorResponse.error}`,
       timestamp: new Date().toISOString(),
       metadata: {
         errorCode: errorResponse.code,
-        originalError: error.message
+        originalError: error.message,
+        requestId: req.requestId
       }
     };
 
     conversation.messages.push(errorMessage);
 
-    // Emetti evento di errore
-    if (socket) {
-      socket.emit('processing_error', { conversationId, error: errorResponse });
-    }
-
     res.status(500).json(errorResponse);
   }
 });
 
-// API per recuperare la conversazione
-app.get("/multi-agent/conversation/:id", (req, res) => {
-  const { id } = req.params;
-
-  if (!conversations.has(id)) {
-    return res.status(404).json({
-      error: 'Conversazione non trovata',
-      code: 'CONVERSATION_NOT_FOUND'
-    });
-  }
-
-  const conversation = conversations.get(id);
-  conversation.lastActivity = Date.now();
-
-  res.json({
-    conversation: conversation.messages,
-    metadata: {
-      messageCount: conversation.messages.length,
-      createdAt: conversation.createdAt,
-      lastActivity: conversation.lastActivity
-    }
-  });
-});
-
-// API per eliminare una conversazione
-app.delete("/multi-agent/conversation/:id", (req, res) => {
-  const { id } = req.params;
-
-  if (!conversations.has(id)) {
-    return res.status(404).json({
-      error: 'Conversazione non trovata',
-      code: 'CONVERSATION_NOT_FOUND'
-    });
-  }
-
-  conversations.delete(id);
-
-  logger.info(`Conversation deleted: ${id}`);
-
-  res.json({
-    success: true,
-    message: 'Conversazione eliminata',
-    conversationId: id
-  });
-});
-
-// API per l'upload di immagini
-app.post("/multi-agent/image", upload.single('image'), async (req, res) => {
-  const { prompt, conversationId = 'default', modelConfig = null } = req.body;
-
-  if (!req.file) {
-    return res.status(400).json({
-      error: 'Nessuna immagine caricata',
-      code: 'NO_IMAGE_UPLOADED'
-    });
-  }
-
-  if (!prompt || prompt.trim() === '') {
-    return res.status(400).json({
-      error: 'Prompt richiesto per l\'analisi dell\'immagine',
-      code: 'PROMPT_REQUIRED'
-    });
-  }
+// Enhanced streaming request handler
+async function handleStreamingRequest(req, res, requestData) {
+  const { conversationId, prompt } = requestData;
 
   try {
-    // Per ora, gestiamo solo l'analisi testuale dell'immagine
-    // In futuro, integreremo con modelli vision
-    const imageAnalysisPrompt = `Analizza questa immagine e rispondi alla seguente domanda: ${prompt}`;
+    // Setup SSE headers for streaming response
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Headers': 'Cache-Control',
+      'X-Accel-Buffering': 'no' // Disable nginx buffering
+    });
 
-    const request = {
-      prompt: imageAnalysisPrompt,
+    // Send initial event
+    res.write(`data: ${JSON.stringify({
+      type: 'stream_started',
       conversationId,
-      modelConfig: modelConfig || { 'gpt': true, 'claude': true },
-      mode: 'image_analysis',
-      metadata: {
-        imageFile: req.file.filename,
-        imagePath: req.file.path,
-        imageSize: req.file.size,
-        mimeType: req.file.mimetype
-      }
-    };
+      timestamp: Date.now()
+    })}\n\n`);
 
-    const result = await router.processRequest(request);
+    // Initialize stream with advanced orchestrator
+    const streamInfo = await streamingHandler.initializeStream(
+      conversationId,
+      { type: 'sse', requestId: req.requestId },
+      'sse'
+    );
 
-    res.json({
-      conversation: result.conversation || [],
-      responses: result.responses || {},
-      imageUrl: `/uploads/${req.file.filename}`,
-      metadata: {
-        imageProcessed: true,
-        fileName: req.file.filename,
-        fileSize: req.file.size
+    // Register SSE client
+    streamingHandler.registerSSEClient(res, conversationId, {
+      userAgent: req.headers['user-agent'],
+      ip: req.ip,
+      requestId: req.requestId
+    });
+
+    // Use advanced orchestrator for intelligent streaming
+    await advancedOrchestrator.startIntelligentStreaming(requestData, streamInfo);
+
+    // Setup heartbeat
+    const heartbeat = setInterval(() => {
+      if (!res.destroyed) {
+        res.write(`data: ${JSON.stringify({
+          type: 'heartbeat',
+          timestamp: Date.now()
+        })}\n\n`);
+      } else {
+        clearInterval(heartbeat);
       }
+    }, 10000);
+
+    // Cleanup on client disconnect
+    req.on('close', () => {
+      clearInterval(heartbeat);
+      streamingHandler.sseClients.delete(res);
+      logger.debug(`SSE client disconnected for conversation ${conversationId}`);
     });
 
   } catch (error) {
-    logger.error('Error processing image:', error);
+    logger.error(`Streaming initialization failed for ${conversationId}:`, error);
 
-    // Rimuovi il file in caso di errore
-    if (req.file && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
+    if (!res.headersSent) {
+      res.status(500).json({
+        error: 'Errore durante l\'inizializzazione dello streaming',
+        code: 'STREAM_INIT_ERROR'
+      });
+    } else {
+      res.write(`data: ${JSON.stringify({
+        type: 'error',
+        error: error.message,
+        timestamp: Date.now()
+      })}\n\n`);
     }
-
-    res.status(500).json({
-      error: 'Errore durante l\'elaborazione dell\'immagine',
-      code: 'IMAGE_PROCESSING_ERROR'
-    });
   }
+}
+
+// Mount streaming routes
+app.use('/api/stream', streamingRoutes);
+
+// WebSocket setup for real-time streaming
+const wss = setupWebSocketStreaming(server);
+
+// Socket.IO configuration for real-time updates
+io.on('connection', (socket) => {
+  logger.debug(`Socket.IO client connected: ${socket.id}`);
+
+  socket.on('join_conversation', (conversationId) => {
+    socket.join(conversationId);
+    logger.debug(`Socket ${socket.id} joined conversation ${conversationId}`);
+  });
+
+  socket.on('start_streaming', async (data) => {
+    try {
+      const { conversationId, prompt, modelConfig, customWeights, mode } = data;
+
+      // Initialize streaming with Socket.IO
+      const streamInfo = await streamingHandler.initializeStream(
+        conversationId,
+        { type: 'socketio', socketId: socket.id },
+        'socketio'
+      );
+
+      // Emit to room
+      socket.to(conversationId).emit('streaming_started', {
+        conversationId,
+        models: Object.keys(modelConfig).filter(k => modelConfig[k])
+      });
+
+      // Start advanced streaming
+      await advancedOrchestrator.startIntelligentStreaming({
+        prompt,
+        conversationId,
+        modelConfig,
+        customWeights,
+        mode
+      }, streamInfo);
+
+    } catch (error) {
+      socket.emit('streaming_error', {
+        error: error.message,
+        timestamp: Date.now()
+      });
+    }
+  });
+
+  socket.on('disconnect', () => {
+    logger.debug(`Socket.IO client disconnected: ${socket.id}`);
+  });
 });
 
-// API per statistiche del sistema
-app.get("/multi-agent/stats", (req, res) => {
+// Advanced streaming event handling
+advancedOrchestrator.on('strategy_selected', (data) => {
+  logger.info(`🎯 Streaming strategy selected: ${data.strategy.type} for ${data.conversationId}`);
+
+  // Broadcast to Socket.IO clients
+  io.to(data.conversationId).emit('strategy_selected', data);
+});
+
+advancedOrchestrator.on('model_chunk_with_metrics', (data) => {
+  // Broadcast chunk with performance metrics
+  io.to(data.conversationId).emit('model_chunk', {
+    model: data.model,
+    chunk: data.chunk,
+    metrics: data.metrics,
+    timestamp: Date.now()
+  });
+});
+
+streamingHandler.on('stream_event', (event) => {
+  // Broadcast all streaming events to Socket.IO
+  io.to(event.conversationId).emit('stream_event', event);
+});
+
+// Additional API endpoints for streaming management
+app.get('/api/streaming/stats', (req, res) => {
   const stats = {
+    ...streamingHandler.getStreamingStats(),
+    ...advancedOrchestrator.getPerformanceStats(),
+    socketioConnections: io.engine.clientsCount,
     activeConversations: conversations.size,
-    totalHandlers: Object.keys(router.handlers).length,
-    availableHandlers: Object.keys(router.handlers).filter(
-      key => router.handlers[key].checkAvailability()
-    ),
-    systemUptime: process.uptime(),
-    memoryUsage: process.memoryUsage(),
-    timestamp: new Date().toISOString()
+    uptime: process.uptime()
   };
 
   res.json(stats);
 });
 
-// API per la salute del sistema
-app.get("/health", (req, res) => {
-  const health = {
-    status: 'healthy',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    version: process.env.npm_package_version || '1.0.0',
-    environment: process.env.NODE_ENV || 'development'
+app.get('/api/streaming/performance/:model', (req, res) => {
+  const { model } = req.params;
+  const performance = advancedOrchestrator.getPerformanceStats()[model];
+
+  if (!performance) {
+    return res.status(404).json({
+      error: `Performance data not found for model: ${model}`,
+      availableModels: Object.keys(advancedOrchestrator.getPerformanceStats())
+    });
+  }
+
+  res.json({ model, performance });
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  logger.error('Unhandled error:', err);
+
+  const isDevelopment = process.env.NODE_ENV === 'development';
+
+  res.status(err.status || 500).json({
+    error: isDevelopment ? err.message : 'Errore interno del server',
+    requestId: req.requestId,
+    ...(isDevelopment && { stack: err.stack })
+  });
+});
+
+// Initialize AI handlers
+const initializeAI = () => {
+  const apiKeys = {
+    'openai': process.env.OPENAI_API_KEY,
+    'anthropic': process.env.ANTHROPIC_API_KEY,
+    'deepseek': process.env.DEEPSEEK_API_KEY,
+    'google': process.env.GOOGLE_API_KEY,
+    'mistral': process.env.MISTRAL_API_KEY,
+    'ollama': process.env.OLLAMA_ENDPOINT || 'localhost:11434'
   };
 
-  res.json(health);
-});
+  const initialized = router.initialize(apiKeys);
 
-// Servi i file statici dalla cartella uploads
-app.use('/uploads', express.static(uploadsDir));
-
-// Middleware per 404
-app.use((req, res) => {
-  res.status(404).json({
-    error: 'Endpoint non trovato',
-    code: 'ENDPOINT_NOT_FOUND',
-    availableEndpoints: [
-      'POST /multi-agent',
-      'GET /multi-agent/conversation/:id',
-      'DELETE /multi-agent/conversation/:id',
-      'POST /multi-agent/image',
-      'GET /multi-agent/stats',
-      'GET /health'
-    ]
-  });
-});
-
-// Middleware per gestione errori (deve essere l'ultimo)
-app.use(errorHandler);
-
-// Gestione connessione socket.io
-io.on('connection', (socket) => {
-  logger.debug(`New client connected: ${socket.id}`);
-
-  socket.on('join_conversation', (conversationId) => {
-    socket.join(conversationId);
-    logger.debug(`Client ${socket.id} joined conversation ${conversationId}`);
+  logger.info('🤖 AI Models Status:');
+  Object.keys(router.handlers).forEach(model => {
+    const status = router.handlers[model].checkAvailability() ? '✅' : '❌';
+    console.log(`   ${status} ${model.toUpperCase()}`);
   });
 
-  socket.on('leave_conversation', (conversationId) => {
-    socket.leave(conversationId);
-    logger.debug(`Client ${socket.id} left conversation ${conversationId}`);
-  });
+  return initialized;
+};
 
-  socket.on('disconnect', () => {
-    logger.debug(`Client disconnected: ${socket.id}`);
-  });
-});
-
-// Gestione graceful shutdown
+// Graceful shutdown
 process.on('SIGTERM', () => {
   logger.info('SIGTERM received, shutting down gracefully');
+
+  // Close all streaming connections
+  streamingHandler.sseClients.clear();
+  streamingHandler.wsClients.clear();
+
   server.close(() => {
     logger.info('Server closed');
     process.exit(0);
   });
 });
 
-process.on('SIGINT', () => {
-  logger.info('SIGINT received, shutting down gracefully');
-  server.close(() => {
-    logger.info('Server closed');
-    process.exit(0);
-  });
-});
-
-// Inizializzazione e avvio del server
+// Server startup
 const startServer = async () => {
   try {
-    // Inizializza i modelli AI
     initializeAI();
 
-    // Avvia il server
     const port = process.env.PORT || 4000;
     server.listen(port, () => {
-      logger.info(`🚀 NeuronVault Backend started`);
+      logger.info(`🚀 NeuronVault Enhanced Backend started`);
       logger.info(`📍 Server: http://localhost:${port}`);
-      logger.info(`🔌 Socket.IO: Active`);
+      logger.info(`🔌 Socket.IO: Active (${io.engine.clientsCount} clients)`);
+      logger.info(`📡 WebSocket Streaming: Active`);
       logger.info(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
 
       if (process.env.NODE_ENV === 'development') {
-        logger.info(`📊 Stats: http://localhost:${port}/multi-agent/stats`);
-        logger.info(`❤️  Health: http://localhost:${port}/health`);
+        logger.info(`📊 Streaming Stats: http://localhost:${port}/api/streaming/stats`);
+        logger.info(`🎯 Performance: http://localhost:${port}/api/streaming/performance/:model`);
       }
     });
 
   } catch (error) {
-    logger.error('Failed to start server:', error);
+    logger.error('Failed to start enhanced server:', error);
     process.exit(1);
   }
 };
 
-// Avvia il server solo se non siamo in modalità test
 if (process.env.NODE_ENV !== 'test') {
   startServer();
 }
 
-// Export per i test
 module.exports = app;
