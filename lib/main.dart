@@ -1,499 +1,416 @@
-// lib/main.dart
+// 🧠 NEURONVAULT - ENTERPRISE MAIN APPLICATION
+// Flutter Desktop App with Riverpod State Management
+// Part of PHASE 2.5 - QUANTUM STATE MANAGEMENT - COMPLETED ✅
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:logger/logger.dart';
+import 'package:window_manager/window_manager.dart';
 
-// Core Imports
+import 'core/providers/providers.dart';
+import 'core/theme/app_theme.dart';
 import 'core/design_system.dart';
-import 'core/accessibility/accessibility_manager.dart';
+import 'screens/main_screen.dart';
+import 'screens/loading_screen.dart';
+import 'screens/error_screen.dart';
 
-// Widget Imports
-import 'widgets/neural_app_bar.dart';
-import 'widgets/core/strategy_selector.dart';
-import 'widgets/core/model_grid.dart';
-import 'widgets/core/message_bubble.dart';
-import 'widgets/core/token_cost_widget.dart';
-
+// 🚀 ENTERPRISE APPLICATION ENTRY POINT
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Accessibility
-  await AccessibilityManager().initialize();
+  // 🔧 DESKTOP WINDOW CONFIGURATION
+  await _configureDesktopWindow();
 
-  runApp(const NeuronVaultApp());
+  // 📱 FLUTTER CONFIGURATION
+  await _configureFlutter();
+
+  // 🧠 INITIALIZE CORE SERVICES
+  final sharedPreferences = await SharedPreferences.getInstance();
+
+  // 🎯 CREATE PROVIDER CONTAINER
+  final container = ProviderContainer(
+    overrides: [
+      // Override SharedPreferences provider with actual instance
+      sharedPreferencesProvider.overrideWithValue(sharedPreferences),
+    ],
+    observers: [
+      // Add provider observers for debugging in development
+      if (kDebugMode) _NeuronVaultProviderObserver(),
+    ],
+  );
+
+  // 🏃 RUN APPLICATION
+  runApp(
+    UncontrolledProviderScope(
+      container: container,
+      child: const NeuronVaultApp(),
+    ),
+  );
 }
 
-/// 🧠 NEURON VAULT APP
-/// App principale con tema moderno e accessibility completa
-class NeuronVaultApp extends StatelessWidget {
-  const NeuronVaultApp({Key? key}) : super(key: key);
+// 🖥️ DESKTOP WINDOW CONFIGURATION
+Future<void> _configureDesktopWindow() async {
+  try {
+    await windowManager.ensureInitialized();
+
+    final windowOptions = WindowOptions(
+      size: const Size(1200, 800),
+      minimumSize: const Size(800, 600),
+      center: true,
+      backgroundColor: Colors.transparent,
+      skipTaskbar: false,
+      titleBarStyle: TitleBarStyle.normal,
+      windowButtonVisibility: true,
+      title: 'NeuronVault - Enterprise AI Orchestration Platform',
+    );
+
+    await windowManager.waitUntilReadyToShow(windowOptions, () async {
+      await windowManager.show();
+      await windowManager.focus();
+    });
+
+  } catch (e) {
+    debugPrint('❌ Failed to configure desktop window: $e');
+  }
+}
+
+// 📱 FLUTTER FRAMEWORK CONFIGURATION
+Future<void> _configureFlutter() async {
+  // Set preferred orientations for desktop
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.landscapeLeft,
+    DeviceOrientation.landscapeRight,
+    DeviceOrientation.portraitUp,
+  ]);
+
+  // Configure system UI overlay style
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: Brightness.light,
+    systemNavigationBarColor: Colors.transparent,
+    systemNavigationBarIconBrightness: Brightness.light,
+  ));
+}
+
+// 🧠 MAIN APPLICATION WIDGET
+class NeuronVaultApp extends ConsumerWidget {
+  const NeuronVaultApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Watch theme providers
+    final currentTheme = ref.watch(currentThemeProvider);
+    final isDarkMode = ref.watch(isDarkModeProvider);
+
     return MaterialApp(
-      title: 'NeuronVault',
-      navigatorKey: AccessibilityManager().navigatorKey,
-      theme: DesignSystem.instance.themeData,
-      home: const MainScreen(),
+      // 🎨 APPLICATION CONFIGURATION
+      title: 'NeuronVault - Enterprise AI Platform',
       debugShowCheckedModeBanner: false,
+
+      // 🎨 THEME CONFIGURATION
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: isDarkMode ? ThemeMode.dark : ThemeMode.light,
+
+      // 🌍 LOCALIZATION
+      locale: const Locale('en', 'US'),
+      supportedLocales: const [
+        Locale('en', 'US'),
+        Locale('it', 'IT'),
+      ],
+
+      // 🏠 HOME SCREEN
+      home: const AppInitializationWrapper(),
+
+      // 🔧 ROUTER CONFIGURATION (Future implementation)
+      // onGenerateRoute: AppRouter.generateRoute,
+
+      // 🧪 TESTING CONFIGURATION
+      builder: (context, child) {
+        // Add any global wrappers here (error handling, etc.)
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(
+            textScaleFactor: 1.0, // Prevent text scaling issues
+          ),
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
     );
   }
 }
 
-/// 🏠 MAIN SCREEN
-/// Schermo principale dell'applicazione
-class MainScreen extends StatefulWidget {
-  const MainScreen({Key? key}) : super(key: key);
+// 🔄 APPLICATION INITIALIZATION WRAPPER
+class AppInitializationWrapper extends ConsumerWidget {
+  const AppInitializationWrapper({super.key});
 
   @override
-  State<MainScreen> createState() => _MainScreenState();
+  Widget build(BuildContext context, WidgetRef ref) {
+    final initializationAsync = ref.watch(initializationProvider);
+
+    return initializationAsync.when(
+      // ⏳ LOADING STATE
+      loading: () => const LoadingScreen(
+        message: 'Initializing NeuronVault...',
+        subtitle: 'Setting up enterprise AI orchestration',
+      ),
+
+      // ✅ SUCCESS STATE
+      data: (isInitialized) {
+        if (isInitialized) {
+          return const MainApplicationScreen();
+        } else {
+          return const ErrorScreen(
+            title: 'Initialization Failed',
+            message: 'Failed to initialize the application. Please restart.',
+            canRetry: true,
+          );
+        }
+      },
+
+      // ❌ ERROR STATE
+      error: (error, stackTrace) {
+        return ErrorScreen(
+          title: 'Initialization Error',
+          message: 'An error occurred during initialization: $error',
+          canRetry: true,
+        );
+      },
+    );
+  }
 }
 
-class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
-  // Animation Controllers
-  late AnimationController _pulseController;
-  late Animation<double> _pulseAnimation;
-
-  // App State
-  AIStrategy _currentStrategy = AIStrategy.parallel;
-  bool _isConnected = true;
-  final List<AIModel> _models = [
-    AIModel(
-      name: 'Claude',
-      icon: Icons.psychology,
-      color: const Color(0xFF6366F1),
-      isActive: true,
-      health: 0.95,
-      tokensUsed: 12500,
-    ),
-    AIModel(
-      name: 'GPT-4',
-      icon: Icons.auto_awesome,
-      color: const Color(0xFF10B981),
-      isActive: true,
-      health: 0.88,
-      tokensUsed: 8200,
-    ),
-    AIModel(
-      name: 'Gemini',
-      icon: Icons.diamond,
-      color: const Color(0xFFF59E0B),
-      isActive: false,
-      health: 0.72,
-      tokensUsed: 0,
-    ),
-    AIModel(
-      name: 'DeepSeek',
-      icon: Icons.explore,
-      color: const Color(0xFF8B5CF6),
-      isActive: true,
-      health: 0.91,
-      tokensUsed: 2800,
-    ),
-  ];
-
-  // Focus Nodes - rimuovi quelli non utilizzati
+// 🏠 MAIN APPLICATION SCREEN
+class MainApplicationScreen extends ConsumerWidget {
+  const MainApplicationScreen({super.key});
 
   @override
-  void initState() {
-    super.initState();
-    _initializeAnimations();
-  }
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Watch global state
+    final appReady = ref.watch(appReadyProvider);
+    final overallHealth = ref.watch(overallHealthProvider);
+    final systemStatus = ref.watch(systemStatusProvider);
 
-  void _initializeAnimations() {
-    _pulseController = AnimationController(
-      duration: const Duration(seconds: 2),
-      vsync: this,
+    return Scaffold(
+      // 🧠 NEURAL APP BAR
+      appBar: AppBar(
+        title: Row(
+          children: [
+            // 🧠 Logo
+            Container(
+              width: 32,
+              height: 32,
+              margin: const EdgeInsets.only(right: 12),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                gradient: NeuralDesignSystem.primaryGradient,
+              ),
+              child: const Icon(Icons.psychology, color: Colors.white, size: 20),
+            ),
+
+            // 📱 Title
+            const Text(
+              'NeuronVault',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 20,
+              ),
+            ),
+
+            // 🏷️ Version Badge
+            Container(
+              margin: const EdgeInsets.only(left: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                'v2.5.0',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w500,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+            ),
+          ],
+        ),
+
+        // 🔧 ACTION BUTTONS
+        actions: [
+          // 🩺 Health Indicator
+          _HealthIndicator(health: overallHealth),
+
+          // 🌐 Connection Status
+          _ConnectionStatusIndicator(),
+
+          // ⚙️ Settings Button
+          IconButton(
+            onPressed: () => _showSettingsModal(context, ref),
+            icon: const Icon(Icons.settings),
+            tooltip: 'Settings',
+          ),
+
+          const SizedBox(width: 8),
+        ],
+
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+      ),
+
+      // 🏠 MAIN CONTENT
+      body: appReady
+          ? const MainScreen()
+          : const _SetupRequiredScreen(),
     );
-
-    _pulseAnimation = Tween<double>(
-      begin: 1.0,
-      end: 1.1,
-    ).animate(CurvedAnimation(
-      parent: _pulseController,
-      curve: Curves.easeInOut,
-    ));
-
-    _pulseController.repeat(reverse: true);
   }
 
-  @override
-  void dispose() {
-    _pulseController.dispose();
-    super.dispose();
-  }
-
-  /// 🔄 Handle Strategy Change
-  void _onStrategyChanged(AIStrategy strategy) {
-    setState(() {
-      _currentStrategy = strategy;
-    });
-
-    AccessibilityManager().announce(
-      'Strategy changed to ${strategy.displayName}',
-      assertive: true,
-    );
-
-    HapticFeedback.selectionClick();
-  }
-
-  /// 🔌 Toggle Connection
-  void _toggleConnection() {
-    setState(() {
-      _isConnected = !_isConnected;
-    });
-
-    AccessibilityManager().announce(
-      'Connection ${_isConnected ? 'established' : 'lost'}',
-      assertive: true,
-    );
-
-    HapticFeedback.lightImpact();
-  }
-
-  /// 🎛️ Toggle High Contrast
-  void _toggleHighContrast() {
-    DesignSystem.instance.toggleHighContrast();
-    setState(() {});
-
-    AccessibilityManager().announce(
-      'High contrast mode ${DesignSystem.instance.isHighContrast ? 'enabled' : 'disabled'}',
-      assertive: true,
-    );
-  }
-
-  /// ℹ️ Show Help Dialog
-  void _showHelpDialog() {
+  void _showSettingsModal(BuildContext context, WidgetRef ref) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Keyboard Shortcuts'),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Ctrl+H: Toggle High Contrast'),
-            Text('F1: Show Help'),
-            Text('Ctrl+Shift+S: Focus Strategy Selector'),
-            Text('Ctrl+Shift+C: Toggle Connection'),
-            Text('Tab: Navigate between elements'),
-            Text('Space/Enter: Activate focused element'),
-          ],
-        ),
+        title: const Text('Settings'),
+        content: const Text('Settings panel coming soon in Phase 2!'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close'),
+            child: const Text('OK'),
           ),
         ],
       ),
     );
   }
+}
 
+// 🩺 HEALTH INDICATOR WIDGET
+class _HealthIndicator extends StatelessWidget {
+  final AppHealth health;
+
+  const _HealthIndicator({required this.health});
 
   @override
   Widget build(BuildContext context) {
-    final ds = context.ds;
+    final (color, icon, tooltip) = switch (health) {
+      AppHealth.healthy => (Colors.green, Icons.check_circle, 'System Healthy'),
+      AppHealth.degraded => (Colors.orange, Icons.warning, 'System Degraded'),
+      AppHealth.unhealthy => (Colors.red, Icons.error, 'System Unhealthy'),
+      AppHealth.critical => (Colors.red, Icons.dangerous, 'System Critical'),
+    };
 
-    return Scaffold(
-      backgroundColor: ds.colors.colorScheme.surface,
-      appBar: NeuralAppBar(
-        isConnected: _isConnected,
-        onConnectionToggle: _toggleConnection,
-        pulseAnimation: _pulseAnimation,
-      ),
-      body: Column(
-        children: [
-          // Strategy Selector
-          Padding(
-            padding: EdgeInsets.all(ds.spacing.md),
-            child: StrategySelector(
-              currentStrategy: _currentStrategy,
-              onStrategyChanged: _onStrategyChanged,
-            ),
-          ),
-
-          // Main Content Area
-          Expanded(
-            child: Row(
-              children: [
-                // Left Panel - Models
-                Expanded(
-                  flex: 1,
-                  child: Padding(
-                    padding: EdgeInsets.all(ds.spacing.md),
-                    child: ModelGrid(
-                      models: _models,
-                      onModelToggle: (modelName) {
-                        setState(() {
-                          final modelIndex = _models.indexWhere((m) => m.name == modelName);
-                          if (modelIndex != -1) {
-                            _models[modelIndex] = _models[modelIndex].copyWith(
-                              isActive: !_models[modelIndex].isActive,
-                            );
-                          }
-                        });
-
-                        AccessibilityManager().announce(
-                          '$modelName ${_models.firstWhere((m) => m.name == modelName).isActive ? 'activated' : 'deactivated'}',
-                        );
-                      },
-                    ),
-                  ),
-                ),
-
-                // Right Panel - Chat & Token Usage
-                Expanded(
-                  flex: 2,
-                  child: Padding(
-                    padding: EdgeInsets.all(ds.spacing.md),
-                    child: Column(
-                      children: [
-                        // Token Cost Widget
-                        TokenCostWidget(
-                          totalTokens: _models.fold<int>(0, (sum, model) => sum + model.tokensUsed),
-                          models: _models,
-                          budgetLimit: 50000,
-                        ),
-
-                        SizedBox(height: ds.spacing.md),
-
-                        // Chat Messages Area
-                        Expanded(
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: ds.colors.colorScheme.surfaceContainer,
-                              borderRadius: ds.effects.cardRadius,
-                              boxShadow: [ds.effects.cardShadow],
-                            ),
-                            child: Column(
-                              children: [
-                                // Sample Message Bubbles
-                                Expanded(
-                                  child: ListView(
-                                    padding: const EdgeInsets.all(16),
-                                    children: const [
-                                      MessageBubble(
-                                        message: 'Welcome to NeuronVault! How can I help you today?',
-                                        isFromAI: true,
-                                        aiModel: 'Claude',
-                                        timestamp: 'Just now',
-                                      ),
-                                      SizedBox(height: 16),
-                                      MessageBubble(
-                                        message: 'I need help with my Flutter project.',
-                                        isFromAI: false,
-                                        timestamp: '2 minutes ago',
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-
-      // Accessibility FAB
-      floatingActionButton: FloatingActionButton(
-        onPressed: _showAccessibilityMenu,
-        backgroundColor: ds.colors.neuralPrimary,
-        child: Icon(
-          Icons.accessibility,
-          color: ds.colors.colorScheme.onPrimary,
-        ),
-      ),
-    );
-  }
-
-  /// 🧸 Show Accessibility Menu
-  void _showAccessibilityMenu() {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => AccessibilityMenu(
-        onHighContrastChanged: _toggleHighContrast,
-        onHelpPressed: _showHelpDialog,
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: Tooltip(
+        message: tooltip,
+        child: Icon(icon, color: color, size: 20),
       ),
     );
   }
 }
 
-/// 🎯 AI STRATEGY ENUM
-enum AIStrategy {
-  parallel,
-  consensus,
-  adaptive,
-  cascade;
+// 🌐 CONNECTION STATUS INDICATOR
+class _ConnectionStatusIndicator extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final connectionStatus = ref.watch(connectionStatusProvider);
+    final latency = ref.watch(connectionLatencyProvider);
 
-  String get displayName {
-    switch (this) {
-      case AIStrategy.parallel:
-        return 'Parallel';
-      case AIStrategy.consensus:
-        return 'Consensus';
-      case AIStrategy.adaptive:
-        return 'Adaptive';
-      case AIStrategy.cascade:
-        return 'Cascade';
-    }
-  }
+    final (color, icon, tooltip) = switch (connectionStatus) {
+      ConnectionStatus.connected => (
+      Colors.green,
+      Icons.wifi,
+      'Connected (${latency}ms)'
+      ),
+      ConnectionStatus.connecting => (
+      Colors.orange,
+      Icons.wifi_find,
+      'Connecting...'
+      ),
+      ConnectionStatus.disconnected => (
+      Colors.grey,
+      Icons.wifi_off,
+      'Disconnected'
+      ),
+      ConnectionStatus.error => (
+      Colors.red,
+      Icons.error_outline,
+      'Connection Error'
+      ),
+      ConnectionStatus.reconnecting => (
+      Colors.amber,
+      Icons.refresh,
+      'Reconnecting...'
+      ),
+    };
 
-  IconData get icon {
-    switch (this) {
-      case AIStrategy.parallel:
-        return Icons.call_split;
-      case AIStrategy.consensus:
-        return Icons.groups;
-      case AIStrategy.adaptive:
-        return Icons.psychology;
-      case AIStrategy.cascade:
-        return Icons.waterfall_chart;
-    }
-  }
-}
-
-/// 🤖 AI MODEL DATA CLASS
-class AIModel {
-  final String name;
-  final IconData icon;
-  final Color color;
-  final bool isActive;
-  final double health;
-  final int tokensUsed;
-
-  AIModel({
-    required this.name,
-    required this.icon,
-    required this.color,
-    required this.isActive,
-    required this.health,
-    required this.tokensUsed,
-  });
-
-  AIModel copyWith({
-    String? name,
-    IconData? icon,
-    Color? color,
-    bool? isActive,
-    double? health,
-    int? tokensUsed,
-  }) {
-    return AIModel(
-      name: name ?? this.name,
-      icon: icon ?? this.icon,
-      color: color ?? this.color,
-      isActive: isActive ?? this.isActive,
-      health: health ?? this.health,
-      tokensUsed: tokensUsed ?? this.tokensUsed,
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: Tooltip(
+        message: tooltip,
+        child: Icon(icon, color: color, size: 20),
+      ),
     );
   }
 }
 
-/// 🧸 ACCESSIBILITY MENU
-/// Menu dedicato alle opzioni di accessibilità
-class AccessibilityMenu extends StatelessWidget {
-  final VoidCallback onHighContrastChanged;
-  final VoidCallback onHelpPressed;
-
-  const AccessibilityMenu({
-    Key? key,
-    required this.onHighContrastChanged,
-    required this.onHelpPressed,
-  }) : super(key: key);
+// 🔧 SETUP REQUIRED SCREEN
+class _SetupRequiredScreen extends ConsumerWidget {
+  const _SetupRequiredScreen();
 
   @override
-  Widget build(BuildContext context) {
-    final ds = context.ds;
-
-    return Container(
-      padding: EdgeInsets.all(ds.spacing.lg),
-      decoration: BoxDecoration(
-        color: ds.colors.colorScheme.surfaceContainer,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-      ),
+  Widget build(BuildContext context, WidgetRef ref) {
+    return const Center(
       child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          Icon(Icons.settings, size: 64, color: Colors.grey),
+          SizedBox(height: 16),
           Text(
-            'Accessibility Options',
-            style: ds.typography.h2.copyWith(
-              color: ds.colors.colorScheme.onSurface,
-            ),
+            'Setup Required',
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
           ),
-
-          SizedBox(height: ds.spacing.lg),
-
-          // High Contrast Toggle
-          GestureDetector(
-            onTap: () {
-              onHighContrastChanged();
-              Navigator.pop(context);
-            },
-            child: ListTile(
-              leading: Icon(
-                Icons.contrast,
-                color: ds.colors.neuralPrimary,
-              ),
-              title: Text(
-                'High Contrast Mode',
-                style: ds.typography.body1.copyWith(
-                  color: ds.colors.colorScheme.onSurface,
-                ),
-              ),
-              subtitle: Text(
-                ds.isHighContrast ? 'Enabled' : 'Disabled',
-                style: ds.typography.body2.copyWith(
-                  color: ds.colors.colorScheme.onSurface.withOpacity(0.7),
-                ),
-              ),
-              trailing: Switch(
-                value: ds.isHighContrast,
-                onChanged: (_) {
-                  onHighContrastChanged();
-                  Navigator.pop(context);
-                },
-              ),
-            ),
+          SizedBox(height: 8),
+          Text(
+            'Please configure your AI models and connection settings.',
+            style: TextStyle(color: Colors.grey),
           ),
-
-          // Keyboard Shortcuts
-          GestureDetector(
-            onTap: () {
-              Navigator.pop(context);
-              onHelpPressed();
-            },
-            child: ListTile(
-              leading: Icon(
-                Icons.keyboard,
-                color: ds.colors.neuralSecondary,
-              ),
-              title: Text(
-                'Keyboard Shortcuts',
-                style: ds.typography.body1.copyWith(
-                  color: ds.colors.colorScheme.onSurface,
-                ),
-              ),
-              subtitle: Text(
-                'View available shortcuts',
-                style: ds.typography.body2.copyWith(
-                  color: ds.colors.colorScheme.onSurface.withOpacity(0.7),
-                ),
-              ),
-              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-            ),
-          ),
-
-          SizedBox(height: ds.spacing.lg),
+          SizedBox(height: 24),
+          // TODO: Add setup wizard button
         ],
       ),
     );
   }
 }
+
+// 🧪 PROVIDER OBSERVER FOR DEBUGGING
+class _NeuronVaultProviderObserver extends ProviderObserver {
+  final Logger _logger = Logger();
+
+  @override
+  void didUpdateProvider(
+      ProviderBase provider,
+      Object? previousValue,
+      Object? newValue,
+      ProviderContainer container,
+      ) {
+    if (provider.name != null) {
+      _logger.d('🔄 Provider Updated: ${provider.name} -> $newValue');
+    }
+  }
+
+  @override
+  void didDisposeProvider(
+      ProviderBase provider,
+      Object? value,
+      ProviderContainer container,
+      ) {
+    if (provider.name != null) {
+      _logger.d('🗑️ Provider Disposed: ${provider.name}');
+    }
+  }
+}
+
+// 🎯 COMPILE-TIME CONSTANTS
+const bool kDebugMode =
+    bool.fromEnvironment('dart.vm.product') == false;

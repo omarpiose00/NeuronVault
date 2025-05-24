@@ -1,49 +1,71 @@
 name: neuronvault
-description: Advanced AI orchestration desktop app with Flutter
-version: 1.0.0+1
+description: "Enterprise AI Orchestration Platform - Privacy-First, Offline-Complete"
+publish_to: 'none'
+version: 2.5.0+1
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
+  flutter: ">=3.16.0"
 
 dependencies:
   flutter:
     sdk: flutter
 
-  # UI & Theming
-  cupertino_icons: ^1.0.6
-  google_fonts: ^6.1.0
-
-  # State Management
-  provider: ^6.1.1
-
-  # Animations
-  flutter_animate: ^4.5.0
-
-  # Utilities
-  path_provider: ^2.1.2
-  shared_preferences: ^2.2.2
-
-  # HTTP & WebSocket
-  http: ^1.2.0
-  web_socket_channel: ^2.4.3
-
-  # JSON & Data
+  # 🧠 STATE MANAGEMENT - ENTERPRISE GRADE
+  flutter_riverpod: ^2.5.1
+  riverpod_annotation: ^2.3.5
+  freezed_annotation: ^2.4.1
   json_annotation: ^4.8.1
 
-  # Platform Integration
-  desktop_window: ^0.4.0
-  window_manager: ^0.3.7
+  # 🔒 SECURITY & STORAGE
+  flutter_secure_storage: ^9.0.0
+  encrypt: ^5.0.1
+  crypto: ^3.0.3
+
+  # 🌐 NETWORKING & WEBSOCKETS
+  web_socket_channel: ^2.4.0
+  http: ^1.1.2
+  dio: ^5.4.0
+
+  # 🎨 UI & ANIMATIONS
+  animations: ^2.0.8
+  flutter_staggered_animations: ^1.1.1
+  shimmer: ^3.0.0
+  lottie: ^2.7.0
+
+  # 🧸 ACCESSIBILITY
+  flutter_tts: ^3.8.5
+  speech_to_text: ^6.6.0
+
+  # 🔧 UTILITIES
+  path_provider: ^2.1.2
+  shared_preferences: ^2.2.2
+  package_info_plus: ^4.2.0
+  device_info_plus: ^9.1.1
+  logger: ^2.0.2+1
+  uuid: ^4.2.1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
 
-  # Linting
-  flutter_lints: ^3.0.1
-
-  # Code Generation
+  # 🏗️ CODE GENERATION
   build_runner: ^2.4.7
+  riverpod_generator: ^2.4.0
+  freezed: ^2.4.6
   json_serializable: ^6.7.1
+
+  # 🧪 TESTING ENTERPRISE
+  golden_toolkit: ^0.15.0
+  integration_test:
+    sdk: flutter
+  mocktail: ^1.0.2
+  flutter_driver:
+    sdk: flutter
+
+  # 📊 ANALYSIS & QUALITY
+  flutter_lints: ^3.0.1
+  very_good_analysis: ^5.1.0
 
 flutter:
   uses-material-design: true
@@ -53,3 +75,15 @@ flutter:
     - assets/icons/
     - assets/animations/
     - assets/audio/
+    - assets/backend/
+
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-Regular.ttf
+        - asset: assets/fonts/Inter-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Inter-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Inter-Bold.ttf
+          weight: 700
