@@ -1,49 +1,55 @@
-name: multi_ai_flutter
-description: Chat multi-AI (Claude, GPT, DeepSeek) con backend orchestratore
-version: 1.0.2
+name: neuronvault
+description: Advanced AI orchestration desktop app with Flutter
+version: 1.0.0+1
+
 environment:
-  sdk: ">=3.0.0 <4.0.0"
+  sdk: '>=3.2.0 <4.0.0'
 
 dependencies:
   flutter:
     sdk: flutter
-  # Networking
-  http: ^1.1.0
 
-  # UI e styling
+  # UI & Theming
+  cupertino_icons: ^1.0.6
   google_fonts: ^6.1.0
-  flutter_markdown: ^0.6.18
-  cached_network_image: ^3.3.0
-  flutter_animate: ^4.3.0
-  rive: ^0.12.3
 
-  # Gestione stato
+  # State Management
   provider: ^6.1.1
+
+  # Animations
+  flutter_animate: ^4.5.0
+
+  # Utilities
+  path_provider: ^2.1.2
   shared_preferences: ^2.2.2
 
-  # Supporto desktop
-  window_manager: ^0.3.7
+  # HTTP & WebSocket
+  http: ^1.2.0
+  web_socket_channel: ^2.4.3
+
+  # JSON & Data
+  json_annotation: ^4.8.1
+
+  # Platform Integration
   desktop_window: ^0.4.0
-  path_provider: ^2.1.1
-  flutter_secure_storage: ^9.0.0
-
-  # Funzionalità multimediali
-  image_picker: ^1.0.4
-  speech_to_text: ^6.3.0
-
-  # Animazioni
-  lottie: ^2.7.0
+  window_manager: ^0.3.7
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^3.0.0
-  test: ^1.25.15
+
+  # Linting
+  flutter_lints: ^3.0.1
+
+  # Code Generation
+  build_runner: ^2.4.7
+  json_serializable: ^6.7.1
 
 flutter:
   uses-material-design: true
 
   assets:
     - assets/images/
+    - assets/icons/
     - assets/animations/
-    - assets/backend/
+    - assets/audio/

@@ -1,418 +1,175 @@
 // assets/backend/streaming/streaming_handler.js
-const { EventEmitter } = require('events');
-const WebSocket = require('ws');
+const EventEmitter = require('events');
 
 /**
- * Gestore centralizzato per lo streaming delle risposte AI
- * Supporta WebSocket e Server-Sent Events (SSE)
+ * Basic Streaming Handler per gestire streaming AI
  */
 class StreamingHandler extends EventEmitter {
   constructor() {
     super();
-    this.activeStreams = new Map(); // conversationId -> streamInfo
-    this.wsClients = new Map(); // websocket -> clientInfo
-    this.sseClients = new Map(); // response -> clientInfo
-
-    // Configurazioni
+    this.activeStreams = new Map();
     this.config = {
-      maxStreamingTime: 30000, // 30 secondi max per stream
-      chunkSize: 512, // Dimensione chunk per streaming
-      heartbeatInterval: 5000, // Heartbeat ogni 5 secondi
       maxConcurrentStreams: 10,
+      streamTimeout: 30000,
+      chunkDelay: 100
     };
-
-    // Cleanup streams scaduti ogni minuto
-    setInterval(() => this._cleanupExpiredStreams(), 60000);
   }
 
   /**
-   * Inizializza un nuovo stream per una conversazione
+   * Inizia un nuovo stream
    */
-  async initializeStream(conversationId, clientInfo, streamType = 'websocket') {
-    // Verifica limiti di streaming concorrenti
-    if (this.activeStreams.size >= this.config.maxConcurrentStreams) {
-      throw new Error('Troppi stream attivi. Riprova più tardi.');
+  async startStream(streamId, request, onChunk) {
+    if (this.activeStreams.has(streamId)) {
+      throw new Error(`Stream ${streamId} is already active`);
     }
 
     const streamInfo = {
-      conversationId,
+      id: streamId,
       startTime: Date.now(),
-      clientInfo,
-      streamType,
-      isActive: true,
-      modelProgress: {}, // Progresso per ogni modello
-      totalProgress: 0,
-      chunks: [], // Buffer dei chunk ricevuti
+      request,
+      status: 'active'
     };
 
-    this.activeStreams.set(conversationId, streamInfo);
-
-    console.log(`🔄 Stream inizializzato per conversazione ${conversationId} (${streamType})`);
-    return streamInfo;
-  }
-
-  /**
-   * Processa una richiesta streaming con più modelli AI
-   */
-  async processStreamingRequest(request, streamInfo) {
-    const { conversationId } = streamInfo;
-    const { prompt, modelConfig, customWeights } = request;
+    this.activeStreams.set(streamId, streamInfo);
 
     try {
-      // Determina quali modelli utilizzare
-      const activeModels = Object.entries(modelConfig)
-        .filter(([_, enabled]) => enabled)
-        .map(([model, _]) => model);
+      // Simula streaming response
+      await this._simulateStreaming(streamId, request, onChunk);
 
-      if (activeModels.length === 0) {
-        throw new Error('Nessun modello AI abilitato per lo streaming');
-      }
+      // Mark stream as completed
+      streamInfo.status = 'completed';
+      streamInfo.endTime = Date.now();
 
-      // Inizializza il progresso per ogni modello
-      activeModels.forEach(model => {
-        streamInfo.modelProgress[model] = {
-          status: 'pending',
-          progress: 0,
-          chunks: [],
-          completed: false,
-          error: null
-        };
-      });
-
-      // Emetti evento di inizio streaming
-      this._emitStreamEvent(conversationId, 'stream_started', {
-        models: activeModels,
-        totalModels: activeModels.length
-      });
-
-      // Avvia streaming parallelo per tutti i modelli
-      const streamPromises = activeModels.map(model =>
-        this._streamFromModel(model, prompt, conversationId, streamInfo)
-      );
-
-      // Aspetta che tutti i modelli completino
-      const modelResponses = await Promise.allSettled(streamPromises);
-
-      // Processa i risultati
-      const successfulResponses = {};
-      const failedModels = [];
-
-      modelResponses.forEach((result, index) => {
-        const model = activeModels[index];
-        if (result.status === 'fulfilled' && result.value) {
-          successfulResponses[model] = result.value;
-        } else {
-          failedModels.push(model);
-          console.error(`❌ Streaming fallito per ${model}:`, result.reason);
-        }
-      });
-
-      // Se abbiamo almeno una risposta, procedi con la sintesi
-      if (Object.keys(successfulResponses).length > 0) {
-        await this._streamSynthesis(successfulResponses, customWeights, streamInfo);
-      } else {
-        throw new Error('Tutti i modelli hanno fallito durante lo streaming');
-      }
+      this.emit('stream_completed', { streamId, streamInfo });
 
     } catch (error) {
-      console.error(`💥 Errore durante streaming per ${conversationId}:`, error);
-      this._emitStreamEvent(conversationId, 'stream_error', {
-        error: error.message,
-        timestamp: Date.now()
-      });
+      streamInfo.status = 'error';
+      streamInfo.error = error.message;
+      this.emit('stream_error', { streamId, error });
+      throw error;
     } finally {
-      // Cleanup stream
-      this._completeStream(conversationId);
+      // Cleanup dopo un po'
+      setTimeout(() => {
+        this.activeStreams.delete(streamId);
+      }, 5000);
     }
   }
 
   /**
-   * Streaming da un singolo modello AI
+   * Simula streaming response
    */
-  async _streamFromModel(model, prompt, conversationId, streamInfo) {
-    const modelProgress = streamInfo.modelProgress[model];
-    modelProgress.status = 'streaming';
+  async _simulateStreaming(streamId, request, onChunk) {
+    const fullText = `This is a simulated streaming response for: "${request.prompt}".
+    The response is being generated in chunks to demonstrate real-time streaming capabilities.
+    Each chunk arrives with a small delay to simulate network latency and processing time.`;
 
-    try {
-      // Emetti inizio streaming per questo modello
-      this._emitStreamEvent(conversationId, 'model_stream_started', {
-        model,
-        timestamp: Date.now()
+    const words = fullText.split(' ');
+
+    for (let i = 0; i < words.length; i++) {
+      // Check if stream is still active
+      const streamInfo = this.activeStreams.get(streamId);
+      if (!streamInfo || streamInfo.status !== 'active') {
+        break;
+      }
+
+      const chunk = words[i] + ' ';
+      const isFinished = i === words.length - 1;
+
+      // Emit chunk event
+      this.emit('chunk', {
+        streamId,
+        chunk,
+        isFinished,
+        progress: (i + 1) / words.length
       });
 
-      // Ottieni handler per il modello
-      const handler = this._getModelHandler(model);
-      if (!handler || !handler.checkAvailability()) {
-        throw new Error(`Modello ${model} non disponibile`);
+      // Call chunk callback
+      if (onChunk) {
+        onChunk(chunk, isFinished);
       }
 
-      // Avvia streaming specifico per il modello
-      let fullResponse = '';
-      const chunkBuffer = [];
-
-      // Simula streaming (per modelli che non supportano streaming nativo)
-      if (handler.supportsStreaming) {
-        // Streaming reale
-        const stream = await handler.processStream(prompt, conversationId);
-
-        stream.on('data', (chunk) => {
-          fullResponse += chunk;
-          chunkBuffer.push(chunk);
-
-          // Emetti chunk
-          this._emitStreamEvent(conversationId, 'model_chunk', {
-            model,
-            chunk,
-            progress: this._calculateProgress(fullResponse),
-            timestamp: Date.now()
-          });
-        });
-
-        stream.on('end', () => {
-          modelProgress.completed = true;
-          modelProgress.status = 'completed';
-        });
-
-        return new Promise((resolve, reject) => {
-          stream.on('end', () => resolve(fullResponse));
-          stream.on('error', reject);
-        });
-
-      } else {
-        // Simula streaming per modelli che non lo supportano nativamente
-        const response = await handler.process(prompt, conversationId);
-        await this._simulateStreaming(model, response, conversationId, streamInfo);
-        return response;
-      }
-
-    } catch (error) {
-      modelProgress.status = 'error';
-      modelProgress.error = error.message;
-      throw error;
+      // Simulate processing delay
+      await new Promise(resolve => setTimeout(resolve, this.config.chunkDelay));
     }
   }
 
   /**
-   * Simula streaming per modelli che non lo supportano nativamente
+   * Pausa uno stream
    */
-  async _simulateStreaming(model, fullResponse, conversationId, streamInfo) {
-    const words = fullResponse.split(' ');
-    const chunkSize = Math.ceil(words.length / 10); // Dividi in 10 chunk
-
-    for (let i = 0; i < words.length; i += chunkSize) {
-      const chunk = words.slice(i, i + chunkSize).join(' ');
-      const progress = Math.min((i + chunkSize) / words.length, 1.0);
-
-      // Emetti chunk
-      this._emitStreamEvent(conversationId, 'model_chunk', {
-        model,
-        chunk: chunk + ' ',
-        progress,
-        timestamp: Date.now()
-      });
-
-      // Pausa realistica per simulare streaming
-      await new Promise(resolve => setTimeout(resolve, 100 + Math.random() * 200));
-    }
-
-    // Marca come completato
-    streamInfo.modelProgress[model].completed = true;
-    streamInfo.modelProgress[model].status = 'completed';
-  }
-
-  /**
-   * Streaming della sintesi finale
-   */
-  async _streamSynthesis(responses, customWeights, streamInfo) {
-    const { conversationId } = streamInfo;
-
-    try {
-      // Emetti inizio sintesi
-      this._emitStreamEvent(conversationId, 'synthesis_started', {
-        models: Object.keys(responses),
-        timestamp: Date.now()
-      });
-
-      // Carica il synthesizer
-      const synthesizer = require('../ai-handlers/synthesizer');
-
-      // Simula streaming della sintesi
-      const synthesizedResponse = await synthesizer.synthesize(responses, {}, customWeights);
-
-      // Simula streaming della risposta sintetizzata
-      const words = synthesizedResponse.split(' ');
-      const chunkSize = Math.ceil(words.length / 15); // Sintesi più lenta
-
-      for (let i = 0; i < words.length; i += chunkSize) {
-        const chunk = words.slice(i, i + chunkSize).join(' ');
-        const progress = Math.min((i + chunkSize) / words.length, 1.0);
-
-        this._emitStreamEvent(conversationId, 'synthesis_chunk', {
-          chunk: chunk + ' ',
-          progress,
-          timestamp: Date.now()
-        });
-
-        await new Promise(resolve => setTimeout(resolve, 150 + Math.random() * 300));
-      }
-
-      // Emetti fine sintesi
-      this._emitStreamEvent(conversationId, 'synthesis_completed', {
-        finalResponse: synthesizedResponse,
-        timestamp: Date.now()
-      });
-
-    } catch (error) {
-      this._emitStreamEvent(conversationId, 'synthesis_error', {
-        error: error.message,
-        timestamp: Date.now()
-      });
-      throw error;
+  pauseStream(streamId) {
+    const streamInfo = this.activeStreams.get(streamId);
+    if (streamInfo && streamInfo.status === 'active') {
+      streamInfo.status = 'paused';
+      this.emit('stream_paused', { streamId });
     }
   }
 
   /**
-   * Ottiene handler per un modello specifico
+   * Riprende uno stream
    */
-  _getModelHandler(model) {
-    const handlers = {
-      'gpt': require('../ai-handlers/gpt_handler'),
-      'claude': require('../ai-handlers/claude_handler'),
-      'deepseek': require('../ai-handlers/deepseek_handler'),
-      'gemini': require('../ai-handlers/gemini_handler'),
-      'mistral': require('../ai-handlers/mistral_handler'),
-      'ollama': require('../ai-handlers/ollama_handler'),
-      'llama': require('../ai-handlers/llama_handler'),
-    };
-
-    return handlers[model];
+  resumeStream(streamId) {
+    const streamInfo = this.activeStreams.get(streamId);
+    if (streamInfo && streamInfo.status === 'paused') {
+      streamInfo.status = 'active';
+      this.emit('stream_resumed', { streamId });
+    }
   }
 
   /**
-   * Calcola progresso basato sulla lunghezza della risposta
+   * Ferma uno stream
    */
-  _calculateProgress(response) {
-    // Stima basata su lunghezza tipica (500-1500 caratteri)
-    const estimatedLength = 1000;
-    return Math.min(response.length / estimatedLength, 1.0);
+  stopStream(streamId) {
+    const streamInfo = this.activeStreams.get(streamId);
+    if (streamInfo) {
+      streamInfo.status = 'stopped';
+      streamInfo.endTime = Date.now();
+      this.emit('stream_stopped', { streamId });
+    }
   }
 
   /**
-   * Emette evento di streaming a tutti i client connessi
+   * Ottieni info su stream attivo
    */
-  _emitStreamEvent(conversationId, eventType, data) {
-    const streamInfo = this.activeStreams.get(conversationId);
-    if (!streamInfo) return;
-
-    const event = {
-      type: eventType,
-      conversationId,
-      data,
-      timestamp: Date.now()
-    };
-
-    // WebSocket clients
-    this.wsClients.forEach((clientInfo, ws) => {
-      if (clientInfo.conversationId === conversationId && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify(event));
-      }
-    });
-
-    // SSE clients
-    this.sseClients.forEach((clientInfo, res) => {
-      if (clientInfo.conversationId === conversationId && !res.destroyed) {
-        res.write(`data: ${JSON.stringify(event)}\n\n`);
-      }
-    });
-
-    // Emetti anche come evento interno
-    this.emit('stream_event', event);
+  getStreamInfo(streamId) {
+    return this.activeStreams.get(streamId);
   }
 
   /**
-   * Completa uno stream
+   * Ottieni tutti gli stream attivi
    */
-  _completeStream(conversationId) {
-    const streamInfo = this.activeStreams.get(conversationId);
-    if (!streamInfo) return;
-
-    streamInfo.isActive = false;
-    streamInfo.endTime = Date.now();
-
-    // Emetti evento di completamento
-    this._emitStreamEvent(conversationId, 'stream_completed', {
-      duration: streamInfo.endTime - streamInfo.startTime,
-      totalChunks: streamInfo.chunks.length
-    });
-
-    // Rimuovi stream dalla mappa attiva (dopo un breve delay per cleanup)
-    setTimeout(() => {
-      this.activeStreams.delete(conversationId);
-    }, 5000);
-
-    console.log(`✅ Stream completato per conversazione ${conversationId}`);
+  getActiveStreams() {
+    return Array.from(this.activeStreams.values());
   }
 
   /**
-   * Cleanup streams scaduti
+   * Pulisci stream completati
    */
-  _cleanupExpiredStreams() {
+  cleanup() {
     const now = Date.now();
-
-    for (const [conversationId, streamInfo] of this.activeStreams.entries()) {
-      const age = now - streamInfo.startTime;
-
-      if (age > this.config.maxStreamingTime) {
-        console.log(`🧹 Cleanup stream scaduto: ${conversationId}`);
-        this._completeStream(conversationId);
+    for (const [streamId, streamInfo] of this.activeStreams.entries()) {
+      // Rimuovi stream inattivi da più di 1 ora
+      if (streamInfo.endTime && (now - streamInfo.endTime) > 3600000) {
+        this.activeStreams.delete(streamId);
       }
     }
   }
 
   /**
-   * Registra un client WebSocket
+   * Ottieni statistiche streaming
    */
-  registerWebSocketClient(ws, conversationId, clientInfo = {}) {
-    this.wsClients.set(ws, {
-      conversationId,
-      connectedAt: Date.now(),
-      ...clientInfo
-    });
+  getStats() {
+    const activeCount = this.getActiveStreams().filter(s => s.status === 'active').length;
+    const pausedCount = this.getActiveStreams().filter(s => s.status === 'paused').length;
+    const completedCount = this.getActiveStreams().filter(s => s.status === 'completed').length;
 
-    ws.on('close', () => {
-      this.wsClients.delete(ws);
-    });
-  }
-
-  /**
-   * Registra un client SSE
-   */
-  registerSSEClient(res, conversationId, clientInfo = {}) {
-    this.sseClients.set(res, {
-      conversationId,
-      connectedAt: Date.now(),
-      ...clientInfo
-    });
-
-    res.on('close', () => {
-      this.sseClients.delete(res);
-    });
-  }
-
-  /**
-   * Ottiene statistiche degli stream attivi
-   */
-  getStreamingStats() {
     return {
-      activeStreams: this.activeStreams.size,
-      wsClients: this.wsClients.size,
-      sseClients: this.sseClients.size,
-      totalEventsEmitted: this.listenerCount('stream_event'),
+      totalActiveStreams: this.activeStreams.size,
+      activeStreams: activeCount,
+      pausedStreams: pausedCount,
+      completedStreams: completedCount,
+      config: this.config
     };
   }
 }
 
-// Singleton instance
-const streamingHandler = new StreamingHandler();
-
-module.exports = streamingHandler;
+module.exports = new StreamingHandler();
