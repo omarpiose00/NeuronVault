@@ -1,461 +1,434 @@
-// 🧠 NEURONVAULT - ENTERPRISE MAIN APPLICATION
-// Flutter Desktop App with Riverpod State Management
-// Part of PHASE 2.5 - QUANTUM STATE MANAGEMENT - COMPLETED ✅
+// 🧬 NEURONVAULT - MAIN APPLICATION ENTRY POINT - CORRECTED
+// Real AI Orchestration with Riverpod State Management
+// Uses existing NeuronVaultTheme system
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:logger/logger.dart';
 import 'package:window_manager/window_manager.dart';
+import 'dart:io';
 
 import 'core/providers/providers_main.dart';
-import 'core/state/state_models.dart';
-import 'core/design_system.dart';
-import 'screens/main_screen.dart';
-import 'screens/loading_screen.dart';
-import 'screens/error_screen.dart';
+import 'core/theme/app_theme.dart'; // Uses existing NeuronVaultTheme
+import 'screens/orchestration_main_screen.dart';
 
-// 🚀 ENTERPRISE APPLICATION ENTRY POINT
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 🔧 DESKTOP WINDOW CONFIGURATION
-  await _configureDesktopWindow();
+  // 🖥️ Desktop window configuration
+  if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+    await windowManager.ensureInitialized();
+    await windowManager.setTitle('NeuronVault - AI Orchestration Platform');
+    await windowManager.setMinimumSize(const Size(800, 600));
+    await windowManager.setSize(const Size(1200, 800));
+    await windowManager.center();
+  }
 
-  // 📱 FLUTTER CONFIGURATION
-  await _configureFlutter();
-
-  // 🧠 INITIALIZE CORE SERVICES
+  // 💾 Initialize SharedPreferences
   final sharedPreferences = await SharedPreferences.getInstance();
 
-  // 🎯 CREATE PROVIDER CONTAINER
-  final container = ProviderContainer(
-    overrides: [
-      // Override SharedPreferences provider with actual instance
-      sharedPreferencesProvider.overrideWithValue(sharedPreferences),
-    ],
-    observers: [
-      // Add provider observers for debugging in development
-      if (kDebugMode) _NeuronVaultProviderObserver(),
-    ],
+  // 🎨 Set system UI overlay style
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+      systemNavigationBarColor: Color(0xFF1A1B23),
+      systemNavigationBarIconBrightness: Brightness.light,
+    ),
   );
 
-  // 🏃 RUN APPLICATION
+  // 🚀 Run application with Riverpod
   runApp(
-    UncontrolledProviderScope(
-      container: container,
+    ProviderScope(
+      overrides: [
+        // Override SharedPreferences provider with actual instance
+        sharedPreferencesProvider.overrideWithValue(sharedPreferences),
+      ],
       child: const NeuronVaultApp(),
     ),
   );
 }
 
-// 🖥️ DESKTOP WINDOW CONFIGURATION
-Future<void> _configureDesktopWindow() async {
-  try {
-    await windowManager.ensureInitialized();
-
-    final windowOptions = WindowOptions(
-      size: const Size(1200, 800),
-      minimumSize: const Size(800, 600),
-      center: true,
-      backgroundColor: Colors.transparent,
-      skipTaskbar: false,
-      titleBarStyle: TitleBarStyle.normal,
-      windowButtonVisibility: true,
-      title: 'NeuronVault - Enterprise AI Orchestration Platform',
-    );
-
-    await windowManager.waitUntilReadyToShow(windowOptions, () async {
-      await windowManager.show();
-      await windowManager.focus();
-    });
-
-  } catch (e) {
-    debugPrint('❌ Failed to configure desktop window: $e');
-  }
-}
-
-// 📱 FLUTTER FRAMEWORK CONFIGURATION
-Future<void> _configureFlutter() async {
-  // Set preferred orientations for desktop
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.landscapeLeft,
-    DeviceOrientation.landscapeRight,
-    DeviceOrientation.portraitUp,
-  ]);
-
-  // Configure system UI overlay style
-  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-    statusBarColor: Colors.transparent,
-    statusBarIconBrightness: Brightness.light,
-    systemNavigationBarColor: Colors.transparent,
-    systemNavigationBarIconBrightness: Brightness.light,
-  ));
-}
-
-// 🧠 MAIN APPLICATION WIDGET
 class NeuronVaultApp extends ConsumerWidget {
   const NeuronVaultApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Watch theme providers
-    final currentTheme = ref.watch(currentThemeProvider);
+    // Watch theme state using existing theme system
     final isDarkMode = ref.watch(isDarkModeProvider);
 
     return MaterialApp(
-      // 🎨 APPLICATION CONFIGURATION
-      title: 'NeuronVault - Enterprise AI Platform',
+      title: 'NeuronVault - AI Orchestration Platform',
       debugShowCheckedModeBanner: false,
 
-      // 🎨 THEME CONFIGURATION
-      theme: _buildLightTheme(),
-      darkTheme: _buildDarkTheme(),
+      // 🎨 Use existing NeuronVaultTheme system
+      theme: NeuronVaultTheme.lightTheme,
+      darkTheme: NeuronVaultTheme.darkTheme,
       themeMode: isDarkMode ? ThemeMode.dark : ThemeMode.light,
 
-      // 🌍 LOCALIZATION
-      locale: const Locale('en', 'US'),
-      supportedLocales: const [
-        Locale('en', 'US'),
-        Locale('it', 'IT'),
-      ],
+      // 🏠 Home screen with initialization handling
+      home: const InitializationWrapper(),
 
-      // 🏠 HOME SCREEN
-      home: const AppInitializationWrapper(),
-
-      // 🧪 TESTING CONFIGURATION
+      // 🌍 App configuration
       builder: (context, child) {
-        // Add any global wrappers here (error handling, etc.)
         return MediaQuery(
           data: MediaQuery.of(context).copyWith(
-            textScaler: const TextScaler.linear(1.0), // Prevent text scaling issues
+            textScaleFactor: 1.0, // Prevent system text scaling
           ),
-          child: child ?? const SizedBox.shrink(),
+          child: child!,
         );
       },
     );
   }
-
-  // 🎨 BUILD LIGHT THEME
-  ThemeData _buildLightTheme() {
-    const colorScheme = ColorScheme.light(
-      primary: Color(0xFF6366F1),
-      secondary: Color(0xFF10B981),
-      tertiary: Color(0xFFF59E0B),
-      surface: Color(0xFFFFFFFF),
-      background: Color(0xFFF8FAFC),
-      error: Color(0xFFEF4444),
-    );
-
-    return ThemeData(
-      useMaterial3: true,
-      colorScheme: colorScheme,
-      brightness: Brightness.light,
-    );
-  }
-
-  // 🎨 BUILD DARK THEME
-  ThemeData _buildDarkTheme() {
-    const colorScheme = ColorScheme.dark(
-      primary: Color(0xFF6366F1),
-      secondary: Color(0xFF10B981),
-      tertiary: Color(0xFFF59E0B),
-      surface: Color(0xFF111827),
-      background: Color(0xFF0F172A),
-      error: Color(0xFFEF4444),
-    );
-
-    return ThemeData(
-      useMaterial3: true,
-      colorScheme: colorScheme,
-      brightness: Brightness.dark,
-    );
-  }
 }
 
-// 🔄 APPLICATION INITIALIZATION WRAPPER
-class AppInitializationWrapper extends ConsumerWidget {
-  const AppInitializationWrapper({super.key});
+/// Wrapper to handle app initialization
+class InitializationWrapper extends ConsumerWidget {
+  const InitializationWrapper({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final initializationAsync = ref.watch(initializationProvider);
 
     return initializationAsync.when(
-      // ⏳ LOADING STATE
-      loading: () => const LoadingScreen(
-        message: 'Initializing NeuronVault...',
-        subtitle: 'Setting up enterprise AI orchestration',
+      // Loading state
+      loading: () => const InitializationLoadingScreen(),
+
+      // Error state
+      error: (error, stackTrace) => InitializationErrorScreen(
+        error: error,
+        onRetry: () => ref.invalidate(initializationProvider),
       ),
 
-      // ✅ SUCCESS STATE
-      data: (isInitialized) {
-        if (isInitialized) {
-          return const MainApplicationScreen();
+      // Success state
+      data: (initialized) {
+        if (initialized) {
+          return const OrchestrationMainScreen();
         } else {
-          return const ErrorScreen(
-            title: 'Initialization Failed',
-            message: 'Failed to initialize the application. Please restart.',
-            canRetry: true,
+          return InitializationErrorScreen(
+            error: 'Initialization failed',
+            onRetry: () => ref.invalidate(initializationProvider),
           );
         }
-      },
-
-      // ❌ ERROR STATE
-      error: (error, stackTrace) {
-        return ErrorScreen(
-          title: 'Initialization Error',
-          message: 'An error occurred during initialization: $error',
-          canRetry: true,
-        );
       },
     );
   }
 }
 
-// 🏠 MAIN APPLICATION SCREEN
-class MainApplicationScreen extends ConsumerWidget {
-  const MainApplicationScreen({super.key});
+/// Loading screen during initialization
+class InitializationLoadingScreen extends StatefulWidget {
+  const InitializationLoadingScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // Watch global state
-    final appReady = ref.watch(appReadyProvider);
-    final overallHealth = ref.watch(overallHealthProvider);
-    final systemStatus = ref.watch(systemStatusProvider);
+  State<InitializationLoadingScreen> createState() => _InitializationLoadingScreenState();
+}
+
+class _InitializationLoadingScreenState extends State<InitializationLoadingScreen>
+    with TickerProviderStateMixin {
+
+  late AnimationController _animationController;
+  late Animation<double> _pulseAnimation;
+  late Animation<double> _rotationAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      duration: const Duration(seconds: 2),
+      vsync: this,
+    )..repeat();
+
+    _pulseAnimation = Tween<double>(
+      begin: 0.8,
+      end: 1.2,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeInOut,
+    ));
+
+    _rotationAnimation = Tween<double>(
+      begin: 0,
+      end: 1,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.linear,
+    ));
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
 
     return Scaffold(
-      // 🧠 NEURAL APP BAR
-      appBar: AppBar(
-        title: Row(
+      backgroundColor: const Color(0xFF0F0F23),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // 🧠 Logo
-            Container(
-              width: 32,
-              height: 32,
-              margin: const EdgeInsets.only(right: 12),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                gradient: _getPrimaryGradient(),
-              ),
-              child: const Icon(Icons.psychology, color: Colors.white, size: 20),
+            // Animated logo using existing NeuronColors
+            AnimatedBuilder(
+              animation: _animationController,
+              builder: (context, child) {
+                return Transform.scale(
+                  scale: _pulseAnimation.value,
+                  child: Transform.rotate(
+                    angle: _rotationAnimation.value * 2 * 3.14159,
+                    child: Container(
+                      width: 100,
+                      height: 100,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(
+                          colors: [
+                            NeuronColors.primary,
+                            NeuronColors.brainBlue,
+                            NeuronColors.primaryVariant,
+                          ],
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: NeuronColors.primary.withOpacity(0.5),
+                            blurRadius: 30,
+                            spreadRadius: 10,
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.psychology,
+                        size: 50,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                );
+              },
             ),
 
-            // 📱 Title
-            const Text(
+            const SizedBox(height: 40),
+
+            // App title using existing typography
+            Text(
               'NeuronVault',
-              style: TextStyle(
+              style: NeuronTypography.textTheme.headlineLarge?.copyWith(
                 fontWeight: FontWeight.bold,
-                fontSize: 20,
+                color: Colors.white,
               ),
             ),
 
-            // 🏷️ Version Badge
-            Container(
-              margin: const EdgeInsets.only(left: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
+            const SizedBox(height: 8),
+
+            Text(
+              'AI Orchestration Platform',
+              style: NeuronTypography.textTheme.titleMedium?.copyWith(
+                color: Colors.grey[400],
               ),
-              child: Text(
-                'v2.5.0',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w500,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
+            ),
+
+            const SizedBox(height: 40),
+
+            // Loading indicator using existing colors
+            SizedBox(
+              width: 40,
+              height: 40,
+              child: CircularProgressIndicator(
+                strokeWidth: 3,
+                valueColor: AlwaysStoppedAnimation(NeuronColors.primary),
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            Text(
+              'Initializing AI Orchestration...',
+              style: NeuronTypography.textTheme.bodyMedium?.copyWith(
+                color: Colors.grey[500],
+              ),
+            ),
+
+            const SizedBox(height: 8),
+
+            Text(
+              'Connecting to backend services',
+              style: NeuronTypography.textTheme.bodySmall?.copyWith(
+                color: Colors.grey[600],
               ),
             ),
           ],
         ),
-
-        // 🔧 ACTION BUTTONS
-        actions: [
-          // 🩺 Health Indicator
-          _HealthIndicator(health: overallHealth),
-
-          // 🌐 Connection Status
-          const _ConnectionStatusIndicator(),
-
-          // ⚙️ Settings Button
-          IconButton(
-            onPressed: () => _showSettingsModal(context, ref),
-            icon: const Icon(Icons.settings),
-            tooltip: 'Settings',
-          ),
-
-          const SizedBox(width: 8),
-        ],
-
-        elevation: 0,
-        backgroundColor: Colors.transparent,
-      ),
-
-      // 🏠 MAIN CONTENT
-      body: appReady
-          ? const MainScreen()
-          : const _SetupRequiredScreen(),
-    );
-  }
-
-  LinearGradient _getPrimaryGradient() {
-    return const LinearGradient(
-      colors: [
-        Color(0xFF6366F1),
-        Color(0xFF8B5CF6),
-      ],
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-    );
-  }
-
-  void _showSettingsModal(BuildContext context, WidgetRef ref) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Settings'),
-        content: const Text('Settings panel coming soon in Phase 2!'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('OK'),
-          ),
-        ],
       ),
     );
   }
 }
 
-// 🩺 HEALTH INDICATOR WIDGET
-class _HealthIndicator extends StatelessWidget {
-  final AppHealth health;
+/// Error screen for initialization failures
+class InitializationErrorScreen extends StatelessWidget {
+  final Object error;
+  final VoidCallback onRetry;
 
-  const _HealthIndicator({required this.health});
+  const InitializationErrorScreen({
+    super.key,
+    required this.error,
+    required this.onRetry,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final (color, icon, tooltip) = switch (health) {
-      AppHealth.healthy => (Colors.green, Icons.check_circle, 'System Healthy'),
-      AppHealth.degraded => (Colors.orange, Icons.warning, 'System Degraded'),
-      AppHealth.unhealthy => (Colors.red, Icons.error, 'System Unhealthy'),
-      AppHealth.critical => (Colors.red, Icons.dangerous, 'System Critical'),
-    };
+    final theme = Theme.of(context);
 
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: Tooltip(
-        message: tooltip,
-        child: Icon(icon, color: color, size: 20),
-      ),
-    );
-  }
-}
+    return Scaffold(
+      backgroundColor: const Color(0xFF0F0F23),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Error icon using existing colors
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: NeuronColors.error.withOpacity(0.2),
+                  border: Border.all(color: NeuronColors.error, width: 2),
+                ),
+                child: const Icon(
+                  Icons.error_outline,
+                  size: 40,
+                  color: NeuronColors.error,
+                ),
+              ),
 
-// 🌐 CONNECTION STATUS INDICATOR
-class _ConnectionStatusIndicator extends ConsumerWidget {
-  const _ConnectionStatusIndicator();
+              const SizedBox(height: 32),
 
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // For now, show a placeholder since providers aren't fully implemented
-    const connectionStatus = ConnectionStatus.connected;
-    const latency = 50;
+              Text(
+                'Initialization Failed',
+                style: NeuronTypography.textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
 
-    final (color, icon, tooltip) = switch (connectionStatus) {
-      ConnectionStatus.connected => (
-      Colors.green,
-      Icons.wifi,
-      'Connected (${latency}ms)'
-      ),
-      ConnectionStatus.connecting => (
-      Colors.orange,
-      Icons.wifi_find,
-      'Connecting...'
-      ),
-      ConnectionStatus.disconnected => (
-      Colors.grey,
-      Icons.wifi_off,
-      'Disconnected'
-      ),
-      ConnectionStatus.error => (
-      Colors.red,
-      Icons.error_outline,
-      'Connection Error'
-      ),
-      ConnectionStatus.reconnecting => (
-      Colors.amber,
-      Icons.refresh,
-      'Reconnecting...'
-      ),
-    };
+              const SizedBox(height: 16),
 
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: Tooltip(
-        message: tooltip,
-        child: Icon(icon, color: color, size: 20),
-      ),
-    );
-  }
-}
+              Text(
+                'Failed to initialize the AI orchestration system.',
+                style: NeuronTypography.textTheme.bodyLarge?.copyWith(
+                  color: Colors.grey[400],
+                ),
+                textAlign: TextAlign.center,
+              ),
 
-// 🔧 SETUP REQUIRED SCREEN
-class _SetupRequiredScreen extends ConsumerWidget {
-  const _SetupRequiredScreen();
+              const SizedBox(height: 8),
 
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.settings, size: 64, color: Colors.grey),
-          SizedBox(height: 16),
-          Text(
-            'Setup Required',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              Text(
+                'Error: $error',
+                style: NeuronTypography.textTheme.bodySmall?.copyWith(
+                  color: Colors.grey[500],
+                ),
+                textAlign: TextAlign.center,
+              ),
+
+              const SizedBox(height: 32),
+
+              // Action buttons using existing colors
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: onRetry,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Retry'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: NeuronColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(width: 16),
+
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      // Show detailed error information
+                      showDialog(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('Error Details'),
+                          content: SingleChildScrollView(
+                            child: Text(error.toString()),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.of(context).pop(),
+                              child: const Text('Close'),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.info_outline),
+                    label: const Text('Details'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.grey[400],
+                      side: BorderSide(color: Colors.grey[600]!),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 32),
+
+              // Troubleshooting tips
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey[800]?.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(NeuronRadius.md),
+                  border: Border.all(color: Colors.grey[700]!),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Troubleshooting:',
+                      style: NeuronTypography.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '• Ensure the Node.js backend server is running\n'
+                          '• Check that port 3001 is available\n'
+                          '• Verify network connectivity\n'
+                          '• Check browser console for additional errors',
+                      style: NeuronTypography.textTheme.bodySmall?.copyWith(
+                        color: Colors.grey[400],
+                        height: 1.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          SizedBox(height: 8),
-          Text(
-            'Please configure your AI models and connection settings.',
-            style: TextStyle(color: Colors.grey),
-          ),
-          SizedBox(height: 24),
-          // TODO: Add setup wizard button
-        ],
+        ),
       ),
     );
   }
 }
-
-// 🧪 PROVIDER OBSERVER FOR DEBUGGING
-class _NeuronVaultProviderObserver extends ProviderObserver {
-  final Logger _logger = Logger();
-
-  @override
-  void didUpdateProvider(
-      ProviderBase provider,
-      Object? previousValue,
-      Object? newValue,
-      ProviderContainer container,
-      ) {
-    if (provider.name != null) {
-      _logger.d('🔄 Provider Updated: ${provider.name} -> $newValue');
-    }
-  }
-
-  @override
-  void didDisposeProvider(
-      ProviderBase provider,
-      ProviderContainer container,
-      ) {
-    if (provider.name != null) {
-      _logger.d('🗑️ Provider Disposed: ${provider.name}');
-    }
-  }
-}
-
-// 🎯 COMPILE-TIME CONSTANTS
-const bool kDebugMode = bool.fromEnvironment('dart.vm.product') == false;

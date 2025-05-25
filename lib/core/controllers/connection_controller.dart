@@ -12,7 +12,7 @@ import 'package:web_socket_channel/io.dart';
 import '../state/state_models.dart';
 import '../services/config_service.dart';
 import '../services/analytics_service.dart';
-import '../providers/providers_main.dart';
+import '../providers/providers_main.dart' hide ConnectionStatus;
 
 // 🌐 CONNECTION CONTROLLER
 class ConnectionController extends Notifier<ConnectionState> {

@@ -3,6 +3,16 @@ import 'package:flutter/material.dart';
 import 'dart:ui';
 
 /// 🎨 NEURON VAULT THEME SYSTEM - Sistema completo unificato
+class AppTheme {
+  static ThemeData getTheme(String currentTheme, bool isDarkMode) {
+    // Personalizza la logica in base ai tuoi temi
+    if (isDarkMode) {
+      return ThemeData.dark();
+    } else {
+      return ThemeData.light();
+    }
+  }
+}
 class NeuronVaultTheme {
   static ThemeData get lightTheme => _buildLightTheme();
   static ThemeData get darkTheme => _buildDarkTheme();

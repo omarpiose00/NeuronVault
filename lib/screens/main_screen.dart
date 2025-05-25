@@ -1,1059 +1,430 @@
-// 🏠 NEURONVAULT - ENTERPRISE MAIN INTERFACE
-// Professional AI orchestration dashboard with chat interface
-// Part of PHASE 2.5 - QUANTUM STATE MANAGEMENT
+// 🧬 NEURONVAULT - MAIN APPLICATION ENTRY POINT
+// Real AI Orchestration with Riverpod State Management
+// Updated for transparent multi-AI orchestration integration
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../core/controllers/chat_controller.dart';
-import '../core/controllers/connection_controller.dart';
-import '../core/controllers/models_controller.dart';
-import '../core/controllers/strategy_controller.dart';
-import '../core/design_system.dart';
-import '../core/providers/providers_main.dart';
-import '../core/state/state_models.dart';
-import '../widgets/core/chat_input_bar.dart';
-import '../widgets/core/message_bubble.dart';
-import '../widgets/core/strategy_selector.dart';
-import '../widgets/core/model_grid.dart';
-import '../widgets/neural_app_bar.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:window_manager/window_manager.dart';
+import 'dart:io';
 
-class MainScreen extends ConsumerStatefulWidget {
-  const MainScreen({super.key});
+import '../core/providers/providers_main.dart' as providers;
+import 'package:neuronvault/core/theme/app_theme.dart';
+import '../../core/services/websocket_orchestration_service.dart';
+import '../core/state/state_models.dart' hide AppTheme;
+import 'package:neuronvault/screens/orchestration_main_screen.dart';
 
-  @override
-  ConsumerState<MainScreen> createState() => _MainScreenState();
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // 🖥️ Desktop window configuration
+  if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+    await windowManager.ensureInitialized();
+    await windowManager.setTitle('NeuronVault - AI Orchestration Platform');
+    await windowManager.setMinimumSize(const Size(800, 600));
+    await windowManager.setSize(const Size(1200, 800));
+    await windowManager.center();
+  }
+
+  // 💾 Initialize SharedPreferences
+  final sharedPreferences = await SharedPreferences.getInstance();
+
+  // 🎨 Set system UI overlay style
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+      systemNavigationBarColor: Color(0xFF1A1B23),
+      systemNavigationBarIconBrightness: Brightness.light,
+    ),
+  );
+
+  // 🚀 Run application with Riverpod
+  runApp(
+    ProviderScope(
+      overrides: [
+        // Override SharedPreferences provider with actual instance
+        providers.sharedPreferencesProvider.overrideWithValue(sharedPreferences),
+      ],
+      child: const NeuronVaultApp(),
+    ),
+  );
 }
 
-class _MainScreenState extends ConsumerState<MainScreen>
+class NeuronVaultApp extends ConsumerWidget {
+  const NeuronVaultApp({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Watch theme and initialization state
+    final currentTheme = ref.watch(providers.currentThemeProvider);
+    final isDarkMode = ref.watch(providers.isDarkModeProvider);
+
+    return MaterialApp(
+      title: 'NeuronVault - AI Orchestration Platform',
+      debugShowCheckedModeBanner: false,
+
+      // 🎨 Theme configuration
+      theme: AppTheme.getTheme(currentTheme as String, isDarkMode),
+
+      // 🏠 Home screen with initialization handling
+      home: const InitializationWrapper(),
+
+      // 🌍 App configuration
+      builder: (context, child) {
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(
+            textScaleFactor: 1.0, // Prevent system text scaling
+          ),
+          child: child!,
+        );
+      },
+    );
+  }
+}
+
+/// Wrapper to handle app initialization
+class InitializationWrapper extends ConsumerWidget {
+  const InitializationWrapper({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final initializationAsync = ref.watch(providers.initializationProvider);
+
+    return initializationAsync.when(
+      loading: () => const InitializationLoadingScreen(),
+      error: (error, stackTrace) => InitializationErrorScreen(
+        error: error,
+        onRetry: () => ref.invalidate(providers.initializationProvider),
+      ),
+      data: (initialized) {
+        if (initialized) {
+          return const RealOrchestrationMainScreen();
+        } else {
+          return InitializationErrorScreen(
+            error: 'Initialization failed',
+            onRetry: () => ref.invalidate(providers.initializationProvider),
+          );
+        }
+      },
+    );
+  }
+}
+
+/// Loading screen during initialization
+class InitializationLoadingScreen extends StatefulWidget {
+  const InitializationLoadingScreen({super.key});
+
+  @override
+  State<InitializationLoadingScreen> createState() => _InitializationLoadingScreenState();
+}
+
+class _InitializationLoadingScreenState extends State<InitializationLoadingScreen>
     with TickerProviderStateMixin {
 
-  late TabController _tabController;
-  late AnimationController _pulseAnimationController;
-  bool _isLeftPanelOpen = false;
-  bool _isRightPanelOpen = false;
-  final _scrollController = ScrollController();
-
-  // 📱 RESPONSIVE BREAKPOINTS
-  static const double _mobileBreakpoint = 768;
-  static const double _tabletBreakpoint = 1024;
-  static const double _desktopBreakpoint = 1440;
+  late AnimationController _animationController;
+  late Animation<double> _pulseAnimation;
+  late Animation<double> _rotationAnimation;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
-    _pulseAnimationController = AnimationController(
+    _animationController = AnimationController(
       duration: const Duration(seconds: 2),
       vsync: this,
     )..repeat();
+
+    _pulseAnimation = Tween<double>(
+      begin: 0.8,
+      end: 1.2,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeInOut,
+    ));
+
+    _rotationAnimation = Tween<double>(
+      begin: 0,
+      end: 1,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.linear,
+    ));
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
-    _pulseAnimationController.dispose();
-    _scrollController.dispose();
+    _animationController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
     final theme = Theme.of(context);
 
-    // 📱 Responsive layout detection
-    final layoutType = _getLayoutType(size.width);
-
     return Scaffold(
-      backgroundColor: theme.colorScheme.background,
-      body: Column(
-        children: [
-          // 🧠 Custom app bar
-          NeuralAppBar(
-            isConnected: ref.watch(isConnectedProvider),
-            onConnectionToggle: () {
-              // Toggle connection logic
-              if (ref.read(isConnectedProvider)) {
-                ref.read(connectionControllerProvider.notifier).disconnect();
-              } else {
-                ref.read(connectionControllerProvider.notifier).connect();
-              }
-            },
-            pulseAnimation: _pulseAnimationController,
-          ),
+      backgroundColor: const Color(0xFF0F0F23),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Animated logo
+            AnimatedBuilder(
+              animation: _animationController,
+              builder: (context, child) {
+                return Transform.scale(
+                  scale: _pulseAnimation.value,
+                  child: Transform.rotate(
+                    angle: _rotationAnimation.value * 2 * 3.14159,
+                    child: Container(
+                      width: 100,
+                      height: 100,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(
+                          colors: [
+                            Colors.deepPurple,
+                            Colors.blue,
+                            Colors.purple,
+                          ],
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.deepPurple.withOpacity(0.5),
+                            blurRadius: 30,
+                            spreadRadius: 10,
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.psychology,
+                        size: 50,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
 
-          // 🏠 Main content area
-          Expanded(
-            child: _buildMainContent(layoutType, theme),
-          ),
-        ],
+            const SizedBox(height: 40),
+
+            // App title
+            Text(
+              'NeuronVault',
+              style: theme.textTheme.headlineLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+
+            const SizedBox(height: 8),
+
+            Text(
+              'AI Orchestration Platform',
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: Colors.grey[400],
+              ),
+            ),
+
+            const SizedBox(height: 40),
+
+            // Loading indicator
+            SizedBox(
+              width: 40,
+              height: 40,
+              child: CircularProgressIndicator(
+                strokeWidth: 3,
+                valueColor: AlwaysStoppedAnimation(Colors.deepPurple),
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            Text(
+              'Initializing AI Orchestration...',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: Colors.grey[500],
+              ),
+            ),
+
+            const SizedBox(height: 8),
+
+            Text(
+              'Connecting to backend services',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: Colors.grey[600],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
+}
 
-  LayoutType _getLayoutType(double width) {
-    if (width < _mobileBreakpoint) return LayoutType.mobile;
-    if (width < _tabletBreakpoint) return LayoutType.tablet;
-    if (width < _desktopBreakpoint) return LayoutType.desktop;
-    return LayoutType.ultrawide;
-  }
+/// Error screen for initialization failures
+class InitializationErrorScreen extends StatelessWidget {
+  final Object error;
+  final VoidCallback onRetry;
 
-  Widget _buildMainContent(LayoutType layoutType, ThemeData theme) {
-    switch (layoutType) {
-      case LayoutType.mobile:
-        return _buildMobileLayout(theme);
-      case LayoutType.tablet:
-        return _buildTabletLayout(theme);
-      case LayoutType.desktop:
-      case LayoutType.ultrawide:
-        return _buildDesktopLayout(theme, layoutType == LayoutType.ultrawide);
-    }
-  }
+  const InitializationErrorScreen({
+    super.key,
+    required this.error,
+    required this.onRetry,
+  });
 
-  // 📱 MOBILE LAYOUT
-  Widget _buildMobileLayout(ThemeData theme) {
-    return Column(
-      children: [
-        // 📊 Status bar
-        _buildStatusBar(theme, compact: true),
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
 
-        // 💬 Chat area
-        Expanded(
-          child: _buildChatArea(theme),
-        ),
-
-        // ⚙️ Quick controls
-        _buildQuickControls(theme),
-
-        // 📝 Chat input
-        ChatInputBar(
-          onMessageSent: (message) {
-            ref.read(chatControllerProvider.notifier).sendMessage(message);
-          },
-        ),
-      ],
-    );
-  }
-
-  // 🖥️ TABLET LAYOUT
-  Widget _buildTabletLayout(ThemeData theme) {
-    return Row(
-      children: [
-        // 🎛️ Left sidebar (strategy & models)
-        Container(
-          width: 280,
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surface,
-            border: Border(
-              right: BorderSide(
-                color: theme.colorScheme.outline.withOpacity(0.1),
-                width: 1,
-              ),
-            ),
-          ),
-          child: _buildLeftPanel(theme),
-        ),
-
-        // 💬 Main chat area
-        Expanded(
+    return Scaffold(
+      backgroundColor: const Color(0xFF0F0F23),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
           child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _buildStatusBar(theme),
-              Expanded(child: _buildChatArea(theme)),
-              ChatInputBar(
-                onMessageSent: (message) {
-                  ref.read(chatControllerProvider.notifier).sendMessage(message);
-                },
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  // 🖥️ DESKTOP LAYOUT
-  Widget _buildDesktopLayout(ThemeData theme, bool isUltrawide) {
-    return Row(
-      children: [
-        // 🎛️ Left panel (collapsible)
-        AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          width: _isLeftPanelOpen ? 320 : 60,
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surface,
-            border: Border(
-              right: BorderSide(
-                color: theme.colorScheme.outline.withOpacity(0.1),
-                width: 1,
-              ),
-            ),
-          ),
-          child: _buildLeftPanel(theme, isCollapsed: !_isLeftPanelOpen),
-        ),
-
-        // 💬 Main content area
-        Expanded(
-          flex: isUltrawide ? 3 : 2,
-          child: Column(
-            children: [
-              _buildStatusBar(theme),
-              Expanded(child: _buildChatArea(theme)),
-              ChatInputBar(
-                onMessageSent: (message) {
-                  ref.read(chatControllerProvider.notifier).sendMessage(message);
-                },
-              ),
-            ],
-          ),
-        ),
-
-        // 📊 Right panel (analytics & monitoring)
-        if (isUltrawide)
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            width: _isRightPanelOpen ? 350 : 60,
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surface,
-              border: Border(
-                left: BorderSide(
-                  color: theme.colorScheme.outline.withOpacity(0.1),
-                  width: 1,
+              // Error icon
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.red.withOpacity(0.2),
+                  border: Border.all(color: Colors.red, width: 2),
+                ),
+                child: const Icon(
+                  Icons.error_outline,
+                  size: 40,
+                  color: Colors.red,
                 ),
               ),
-            ),
-            child: _buildRightPanel(theme, isCollapsed: !_isRightPanelOpen),
-          ),
-      ],
-    );
-  }
 
-  // 📊 STATUS BAR
-  Widget _buildStatusBar(ThemeData theme, {bool compact = false}) {
-    return Consumer(
-      builder: (context, ref, child) {
-        final connectionStatus = ref.watch(connectionStatusProvider);
-        final systemStatus = ref.watch(systemStatusProvider);
-        final budgetUsage = ref.watch(budgetUsageProvider);
+              const SizedBox(height: 32),
 
-        return Container(
-          height: compact ? 40 : 50,
-          padding: EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: compact ? 4 : 8,
-          ),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surface.withOpacity(0.5),
-            border: Border(
-              bottom: BorderSide(
-                color: theme.colorScheme.outline.withOpacity(0.1),
-                width: 1,
-              ),
-            ),
-          ),
-          child: Row(
-            children: [
-              // 🌐 Connection status
-              _buildStatusIndicator(
-                theme,
-                _getConnectionIcon(connectionStatus),
-                _getConnectionColor(connectionStatus),
-                connectionStatus.name.toUpperCase(),
-                compact,
-              ),
-
-              const SizedBox(width: 16),
-
-              // 🤖 Active models
-              _buildStatusIndicator(
-                theme,
-                Icons.psychology,
-                systemStatus.healthyModelCount > 0 ? Colors.green : Colors.red,
-                '${systemStatus.healthyModelCount} models',
-                compact,
-              ),
-
-              const SizedBox(width: 16),
-
-              // 💰 Budget usage
-              _buildBudgetIndicator(theme, budgetUsage, compact),
-
-              const Spacer(),
-
-              // ⚙️ Panel toggles (desktop only)
-              if (!compact) ...[
-                IconButton(
-                  onPressed: () {
-                    setState(() {
-                      _isLeftPanelOpen = !_isLeftPanelOpen;
-                    });
-                  },
-                  icon: const Icon(Icons.menu),
-                  tooltip: 'Toggle Strategy Panel',
-                ),
-
-                IconButton(
-                  onPressed: () {
-                    setState(() {
-                      _isRightPanelOpen = !_isRightPanelOpen;
-                    });
-                  },
-                  icon: const Icon(Icons.analytics),
-                  tooltip: 'Toggle Analytics Panel',
-                ),
-              ],
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildStatusIndicator(
-      ThemeData theme,
-      IconData icon,
-      Color color,
-      String label,
-      bool compact,
-      ) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          icon,
-          size: compact ? 16 : 18,
-          color: color,
-        ),
-        if (!compact) ...[
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: theme.textTheme.bodySmall?.copyWith(
-              fontWeight: FontWeight.w500,
-              color: theme.colorScheme.onSurface.withOpacity(0.8),
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildBudgetIndicator(ThemeData theme, double usage, bool compact) {
-    final color = usage > 80 ? Colors.red : (usage > 60 ? Colors.orange : Colors.green);
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          Icons.account_balance_wallet,
-          size: compact ? 16 : 18,
-          color: color,
-        ),
-        if (!compact) ...[
-          const SizedBox(width: 6),
-          Text(
-            '${usage.toInt()}%',
-            style: theme.textTheme.bodySmall?.copyWith(
-              fontWeight: FontWeight.w500,
-              color: color,
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
-  // 🎛️ LEFT PANEL
-  Widget _buildLeftPanel(ThemeData theme, {bool isCollapsed = false}) {
-    if (isCollapsed) {
-      return _buildCollapsedLeftPanel(theme);
-    }
-
-    return Column(
-      children: [
-        // 📋 Panel header
-        Container(
-          height: 50,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          decoration: BoxDecoration(
-            border: Border(
-              bottom: BorderSide(
-                color: theme.colorScheme.outline.withOpacity(0.1),
-                width: 1,
-              ),
-            ),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                Icons.tune,
-                size: 20,
-                color: theme.colorScheme.onSurface.withOpacity(0.7),
-              ),
-              const SizedBox(width: 8),
               Text(
-                'AI Configuration',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
+                'Initialization Failed',
+                style: theme.textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
                 ),
               ),
-            ],
-          ),
-        ),
 
-        // 📑 Tabbed content
-        Expanded(
-          child: Column(
-            children: [
-              // 📑 Tab bar
-              TabBar(
-                controller: _tabController,
-                labelColor: theme.colorScheme.primary,
-                unselectedLabelColor: theme.colorScheme.onSurface.withOpacity(0.6),
-                indicatorColor: theme.colorScheme.primary,
-                tabs: const [
-                  Tab(text: 'Strategy'),
-                  Tab(text: 'Models'),
-                  Tab(text: 'Settings'),
+              const SizedBox(height: 16),
+
+              Text(
+                'Failed to initialize the AI orchestration system.',
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  color: Colors.grey[400],
+                ),
+                textAlign: TextAlign.center,
+              ),
+
+              const SizedBox(height: 8),
+
+              Text(
+                'Error: $error',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: Colors.grey[500],
+                ),
+                textAlign: TextAlign.center,
+              ),
+
+              const SizedBox(height: 32),
+
+              // Action buttons
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: onRetry,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Retry'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.deepPurple,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(width: 16),
+
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      // Show detailed error information
+                      showDialog(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('Error Details'),
+                          content: SingleChildScrollView(
+                            child: Text(error.toString()),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.of(context).pop(),
+                              child: const Text('Close'),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.info_outline),
+                    label: const Text('Details'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.grey[400],
+                      side: BorderSide(color: Colors.grey[600]!),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
+                    ),
+                  ),
                 ],
               ),
 
-              // 📄 Tab content
-              Expanded(
-                child: TabBarView(
-                  controller: _tabController,
+              const SizedBox(height: 32),
+
+              // Troubleshooting tips
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey[800]?.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey[700]!),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildStrategyTab(theme),
-                    _buildModelsTab(theme),
-                    _buildSettingsTab(theme),
+                    Text(
+                      'Troubleshooting:',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '• Ensure the Node.js backend server is running\n'
+                          '• Check that port 3001 is available\n'
+                          '• Verify network connectivity\n'
+                          '• Check browser console for additional errors',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: Colors.grey[400],
+                        height: 1.5,
+                      ),
+                    ),
                   ],
                 ),
               ),
             ],
           ),
         ),
-      ],
-    );
-  }
-
-  Widget _buildCollapsedLeftPanel(ThemeData theme) {
-    return Column(
-      children: [
-        const SizedBox(height: 16),
-        IconButton(
-          onPressed: () {
-            setState(() {
-              _isLeftPanelOpen = true;
-            });
-          },
-          icon: const Icon(Icons.tune),
-          tooltip: 'Open Configuration',
-        ),
-        const SizedBox(height: 16),
-        Consumer(
-          builder: (context, ref, child) {
-            final activeStrategy = ref.watch(activeStrategyProvider);
-            return IconButton(
-              onPressed: () {
-                setState(() {
-                  _isLeftPanelOpen = true;
-                  _tabController.index = 0;
-                });
-              },
-              icon: Icon(_getStrategyIcon(activeStrategy)),
-              tooltip: 'Strategy: ${activeStrategy.displayName}',
-            );
-          },
-        ),
-      ],
-    );
-  }
-
-  // 📊 RIGHT PANEL
-  Widget _buildRightPanel(ThemeData theme, {bool isCollapsed = false}) {
-    if (isCollapsed) {
-      return _buildCollapsedRightPanel(theme);
-    }
-
-    return Column(
-      children: [
-        // 📋 Panel header
-        Container(
-          height: 50,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          decoration: BoxDecoration(
-            border: Border(
-              bottom: BorderSide(
-                color: theme.colorScheme.outline.withOpacity(0.1),
-                width: 1,
-              ),
-            ),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                Icons.analytics,
-                size: 20,
-                color: theme.colorScheme.onSurface.withOpacity(0.7),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Analytics & Monitoring',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        // 📊 Analytics content
-        Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildPerformanceMetrics(theme),
-                const SizedBox(height: 16),
-                _buildModelHealthCards(theme),
-                const SizedBox(height: 16),
-                _buildUsageStatistics(theme),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildCollapsedRightPanel(ThemeData theme) {
-    return Column(
-      children: [
-        const SizedBox(height: 16),
-        IconButton(
-          onPressed: () {
-            setState(() {
-              _isRightPanelOpen = true;
-            });
-          },
-          icon: const Icon(Icons.analytics),
-          tooltip: 'Open Analytics',
-        ),
-      ],
-    );
-  }
-
-  // 💬 CHAT AREA
-  Widget _buildChatArea(ThemeData theme) {
-    return Consumer(
-      builder: (context, ref, child) {
-        final messages = ref.watch(chatMessagesProvider);
-        final isGenerating = ref.watch(isGeneratingProvider);
-
-        if (messages.isEmpty) {
-          return _buildEmptyChat(theme);
-        }
-
-        return Column(
-          children: [
-            // 💬 Messages list
-            Expanded(
-              child: ListView.builder(
-                controller: _scrollController,
-                padding: const EdgeInsets.all(16),
-                itemCount: messages.length + (isGenerating ? 1 : 0),
-                itemBuilder: (context, index) {
-                  if (index < messages.length) {
-                    return MessageBubble(
-                      message: messages[index].content,
-                      isFromAI: messages[index].type == MessageType.assistant,
-                      timestamp: messages[index].timestamp.toIso8601String(),
-                    );
-                  } else {
-                    // Typing indicator
-                    return _buildTypingIndicator(theme);
-                  }
-                },
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildEmptyChat(ThemeData theme) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // 🧠 Welcome icon
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: NeuralDesignSystem.primaryGradient,
-              boxShadow: [
-                BoxShadow(
-                  color: theme.colorScheme.primary.withOpacity(0.3),
-                  blurRadius: 20,
-                  spreadRadius: 5,
-                ),
-              ],
-            ),
-            child: const Icon(
-              Icons.psychology,
-              size: 40,
-              color: Colors.white,
-            ),
-          ),
-
-          const SizedBox(height: 24),
-
-          // 👋 Welcome message
-          Text(
-            'Welcome to NeuronVault',
-            style: theme.textTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-
-          const SizedBox(height: 8),
-
-          Text(
-            'Your enterprise AI orchestration platform.\nStart a conversation to begin.',
-            style: theme.textTheme.bodyLarge?.copyWith(
-              color: theme.colorScheme.onBackground.withOpacity(0.7),
-            ),
-            textAlign: TextAlign.center,
-          ),
-
-          const SizedBox(height: 32),
-
-          // 💡 Quick actions
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              _buildQuickActionChip(
-                theme,
-                'Ask about AI',
-                Icons.psychology,
-                    () => _insertQuickPrompt('What can you tell me about artificial intelligence?'),
-              ),
-              _buildQuickActionChip(
-                theme,
-                'Code Review',
-                Icons.code,
-                    () => _insertQuickPrompt('Please review my code for best practices'),
-              ),
-              _buildQuickActionChip(
-                theme,
-                'Creative Writing',
-                Icons.edit,
-                    () => _insertQuickPrompt('Help me write a creative story about'),
-              ),
-              _buildQuickActionChip(
-                theme,
-                'Data Analysis',
-                Icons.analytics,
-                    () => _insertQuickPrompt('Analyze this data and provide insights:'),
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }
-
-  Widget _buildQuickActionChip(
-      ThemeData theme,
-      String label,
-      IconData icon,
-      VoidCallback onTap,
-      ) {
-    return ActionChip(
-      onPressed: onTap,
-      avatar: Icon(icon, size: 16),
-      label: Text(label),
-      backgroundColor: theme.colorScheme.surface,
-      side: BorderSide(
-        color: theme.colorScheme.outline.withOpacity(0.3),
-      ),
-    );
-  }
-
-  Widget _buildTypingIndicator(ThemeData theme) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 16,
-            backgroundColor: theme.colorScheme.primary,
-            child: const Icon(Icons.psychology, size: 16, color: Colors.white),
-          ),
-          const SizedBox(width: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surface,
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation(theme.colorScheme.primary),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'AI is thinking...',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurface.withOpacity(0.7),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 🎯 TAB CONTENT BUILDERS
-  Widget _buildStrategyTab(ThemeData theme) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: StrategySelector(
-        currentStrategy: ref.watch(activeStrategyProvider),
-        onStrategyChanged: (strategy) {
-          ref.read(strategyControllerProvider.notifier).setActiveStrategy(strategy);
-        },
-      ),
-    );
-  }
-
-  Widget _buildModelsTab(ThemeData theme) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: ModelGrid(
-        models: ref.watch(availableModelsProvider).keys.toList(),
-        onModelToggle: (modelName) {
-          final model = AIModel.values.firstWhere((m) => m.displayName == modelName);
-          final isCurrentlyActive = ref.read(activeModelsProvider)[model] ?? false;
-          if (isCurrentlyActive) {
-            ref.read(modelsControllerProvider.notifier).deactivateModel(model);
-          } else {
-            ref.read(modelsControllerProvider.notifier).activateModel(model);
-          }
-        },
-      ),
-    );
-  }
-
-  Widget _buildSettingsTab(ThemeData theme) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'General Settings',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Theme selector
-          ListTile(
-            leading: const Icon(Icons.palette),
-            title: const Text('Theme'),
-            subtitle: const Text('Neural Dark'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              // Open theme selector
-            },
-          ),
-
-          // Language selector
-          ListTile(
-            leading: const Icon(Icons.language),
-            title: const Text('Language'),
-            subtitle: const Text('English (US)'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              // Open language selector
-            },
-          ),
-
-          const Divider(height: 32),
-
-          Text(
-            'Advanced Settings',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Export/Import
-          ListTile(
-            leading: const Icon(Icons.import_export),
-            title: const Text('Export/Import'),
-            subtitle: const Text('Backup your configuration'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              // Open export/import dialog
-            },
-          ),
-
-          // Reset settings
-          ListTile(
-            leading: const Icon(Icons.restore, color: Colors.red),
-            title: const Text('Reset Settings'),
-            subtitle: const Text('Restore default configuration'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              // Show reset confirmation
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ⚡ QUICK CONTROLS
-  Widget _buildQuickControls(ThemeData theme) {
-    return Container(
-      height: 60,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        border: Border(
-          top: BorderSide(
-            color: theme.colorScheme.outline.withOpacity(0.1),
-            width: 1,
-          ),
-        ),
-      ),
-      child: Consumer(
-        builder: (context, ref, child) {
-          final activeStrategy = ref.watch(activeStrategyProvider);
-          final isGenerating = ref.watch(isGeneratingProvider);
-
-          return Row(
-            children: [
-              // 🎛️ Strategy quick switch
-              Expanded(
-                child: DropdownButton<AIStrategy>(
-                  value: activeStrategy,
-                  onChanged: isGenerating ? null : (strategy) {
-                    if (strategy != null) {
-                      ref.read(strategyControllerProvider.notifier)
-                          .setActiveStrategy(strategy);
-                    }
-                  },
-                  items: AIStrategy.values.map((strategy) {
-                    return DropdownMenuItem(
-                      value: strategy,
-                      child: Row(
-                        children: [
-                          Icon(_getStrategyIcon(strategy), size: 16),
-                          const SizedBox(width: 8),
-                          Text(strategy.displayName.toUpperCase()),
-                        ],
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ),
-
-              const SizedBox(width: 12),
-
-              // ⏹️ Stop generation button
-              if (isGenerating)
-                IconButton(
-                  onPressed: () {
-                    ref.read(chatControllerProvider.notifier).stopGeneration();
-                  },
-                  icon: const Icon(Icons.stop),
-                  tooltip: 'Stop Generation',
-                ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  // 📊 ANALYTICS COMPONENTS
-  Widget _buildPerformanceMetrics(ThemeData theme) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Performance',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 12),
-            // Performance metrics would go here
-            const Text('Real-time metrics coming in Phase 3'),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildModelHealthCards(ThemeData theme) {
-    return Consumer(
-      builder: (context, ref, child) {
-        final modelHealth = ref.watch(modelHealthProvider);
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Model Health',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 12),
-            ...modelHealth.entries.map((entry) {
-              return Card(
-                margin: const EdgeInsets.only(bottom: 8),
-                child: ListTile(
-                  leading: Icon(
-                    _getHealthIcon(entry.value.status),
-                    color: _getHealthColor(entry.value.status),
-                  ),
-                  title: Text(entry.key.displayName.toUpperCase()),
-                  subtitle: Text('${entry.value.responseTime}ms'),
-                  trailing: Text(
-                    '${(entry.value.successRate * 100).toInt()}%',
-                    style: TextStyle(
-                      color: _getHealthColor(entry.value.status),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildUsageStatistics(ThemeData theme) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Usage Statistics',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 12),
-            // Usage statistics would go here
-            const Text('Detailed analytics coming in Phase 3'),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // 🔧 UTILITY METHODS
-  IconData _getConnectionIcon(ConnectionStatus status) {
-    switch (status) {
-      case ConnectionStatus.connected:
-        return Icons.wifi;
-      case ConnectionStatus.connecting:
-        return Icons.wifi_find;
-      case ConnectionStatus.disconnected:
-        return Icons.wifi_off;
-      case ConnectionStatus.error:
-        return Icons.error_outline;
-      case ConnectionStatus.reconnecting:
-        return Icons.refresh;
-    }
-  }
-
-  Color _getConnectionColor(ConnectionStatus status) {
-    switch (status) {
-      case ConnectionStatus.connected:
-        return Colors.green;
-      case ConnectionStatus.connecting:
-        return Colors.orange;
-      case ConnectionStatus.disconnected:
-        return Colors.grey;
-      case ConnectionStatus.error:
-        return Colors.red;
-      case ConnectionStatus.reconnecting:
-        return Colors.amber;
-    }
-  }
-
-  IconData _getStrategyIcon(AIStrategy strategy) {
-    return strategy.icon;
-  }
-
-  IconData _getHealthIcon(HealthStatus status) {
-    switch (status) {
-      case HealthStatus.healthy:
-        return Icons.check_circle;
-      case HealthStatus.degraded:
-        return Icons.warning;
-      case HealthStatus.unhealthy:
-        return Icons.error;
-      case HealthStatus.critical:
-        return Icons.dangerous;
-      case HealthStatus.unknown:
-        return Icons.help;
-    }
-  }
-
-  Color _getHealthColor(HealthStatus status) {
-    switch (status) {
-      case HealthStatus.healthy:
-        return Colors.green;
-      case HealthStatus.degraded:
-        return Colors.orange;
-      case HealthStatus.unhealthy:
-        return Colors.red;
-      case HealthStatus.critical:
-        return Colors.red.shade900;
-      case HealthStatus.unknown:
-        return Colors.grey;
-    }
-  }
-
-  void _insertQuickPrompt(String prompt) {
-    ref.read(chatControllerProvider.notifier).updateCurrentInput(prompt);
-  }
-}
-
-enum LayoutType {
-  mobile,
-  tablet,
-  desktop,
-  ultrawide,
 }

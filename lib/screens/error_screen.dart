@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/design_system.dart';
-import '../core/providers/providers_main.dart';
+import '../core/providers/providers_main.dart' hide ConnectionStatus;
 import '../core/services/analytics_service.dart';
 import '../core/state/state_models.dart';
 
