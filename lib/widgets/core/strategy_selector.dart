@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 
 import '../../core/design_system.dart';
 import '../../core/accessibility/accessibility_manager.dart';
+import '../../core/state/state_models.dart';
 import '../../main.dart'; // For AIStrategy enum
 
 /// 🎯 STRATEGY SELECTOR
@@ -279,6 +280,12 @@ class _StrategySelectorState extends State<StrategySelector> with TickerProvider
         return 'Dynamically selects best model based on query type';
       case AIStrategy.cascade:
         return 'Processes through models sequentially for refined output';
+      case AIStrategy.sequential:
+        // TODO: Handle this case.
+        throw UnimplementedError();
+      case AIStrategy.weighted:
+        // TODO: Handle this case.
+        throw UnimplementedError();
     }
   }
 

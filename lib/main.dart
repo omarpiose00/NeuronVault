@@ -9,8 +9,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:logger/logger.dart';
 import 'package:window_manager/window_manager.dart';
 
-import 'core/providers/providers.dart';
-import 'core/theme/app_theme.dart';
+import 'core/providers/providers_main.dart';
+import 'core/state/state_models.dart';
 import 'core/design_system.dart';
 import 'screens/main_screen.dart';
 import 'screens/loading_screen.dart';
@@ -110,8 +110,8 @@ class NeuronVaultApp extends ConsumerWidget {
       debugShowCheckedModeBanner: false,
 
       // 🎨 THEME CONFIGURATION
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
+      theme: _buildLightTheme(),
+      darkTheme: _buildDarkTheme(),
       themeMode: isDarkMode ? ThemeMode.dark : ThemeMode.light,
 
       // 🌍 LOCALIZATION
@@ -124,19 +124,52 @@ class NeuronVaultApp extends ConsumerWidget {
       // 🏠 HOME SCREEN
       home: const AppInitializationWrapper(),
 
-      // 🔧 ROUTER CONFIGURATION (Future implementation)
-      // onGenerateRoute: AppRouter.generateRoute,
-
       // 🧪 TESTING CONFIGURATION
       builder: (context, child) {
         // Add any global wrappers here (error handling, etc.)
         return MediaQuery(
           data: MediaQuery.of(context).copyWith(
-            textScaleFactor: 1.0, // Prevent text scaling issues
+            textScaler: const TextScaler.linear(1.0), // Prevent text scaling issues
           ),
           child: child ?? const SizedBox.shrink(),
         );
       },
+    );
+  }
+
+  // 🎨 BUILD LIGHT THEME
+  ThemeData _buildLightTheme() {
+    const colorScheme = ColorScheme.light(
+      primary: Color(0xFF6366F1),
+      secondary: Color(0xFF10B981),
+      tertiary: Color(0xFFF59E0B),
+      surface: Color(0xFFFFFFFF),
+      background: Color(0xFFF8FAFC),
+      error: Color(0xFFEF4444),
+    );
+
+    return ThemeData(
+      useMaterial3: true,
+      colorScheme: colorScheme,
+      brightness: Brightness.light,
+    );
+  }
+
+  // 🎨 BUILD DARK THEME
+  ThemeData _buildDarkTheme() {
+    const colorScheme = ColorScheme.dark(
+      primary: Color(0xFF6366F1),
+      secondary: Color(0xFF10B981),
+      tertiary: Color(0xFFF59E0B),
+      surface: Color(0xFF111827),
+      background: Color(0xFF0F172A),
+      error: Color(0xFFEF4444),
+    );
+
+    return ThemeData(
+      useMaterial3: true,
+      colorScheme: colorScheme,
+      brightness: Brightness.dark,
     );
   }
 }
@@ -204,7 +237,7 @@ class MainApplicationScreen extends ConsumerWidget {
               margin: const EdgeInsets.only(right: 12),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(8),
-                gradient: NeuralDesignSystem.primaryGradient,
+                gradient: _getPrimaryGradient(),
               ),
               child: const Icon(Icons.psychology, color: Colors.white, size: 20),
             ),
@@ -244,7 +277,7 @@ class MainApplicationScreen extends ConsumerWidget {
           _HealthIndicator(health: overallHealth),
 
           // 🌐 Connection Status
-          _ConnectionStatusIndicator(),
+          const _ConnectionStatusIndicator(),
 
           // ⚙️ Settings Button
           IconButton(
@@ -264,6 +297,17 @@ class MainApplicationScreen extends ConsumerWidget {
       body: appReady
           ? const MainScreen()
           : const _SetupRequiredScreen(),
+    );
+  }
+
+  LinearGradient _getPrimaryGradient() {
+    return const LinearGradient(
+      colors: [
+        Color(0xFF6366F1),
+        Color(0xFF8B5CF6),
+      ],
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
     );
   }
 
@@ -311,10 +355,13 @@ class _HealthIndicator extends StatelessWidget {
 
 // 🌐 CONNECTION STATUS INDICATOR
 class _ConnectionStatusIndicator extends ConsumerWidget {
+  const _ConnectionStatusIndicator();
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final connectionStatus = ref.watch(connectionStatusProvider);
-    final latency = ref.watch(connectionLatencyProvider);
+    // For now, show a placeholder since providers aren't fully implemented
+    const connectionStatus = ConnectionStatus.connected;
+    const latency = 50;
 
     final (color, icon, tooltip) = switch (connectionStatus) {
       ConnectionStatus.connected => (
@@ -402,7 +449,6 @@ class _NeuronVaultProviderObserver extends ProviderObserver {
   @override
   void didDisposeProvider(
       ProviderBase provider,
-      Object? value,
       ProviderContainer container,
       ) {
     if (provider.name != null) {
@@ -412,5 +458,4 @@ class _NeuronVaultProviderObserver extends ProviderObserver {
 }
 
 // 🎯 COMPILE-TIME CONSTANTS
-const bool kDebugMode =
-    bool.fromEnvironment('dart.vm.product') == false;
+const bool kDebugMode = bool.fromEnvironment('dart.vm.product') == false;

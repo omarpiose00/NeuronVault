@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 
 import '../../core/design_system.dart';
 import '../../core/accessibility/accessibility_manager.dart';
+import '../../core/state/state_models.dart';
 import '../../main.dart'; // For AIModel
 
 /// 💰 TOKEN COST WIDGET

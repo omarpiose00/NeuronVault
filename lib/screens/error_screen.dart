@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/design_system.dart';
 import '../core/providers/providers_main.dart';
 import '../core/services/analytics_service.dart';
+import '../core/state/state_models.dart';
 
 enum ErrorSeverity {
   low,      // Non-critical errors, app continues
@@ -86,13 +87,13 @@ class _ErrorScreenState extends ConsumerState<ErrorScreen>
     final analyticsService = ref.read(analyticsServiceProvider);
     analyticsService.trackError(
       widget.message,
-      widget.technicalDetails,
-      {
-        'title': widget.title,
-        'severity': widget.severity.name,
-        'context': widget.errorContext ?? {},
-        'timestamp': DateTime.now().toIso8601String(),
-      },
+      description: widget.technicalDetails,
+      // details: {
+      //   'title': widget.title,
+      //   'severity': widget.severity.name,
+      //   'context': widget.errorContext ?? {},
+      //   'timestamp': DateTime.now().toIso8601String(),
+      // },
     );
   }
 
@@ -497,7 +498,9 @@ class _ErrorScreenState extends ConsumerState<ErrorScreen>
                 _buildDiagnosticItem(
                   theme,
                   'Last Update',
-                  _formatTimestamp(systemStatus.lastUpdate),
+                  systemStatus.lastUpdate != null
+                      ? _formatTimestamp(systemStatus.lastUpdate!)
+                      : 'N/A',
                   true,
                 ),
               ],

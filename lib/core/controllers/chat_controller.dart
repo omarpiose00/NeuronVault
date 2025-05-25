@@ -1,154 +1,139 @@
-// 💬 NEURONVAULT - REAL-TIME CHAT CONTROLLER
-// Enterprise-grade chat state management with real-time messaging
+// 💬 NEURONVAULT - CHAT CONTROLLER
+// Enterprise-grade chat management with AI orchestration
 // Part of PHASE 2.5 - QUANTUM STATE MANAGEMENT
 
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logger/logger.dart';
 import 'package:uuid/uuid.dart';
+
 import '../state/state_models.dart';
 import '../services/ai_service.dart';
 import '../services/storage_service.dart';
 import '../services/analytics_service.dart';
+import '../providers/providers_main.dart';
 
-// 💬 CHAT CONTROLLER PROVIDER
-final chatControllerProvider = 
-    StateNotifierProvider<ChatController, ChatState>((ref) {
-  return ChatController(
-    aiService: ref.watch(aiServiceProvider),
-    storageService: ref.watch(storageServiceProvider),
-    analyticsService: ref.watch(analyticsServiceProvider),
-    logger: ref.watch(loggerProvider),
-  );
-});
+// 💬 CHAT CONTROLLER
+class ChatController extends Notifier<ChatState> {
+  late final AIService _aiService;
+  late final StorageService _storageService;
+  late final AnalyticsService _analyticsService;
+  late final Logger _logger;
 
-// 🧠 REAL-TIME CHAT STATE CONTROLLER
-class ChatController extends StateNotifier<ChatState> {
-  final AIService _aiService;
-  final StorageService _storageService;
-  final AnalyticsService _analyticsService;
-  final Logger _logger;
   final Uuid _uuid = const Uuid();
+  StreamSubscription<String>? _currentStreamSubscription;
 
-  StreamSubscription<String>? _streamSubscription;
-  Timer? _typingTimer;
-  static const Duration _typingTimeout = Duration(seconds: 2);
+  @override
+  ChatState build() {
+    // Initialize services
+    _aiService = ref.read(aiServiceProvider);
+    _storageService = ref.read(storageServiceProvider);
+    _analyticsService = ref.read(analyticsServiceProvider);
+    _logger = ref.read(loggerProvider);
 
-  ChatController({
-    required AIService aiService,
-    required StorageService storageService,
-    required AnalyticsService analyticsService,
-    required Logger logger,
-  }) : _aiService = aiService,
-       _storageService = storageService,
-       _analyticsService = analyticsService,
-       _logger = logger,
-       super(const ChatState()) {
-    _initializeChat();
+    // Load chat history
+    _loadChatHistory();
+
+    return const ChatState();
   }
 
-  // 🚀 INITIALIZATION
-  Future<void> _initializeChat() async {
+  // 🔄 LOAD CHAT HISTORY
+  Future<void> _loadChatHistory() async {
     try {
-      _logger.i('💬 Initializing Chat Controller...');
-      
-      // Load chat history
-      final savedMessages = await _storageService.getChatHistory();
-      if (savedMessages.isNotEmpty) {
-        state = state.copyWith(
-          messages: savedMessages,
-          messageCount: savedMessages.length,
-          lastMessageTime: savedMessages.last.timestamp,
-        );
-        _logger.i('✅ Loaded ${savedMessages.length} messages from history');
-      }
-      
-      _analyticsService.trackEvent('chat_initialized', {
-        'message_count': state.messageCount,
-        'has_history': savedMessages.isNotEmpty,
-      });
-      
+      _logger.d('🔄 Loading chat history...');
+
+      final messages = await _storageService.getChatHistory();
+
+      state = state.copyWith(
+        messages: messages,
+        messageCount: messages.length,
+        lastMessageTime: messages.isNotEmpty ? messages.last.timestamp : null,
+      );
+
+      _logger.i('✅ Chat history loaded: ${messages.length} messages');
+
     } catch (e, stackTrace) {
-      _logger.e('❌ Failed to initialize chat', error: e, stackTrace: stackTrace);
+      _logger.e('❌ Failed to load chat history', error: e, stackTrace: stackTrace);
     }
   }
 
-  // ✍️ INPUT MANAGEMENT
-  void updateInput(String input) {
-    if (input == state.currentInput) return;
-    
+  // 📝 UPDATE CURRENT INPUT
+  void updateCurrentInput(String input) {
+    if (state.currentInput == input) return;
+
     state = state.copyWith(currentInput: input);
-    
-    // Handle typing indicator
-    _handleTypingIndicator();
-    
-    _logger.d('✍️ Input updated: ${input.length} chars');
-  }
 
-  void clearInput() {
-    state = state.copyWith(currentInput: '');
-    _stopTypingIndicator();
-    _logger.d('🗑️ Input cleared');
-  }
-
-  // 📨 MESSAGE SENDING
-  Future<void> sendMessage() async {
-    if (!state.canSendMessage) {
-      _logger.w('⚠️ Cannot send message: ${state.isGenerating ? "generating" : "empty input"}');
-      return;
+    // Start typing indicator
+    if (!state.isTyping && input.isNotEmpty) {
+      _setTypingState(true);
+    } else if (state.isTyping && input.isEmpty) {
+      _setTypingState(false);
     }
+  }
 
-    final messageContent = state.currentInput.trim();
-    final requestId = _uuid.v4();
-    
+  // ⌨️ SET TYPING STATE
+  void _setTypingState(bool isTyping) {
+    state = state.copyWith(isTyping: isTyping);
+
+    if (isTyping) {
+      _analyticsService.trackEvent('chat_typing_started');
+    }
+  }
+
+  // 📤 SEND MESSAGE
+  Future<void> sendMessage(String content) async {
+    if (content.trim().isEmpty || state.isGenerating) return;
+
     try {
-      _logger.i('📨 Sending message: ${messageContent.length} chars');
-      
+      final requestId = _uuid.v4();
+
       // Create user message
       final userMessage = ChatMessage(
         id: _uuid.v4(),
-        content: messageContent,
+        content: content.trim(),
         type: MessageType.user,
         timestamp: DateTime.now(),
         requestId: requestId,
       );
-      
-      // Update state
+
+      // Add user message to state
+      final updatedMessages = [...state.messages, userMessage];
       state = state.copyWith(
-        messages: [...state.messages, userMessage],
+        messages: updatedMessages,
         currentInput: '',
+        isTyping: false,
         isGenerating: true,
         activeRequestId: requestId,
-        messageCount: state.messageCount + 1,
-        lastMessageTime: DateTime.now(),
+        messageCount: updatedMessages.length,
+        lastMessageTime: userMessage.timestamp,
       );
-      
-      // Save message immediately
+
+      // Save user message
       await _storageService.saveMessage(userMessage);
-      
-      // Process AI response
-      await _processAIResponse(messageContent, requestId);
-      
-      _analyticsService.trackEvent('message_sent', {
-        'message_length': messageContent.length,
+
+      // Track analytics
+      _analyticsService.trackChatEvent('message_sent', data: {
+        'length': content.length,
         'request_id': requestId,
-        'total_messages': state.messageCount,
       });
-      
+
+      // Generate AI response
+      await _generateAIResponse(content, requestId);
+
     } catch (e, stackTrace) {
       _logger.e('❌ Failed to send message', error: e, stackTrace: stackTrace);
-      await _handleMessageError(e.toString(), requestId);
+      _handleError('Failed to send message: ${e.toString()}');
     }
   }
 
-  // 🤖 AI RESPONSE PROCESSING
-  Future<void> _processAIResponse(String userMessage, String requestId) async {
+  // 🤖 GENERATE AI RESPONSE
+  Future<void> _generateAIResponse(String prompt, String requestId) async {
     try {
-      _logger.d('🤖 Processing AI response for request: $requestId');
-      
-      // Start streaming response
-      final responseStream = _aiService.streamResponse(userMessage, requestId);
-      
+      _logger.d('🤖 Generating AI response for request: $requestId');
+
+      // Create streaming response
+      final responseStream = _aiService.streamResponse(prompt, requestId);
+
       // Create initial assistant message
       final assistantMessage = ChatMessage(
         id: _uuid.v4(),
@@ -157,295 +142,252 @@ class ChatController extends StateNotifier<ChatState> {
         timestamp: DateTime.now(),
         requestId: requestId,
       );
-      
-      // Add to messages list
-      state = state.copyWith(
-        messages: [...state.messages, assistantMessage],
-        messageCount: state.messageCount + 1,
-      );
-      
+
+      // Add initial message to state
+      final updatedMessages = [...state.messages, assistantMessage];
+      state = state.copyWith(messages: updatedMessages);
+
       // Listen to stream
-      _streamSubscription?.cancel();
-      _streamSubscription = responseStream.listen(
-        _onStreamData,
-        onError: (error) => _onStreamError(error, requestId),
-        onDone: () => _onStreamComplete(requestId),
+      _currentStreamSubscription = responseStream.listen(
+            (chunk) => _handleStreamChunk(assistantMessage.id, chunk),
+        onError: (error) => _handleStreamError(error),
+        onDone: () => _handleStreamComplete(requestId),
       );
-      
+
     } catch (e, stackTrace) {
-      _logger.e('❌ Failed to process AI response', error: e, stackTrace: stackTrace);
-      await _handleMessageError(e.toString(), requestId);
+      _logger.e('❌ Failed to generate AI response', error: e, stackTrace: stackTrace);
+      _handleError('Failed to generate response: ${e.toString()}');
     }
   }
 
-  void _onStreamData(String chunk) {
-    if (state.activeRequestId == null) return;
-    
+  // 📝 HANDLE STREAM CHUNK
+  void _handleStreamChunk(String messageId, String chunk) {
     try {
-      // Find the assistant message for this request
-      final messages = List<ChatMessage>.from(state.messages);
-      final messageIndex = messages.lastIndexWhere(
-        (msg) => msg.requestId == state.activeRequestId && 
-                msg.type == MessageType.assistant
-      );
-      
+      final messageIndex = state.messages.indexWhere((msg) => msg.id == messageId);
       if (messageIndex == -1) return;
-      
-      // Update message content
-      final currentMessage = messages[messageIndex];
+
+      final currentMessage = state.messages[messageIndex];
       final updatedMessage = currentMessage.copyWith(
         content: currentMessage.content + chunk,
-        timestamp: DateTime.now(),
       );
-      
-      messages[messageIndex] = updatedMessage;
-      
-      state = state.copyWith(
-        messages: messages,
-        lastMessageTime: DateTime.now(),
-      );
-      
-      _logger.d('📡 Stream chunk received: ${chunk.length} chars');
-      
+
+      final updatedMessages = [...state.messages];
+      updatedMessages[messageIndex] = updatedMessage;
+
+      state = state.copyWith(messages: updatedMessages);
+
     } catch (e) {
-      _logger.e('❌ Failed to process stream chunk: $e');
+      _logger.w('⚠️ Failed to handle stream chunk: $e');
     }
   }
 
-  void _onStreamError(dynamic error, String requestId) {
-    _logger.e('❌ Stream error for request $requestId: $error');
-    _handleMessageError(error.toString(), requestId);
-  }
+  // ❌ HANDLE STREAM ERROR
+  void _handleStreamError(dynamic error) {
+    _logger.e('❌ Stream error: $error');
 
-  void _onStreamComplete(String requestId) {
-    _logger.i('✅ Stream completed for request: $requestId');
-    
     state = state.copyWith(
       isGenerating: false,
       activeRequestId: null,
     );
-    
-    // Save the completed message
-    _saveCompletedMessage(requestId);
-    
-    _analyticsService.trackEvent('ai_response_completed', {
-      'request_id': requestId,
-      'response_time': DateTime.now().millisecondsSinceEpoch,
-    });
+
+    _handleError('AI response error: ${error.toString()}');
   }
 
-  // 💾 MESSAGE PERSISTENCE
-  Future<void> _saveCompletedMessage(String requestId) async {
+  // ✅ HANDLE STREAM COMPLETE
+  void _handleStreamComplete(String requestId) async {
     try {
-      final message = state.messages.lastWhere(
-        (msg) => msg.requestId == requestId && msg.type == MessageType.assistant
+      _logger.d('✅ Stream completed for request: $requestId');
+
+      state = state.copyWith(
+        isGenerating: false,
+        activeRequestId: null,
       );
-      
-      await _storageService.saveMessage(message);
-      _logger.d('💾 Message saved: ${message.id}');
-      
-    } catch (e) {
-      _logger.w('⚠️ Failed to save completed message: $e');
+
+      // Find and save the completed message
+      final completedMessage = state.messages
+          .where((msg) => msg.requestId == requestId && msg.type == MessageType.assistant)
+          .lastOrNull;
+
+      if (completedMessage != null) {
+        await _storageService.saveMessage(completedMessage);
+
+        _analyticsService.trackChatEvent('response_completed', data: {
+          'request_id': requestId,
+          'response_length': completedMessage.content.length,
+        });
+      }
+
+    } catch (e, stackTrace) {
+      _logger.e('❌ Failed to handle stream completion', error: e, stackTrace: stackTrace);
     }
   }
 
-  // ⚠️ ERROR HANDLING
-  Future<void> _handleMessageError(String error, String requestId) async {
-    _logger.e('⚠️ Handling message error: $error');
-    
-    final errorMessage = ChatMessage(
-      id: _uuid.v4(),
-      content: 'Error: $error',
+  // ⏹️ STOP GENERATION
+  Future<void> stopGeneration() async {
+    if (!state.isGenerating || state.activeRequestId == null) return;
+
+    try {
+      _logger.d('⏹️ Stopping generation...');
+
+      await _aiService.stopGeneration(state.activeRequestId!);
+      await _currentStreamSubscription?.cancel();
+
+      state = state.copyWith(
+        isGenerating: false,
+        activeRequestId: null,
+      );
+
+      _analyticsService.trackChatEvent('generation_stopped');
+
+      _logger.i('⏹️ Generation stopped');
+
+    } catch (e, stackTrace) {
+      _logger.e('❌ Failed to stop generation', error: e, stackTrace: stackTrace);
+    }
+  }
+
+  // ❌ HANDLE ERROR
+  void _handleError(String errorMessage) {
+    final errorId = _uuid.v4();
+
+    final errorMsg = ChatMessage(
+      id: errorId,
+      content: errorMessage,
       type: MessageType.error,
       timestamp: DateTime.now(),
-      requestId: requestId,
       isError: true,
-      metadata: {'error_type': 'ai_response_error'},
     );
-    
+
+    final updatedMessages = [...state.messages, errorMsg];
     state = state.copyWith(
-      messages: [...state.messages, errorMessage],
+      messages: updatedMessages,
       isGenerating: false,
       activeRequestId: null,
-      messageCount: state.messageCount + 1,
+      messageCount: updatedMessages.length,
     );
-    
-    await _storageService.saveMessage(errorMessage);
-    
-    _analyticsService.trackEvent('message_error', {
-      'error': error,
-      'request_id': requestId,
-      'timestamp': DateTime.now().toIso8601String(),
-    });
+
+    _analyticsService.trackError('chat_error', description: errorMessage);
   }
 
-  // ⌨️ TYPING INDICATORS
-  void _handleTypingIndicator() {
-    if (!state.isTyping) {
-      state = state.copyWith(isTyping: true);
-      _logger.d('⌨️ Started typing');
-    }
-    
-    _typingTimer?.cancel();
-    _typingTimer = Timer(_typingTimeout, () {
-      _stopTypingIndicator();
-    });
-  }
-
-  void _stopTypingIndicator() {
-    if (state.isTyping) {
-      state = state.copyWith(isTyping: false);
-      _logger.d('⏹️ Stopped typing');
-    }
-    _typingTimer?.cancel();
-  }
-
-  // 🔄 MESSAGE MANAGEMENT
+  // 🗑️ DELETE MESSAGE
   Future<void> deleteMessage(String messageId) async {
     try {
       _logger.d('🗑️ Deleting message: $messageId');
-      
-      final updatedMessages = state.messages
-          .where((msg) => msg.id != messageId)
-          .toList();
-      
+
+      final updatedMessages = state.messages.where((msg) => msg.id != messageId).toList();
+
       state = state.copyWith(
         messages: updatedMessages,
         messageCount: updatedMessages.length,
       );
-      
+
       await _storageService.deleteMessage(messageId);
-      
-      _analyticsService.trackEvent('message_deleted', {
+
+      _analyticsService.trackChatEvent('message_deleted', data: {
         'message_id': messageId,
-        'remaining_count': state.messageCount,
       });
-      
+
+      _logger.i('✅ Message deleted');
+
     } catch (e, stackTrace) {
       _logger.e('❌ Failed to delete message', error: e, stackTrace: stackTrace);
     }
   }
 
-  Future<void> editMessage(String messageId, String newContent) async {
+  // 🧹 CLEAR CHAT HISTORY
+  Future<void> clearChatHistory() async {
     try {
-      _logger.d('✏️ Editing message: $messageId');
-      
-      final messages = List<ChatMessage>.from(state.messages);
-      final messageIndex = messages.indexWhere((msg) => msg.id == messageId);
-      
-      if (messageIndex == -1) {
-        throw StateError('Message not found: $messageId');
+      _logger.i('🧹 Clearing chat history...');
+
+      // Stop any ongoing generation
+      if (state.isGenerating) {
+        await stopGeneration();
       }
-      
-      final updatedMessage = messages[messageIndex].copyWith(
-        content: newContent,
-        timestamp: DateTime.now(),
-        metadata: {
-          ...messages[messageIndex].metadata,
-          'edited': true,
-          'edit_time': DateTime.now().toIso8601String(),
-        },
-      );
-      
-      messages[messageIndex] = updatedMessage;
-      
-      state = state.copyWith(messages: messages);
-      await _storageService.saveMessage(updatedMessage);
-      
-      _analyticsService.trackEvent('message_edited', {
-        'message_id': messageId,
-        'new_length': newContent.length,
-      });
-      
-    } catch (e, stackTrace) {
-      _logger.e('❌ Failed to edit message', error: e, stackTrace: stackTrace);
-    }
-  }
 
-  // 🔄 CHAT MANAGEMENT
-  Future<void> clearChat() async {
-    try {
-      _logger.i('🔄 Clearing chat history...');
-      
-      // Cancel any active streams
-      _streamSubscription?.cancel();
-      
       state = const ChatState();
+
       await _storageService.clearChatHistory();
-      
-      _analyticsService.trackEvent('chat_cleared', {
-        'timestamp': DateTime.now().toIso8601String(),
+
+      _analyticsService.trackChatEvent('chat_history_cleared', data: {
+        'message_count': state.messageCount,
       });
-      
-      _logger.i('✅ Chat cleared successfully');
-      
+
+      _logger.i('✅ Chat history cleared');
+
     } catch (e, stackTrace) {
-      _logger.e('❌ Failed to clear chat', error: e, stackTrace: stackTrace);
+      _logger.e('❌ Failed to clear chat history', error: e, stackTrace: stackTrace);
     }
   }
 
-  Future<void> exportChat() async {
+  // 📤 EXPORT CHAT
+  Future<String> exportChat() async {
     try {
-      _logger.i('📤 Exporting chat...');
-      
-      final exportData = await _storageService.exportChatHistory();
-      
-      _analyticsService.trackEvent('chat_exported', {
+      _logger.d('📤 Exporting chat...');
+
+      final exportPath = await _storageService.exportChatHistory();
+
+      _analyticsService.trackChatEvent('chat_exported', data: {
         'message_count': state.messageCount,
-        'export_size': exportData.length,
+        'export_path': exportPath,
       });
-      
-      return exportData;
-      
+
+      _logger.i('✅ Chat exported to: $exportPath');
+      return exportPath;
+
     } catch (e, stackTrace) {
       _logger.e('❌ Failed to export chat', error: e, stackTrace: stackTrace);
       rethrow;
     }
   }
 
-  // ⏹️ STOP GENERATION
-  Future<void> stopGeneration() async {
-    if (!state.isGenerating) return;
-    
+  // 🔍 SEARCH MESSAGES
+  Future<List<ChatMessage>> searchMessages(String query) async {
     try {
-      _logger.i('⏹️ Stopping generation...');
-      
-      // Cancel stream
-      _streamSubscription?.cancel();
-      
-      // Stop AI service generation
-      if (state.activeRequestId != null) {
-        await _aiService.stopGeneration(state.activeRequestId!);
-      }
-      
-      state = state.copyWith(
-        isGenerating: false,
-        activeRequestId: null,
-      );
-      
-      _analyticsService.trackEvent('generation_stopped', {
-        'request_id': state.activeRequestId,
-        'timestamp': DateTime.now().toIso8601String(),
+      _logger.d('🔍 Searching messages for: "$query"');
+
+      final results = await _storageService.searchMessages(query);
+
+      _analyticsService.trackChatEvent('messages_searched', data: {
+        'query': query,
+        'results_count': results.length,
       });
-      
-      _logger.i('✅ Generation stopped');
-      
+
+      return results;
+
     } catch (e, stackTrace) {
-      _logger.e('❌ Failed to stop generation', error: e, stackTrace: stackTrace);
+      _logger.e('❌ Failed to search messages', error: e, stackTrace: stackTrace);
+      return [];
     }
   }
 
-  // 🔄 CLEANUP
+  // 📊 GET CHAT STATISTICS
+  Map<String, dynamic> getChatStatistics() {
+    return {
+      'total_messages': state.messageCount,
+      'user_messages': state.userMessageCount,
+      'assistant_messages': state.assistantMessageCount,
+      'has_messages': state.hasMessages,
+      'is_generating': state.isGenerating,
+      'is_typing': state.isTyping,
+      'current_input_length': state.currentInput.length,
+      'can_send_message': state.canSendMessage,
+      'last_message_time': state.lastMessageTime?.toIso8601String(),
+    };
+  }
+
+  // 🧹 DISPOSE
   @override
   void dispose() {
-    _streamSubscription?.cancel();
-    _typingTimer?.cancel();
-    _logger.d('🧹 Chat Controller disposed');
-    super.dispose();
+    _currentStreamSubscription?.cancel();
   }
 }
 
-// 🎯 COMPUTED PROVIDERS FOR CHAT
+// 💬 CHAT CONTROLLER PROVIDER
+final chatControllerProvider = NotifierProvider<ChatController, ChatState>(
+      () => ChatController(),
+);
+
+// 📊 COMPUTED PROVIDERS
 final chatMessagesProvider = Provider<List<ChatMessage>>((ref) {
   return ref.watch(chatControllerProvider).messages;
 });
@@ -480,4 +422,8 @@ final userMessageCountProvider = Provider<int>((ref) {
 
 final assistantMessageCountProvider = Provider<int>((ref) {
   return ref.watch(chatControllerProvider).assistantMessageCount;
+});
+
+final chatStatisticsProvider = Provider<Map<String, dynamic>>((ref) {
+  return ref.read(chatControllerProvider.notifier).getChatStatistics();
 });

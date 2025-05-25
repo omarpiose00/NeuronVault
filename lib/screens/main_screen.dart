@@ -4,8 +4,13 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/controllers/chat_controller.dart';
+import '../core/controllers/connection_controller.dart';
+import '../core/controllers/models_controller.dart';
+import '../core/controllers/strategy_controller.dart';
 import '../core/design_system.dart';
 import '../core/providers/providers_main.dart';
+import '../core/state/state_models.dart';
 import '../widgets/core/chat_input_bar.dart';
 import '../widgets/core/message_bubble.dart';
 import '../widgets/core/strategy_selector.dart';
@@ -21,12 +26,13 @@ class MainScreen extends ConsumerStatefulWidget {
 
 class _MainScreenState extends ConsumerState<MainScreen>
     with TickerProviderStateMixin {
-  
+
   late TabController _tabController;
+  late AnimationController _pulseAnimationController;
   bool _isLeftPanelOpen = false;
   bool _isRightPanelOpen = false;
   final _scrollController = ScrollController();
-  
+
   // 📱 RESPONSIVE BREAKPOINTS
   static const double _mobileBreakpoint = 768;
   static const double _tabletBreakpoint = 1024;
@@ -36,11 +42,16 @@ class _MainScreenState extends ConsumerState<MainScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _pulseAnimationController = AnimationController(
+      duration: const Duration(seconds: 2),
+      vsync: this,
+    )..repeat();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _pulseAnimationController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -49,17 +60,28 @@ class _MainScreenState extends ConsumerState<MainScreen>
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final theme = Theme.of(context);
-    
+
     // 📱 Responsive layout detection
     final layoutType = _getLayoutType(size.width);
-    
+
     return Scaffold(
       backgroundColor: theme.colorScheme.background,
       body: Column(
         children: [
           // 🧠 Custom app bar
-          const NeuralAppBar(),
-          
+          NeuralAppBar(
+            isConnected: ref.watch(isConnectedProvider),
+            onConnectionToggle: () {
+              // Toggle connection logic
+              if (ref.read(isConnectedProvider)) {
+                ref.read(connectionControllerProvider.notifier).disconnect();
+              } else {
+                ref.read(connectionControllerProvider.notifier).connect();
+              }
+            },
+            pulseAnimation: _pulseAnimationController,
+          ),
+
           // 🏠 Main content area
           Expanded(
             child: _buildMainContent(layoutType, theme),
@@ -94,17 +116,21 @@ class _MainScreenState extends ConsumerState<MainScreen>
       children: [
         // 📊 Status bar
         _buildStatusBar(theme, compact: true),
-        
+
         // 💬 Chat area
         Expanded(
           child: _buildChatArea(theme),
         ),
-        
+
         // ⚙️ Quick controls
         _buildQuickControls(theme),
-        
+
         // 📝 Chat input
-        const ChatInputBar(),
+        ChatInputBar(
+          onMessageSent: (message) {
+            ref.read(chatControllerProvider.notifier).sendMessage(message);
+          },
+        ),
       ],
     );
   }
@@ -127,14 +153,18 @@ class _MainScreenState extends ConsumerState<MainScreen>
           ),
           child: _buildLeftPanel(theme),
         ),
-        
+
         // 💬 Main chat area
         Expanded(
           child: Column(
             children: [
               _buildStatusBar(theme),
               Expanded(child: _buildChatArea(theme)),
-              const ChatInputBar(),
+              ChatInputBar(
+                onMessageSent: (message) {
+                  ref.read(chatControllerProvider.notifier).sendMessage(message);
+                },
+              ),
             ],
           ),
         ),
@@ -161,7 +191,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
           ),
           child: _buildLeftPanel(theme, isCollapsed: !_isLeftPanelOpen),
         ),
-        
+
         // 💬 Main content area
         Expanded(
           flex: isUltrawide ? 3 : 2,
@@ -169,11 +199,15 @@ class _MainScreenState extends ConsumerState<MainScreen>
             children: [
               _buildStatusBar(theme),
               Expanded(child: _buildChatArea(theme)),
-              const ChatInputBar(),
+              ChatInputBar(
+                onMessageSent: (message) {
+                  ref.read(chatControllerProvider.notifier).sendMessage(message);
+                },
+              ),
             ],
           ),
         ),
-        
+
         // 📊 Right panel (analytics & monitoring)
         if (isUltrawide)
           AnimatedContainer(
@@ -201,7 +235,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
         final connectionStatus = ref.watch(connectionStatusProvider);
         final systemStatus = ref.watch(systemStatusProvider);
         final budgetUsage = ref.watch(budgetUsageProvider);
-        
+
         return Container(
           height: compact ? 40 : 50,
           padding: EdgeInsets.symmetric(
@@ -227,9 +261,9 @@ class _MainScreenState extends ConsumerState<MainScreen>
                 connectionStatus.name.toUpperCase(),
                 compact,
               ),
-              
+
               const SizedBox(width: 16),
-              
+
               // 🤖 Active models
               _buildStatusIndicator(
                 theme,
@@ -238,14 +272,14 @@ class _MainScreenState extends ConsumerState<MainScreen>
                 '${systemStatus.healthyModelCount} models',
                 compact,
               ),
-              
+
               const SizedBox(width: 16),
-              
+
               // 💰 Budget usage
               _buildBudgetIndicator(theme, budgetUsage, compact),
-              
+
               const Spacer(),
-              
+
               // ⚙️ Panel toggles (desktop only)
               if (!compact) ...[
                 IconButton(
@@ -257,7 +291,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
                   icon: const Icon(Icons.menu),
                   tooltip: 'Toggle Strategy Panel',
                 ),
-                
+
                 IconButton(
                   onPressed: () {
                     setState(() {
@@ -276,12 +310,12 @@ class _MainScreenState extends ConsumerState<MainScreen>
   }
 
   Widget _buildStatusIndicator(
-    ThemeData theme,
-    IconData icon,
-    Color color,
-    String label,
-    bool compact,
-  ) {
+      ThemeData theme,
+      IconData icon,
+      Color color,
+      String label,
+      bool compact,
+      ) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -306,7 +340,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
 
   Widget _buildBudgetIndicator(ThemeData theme, double usage, bool compact) {
     final color = usage > 80 ? Colors.red : (usage > 60 ? Colors.orange : Colors.green);
-    
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -334,7 +368,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
     if (isCollapsed) {
       return _buildCollapsedLeftPanel(theme);
     }
-    
+
     return Column(
       children: [
         // 📋 Panel header
@@ -366,7 +400,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
             ],
           ),
         ),
-        
+
         // 📑 Tabbed content
         Expanded(
           child: Column(
@@ -383,7 +417,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
                   Tab(text: 'Settings'),
                 ],
               ),
-              
+
               // 📄 Tab content
               Expanded(
                 child: TabBarView(
@@ -427,7 +461,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
                 });
               },
               icon: Icon(_getStrategyIcon(activeStrategy)),
-              tooltip: 'Strategy: ${activeStrategy.name}',
+              tooltip: 'Strategy: ${activeStrategy.displayName}',
             );
           },
         ),
@@ -440,7 +474,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
     if (isCollapsed) {
       return _buildCollapsedRightPanel(theme);
     }
-    
+
     return Column(
       children: [
         // 📋 Panel header
@@ -472,7 +506,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
             ],
           ),
         ),
-        
+
         // 📊 Analytics content
         Expanded(
           child: SingleChildScrollView(
@@ -516,11 +550,11 @@ class _MainScreenState extends ConsumerState<MainScreen>
       builder: (context, ref, child) {
         final messages = ref.watch(chatMessagesProvider);
         final isGenerating = ref.watch(isGeneratingProvider);
-        
+
         if (messages.isEmpty) {
           return _buildEmptyChat(theme);
         }
-        
+
         return Column(
           children: [
             // 💬 Messages list
@@ -531,7 +565,11 @@ class _MainScreenState extends ConsumerState<MainScreen>
                 itemCount: messages.length + (isGenerating ? 1 : 0),
                 itemBuilder: (context, index) {
                   if (index < messages.length) {
-                    return MessageBubble(message: messages[index]);
+                    return MessageBubble(
+                      message: messages[index].content,
+                      isFromAI: messages[index].type == MessageType.assistant,
+                      timestamp: messages[index].timestamp.toIso8601String(),
+                    );
                   } else {
                     // Typing indicator
                     return _buildTypingIndicator(theme);
@@ -567,13 +605,13 @@ class _MainScreenState extends ConsumerState<MainScreen>
             ),
             child: const Icon(
               Icons.psychology,
-              size: 40,  
+              size: 40,
               color: Colors.white,
             ),
           ),
-          
+
           const SizedBox(height: 24),
-          
+
           // 👋 Welcome message
           Text(
             'Welcome to NeuronVault',
@@ -581,9 +619,9 @@ class _MainScreenState extends ConsumerState<MainScreen>
               fontWeight: FontWeight.bold,
             ),
           ),
-          
+
           const SizedBox(height: 8),
-          
+
           Text(
             'Your enterprise AI orchestration platform.\nStart a conversation to begin.',
             style: theme.textTheme.bodyLarge?.copyWith(
@@ -591,9 +629,9 @@ class _MainScreenState extends ConsumerState<MainScreen>
             ),
             textAlign: TextAlign.center,
           ),
-          
+
           const SizedBox(height: 32),
-          
+
           // 💡 Quick actions
           Wrap(
             spacing: 12,
@@ -603,25 +641,25 @@ class _MainScreenState extends ConsumerState<MainScreen>
                 theme,
                 'Ask about AI',
                 Icons.psychology,
-                () => _insertQuickPrompt('What can you tell me about artificial intelligence?'),
+                    () => _insertQuickPrompt('What can you tell me about artificial intelligence?'),
               ),
               _buildQuickActionChip(
                 theme,
                 'Code Review',
                 Icons.code,
-                () => _insertQuickPrompt('Please review my code for best practices'),
+                    () => _insertQuickPrompt('Please review my code for best practices'),
               ),
               _buildQuickActionChip(
                 theme,
                 'Creative Writing',
                 Icons.edit,
-                () => _insertQuickPrompt('Help me write a creative story about'),
+                    () => _insertQuickPrompt('Help me write a creative story about'),
               ),
               _buildQuickActionChip(
                 theme,
                 'Data Analysis',
                 Icons.analytics,
-                () => _insertQuickPrompt('Analyze this data and provide insights:'),
+                    () => _insertQuickPrompt('Analyze this data and provide insights:'),
               ),
             ],
           ),
@@ -631,11 +669,11 @@ class _MainScreenState extends ConsumerState<MainScreen>
   }
 
   Widget _buildQuickActionChip(
-    ThemeData theme,
-    String label,
-    IconData icon,
-    VoidCallback onTap,
-  ) {
+      ThemeData theme,
+      String label,
+      IconData icon,
+      VoidCallback onTap,
+      ) {
     return ActionChip(
       onPressed: onTap,
       avatar: Icon(icon, size: 16),
@@ -692,16 +730,32 @@ class _MainScreenState extends ConsumerState<MainScreen>
 
   // 🎯 TAB CONTENT BUILDERS
   Widget _buildStrategyTab(ThemeData theme) {
-    return const SingleChildScrollView(
-      padding: EdgeInsets.all(16),
-      child: StrategySelector(),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: StrategySelector(
+        currentStrategy: ref.watch(activeStrategyProvider),
+        onStrategyChanged: (strategy) {
+          ref.read(strategyControllerProvider.notifier).setActiveStrategy(strategy);
+        },
+      ),
     );
   }
 
   Widget _buildModelsTab(ThemeData theme) {
-    return const SingleChildScrollView(
-      padding: EdgeInsets.all(16),
-      child: ModelGrid(),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: ModelGrid(
+        models: ref.watch(availableModelsProvider).keys.toList(),
+        onModelToggle: (modelName) {
+          final model = AIModel.values.firstWhere((m) => m.displayName == modelName);
+          final isCurrentlyActive = ref.read(activeModelsProvider)[model] ?? false;
+          if (isCurrentlyActive) {
+            ref.read(modelsControllerProvider.notifier).deactivateModel(model);
+          } else {
+            ref.read(modelsControllerProvider.notifier).activateModel(model);
+          }
+        },
+      ),
     );
   }
 
@@ -718,7 +772,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
             ),
           ),
           const SizedBox(height: 16),
-          
+
           // Theme selector
           ListTile(
             leading: const Icon(Icons.palette),
@@ -729,7 +783,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
               // Open theme selector
             },
           ),
-          
+
           // Language selector
           ListTile(
             leading: const Icon(Icons.language),
@@ -740,9 +794,9 @@ class _MainScreenState extends ConsumerState<MainScreen>
               // Open language selector
             },
           ),
-          
+
           const Divider(height: 32),
-          
+
           Text(
             'Advanced Settings',
             style: theme.textTheme.titleMedium?.copyWith(
@@ -750,7 +804,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
             ),
           ),
           const SizedBox(height: 16),
-          
+
           // Export/Import
           ListTile(
             leading: const Icon(Icons.import_export),
@@ -761,7 +815,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
               // Open export/import dialog
             },
           ),
-          
+
           // Reset settings
           ListTile(
             leading: const Icon(Icons.restore, color: Colors.red),
@@ -795,7 +849,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
         builder: (context, ref, child) {
           final activeStrategy = ref.watch(activeStrategyProvider);
           final isGenerating = ref.watch(isGeneratingProvider);
-          
+
           return Row(
             children: [
               // 🎛️ Strategy quick switch
@@ -805,7 +859,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
                   onChanged: isGenerating ? null : (strategy) {
                     if (strategy != null) {
                       ref.read(strategyControllerProvider.notifier)
-                          .setStrategy(strategy);
+                          .setActiveStrategy(strategy);
                     }
                   },
                   items: AIStrategy.values.map((strategy) {
@@ -815,16 +869,16 @@ class _MainScreenState extends ConsumerState<MainScreen>
                         children: [
                           Icon(_getStrategyIcon(strategy), size: 16),
                           const SizedBox(width: 8),
-                          Text(strategy.name.toUpperCase()),
+                          Text(strategy.displayName.toUpperCase()),
                         ],
                       ),
                     );
                   }).toList(),
                 ),
               ),
-              
+
               const SizedBox(width: 12),
-              
+
               // ⏹️ Stop generation button
               if (isGenerating)
                 IconButton(
@@ -868,7 +922,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
     return Consumer(
       builder: (context, ref, child) {
         final modelHealth = ref.watch(modelHealthProvider);
-        
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -887,7 +941,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
                     _getHealthIcon(entry.value.status),
                     color: _getHealthColor(entry.value.status),
                   ),
-                  title: Text(entry.key.name.toUpperCase()),
+                  title: Text(entry.key.displayName.toUpperCase()),
                   subtitle: Text('${entry.value.responseTime}ms'),
                   trailing: Text(
                     '${(entry.value.successRate * 100).toInt()}%',
@@ -959,18 +1013,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
   }
 
   IconData _getStrategyIcon(AIStrategy strategy) {
-    switch (strategy) {
-      case AIStrategy.parallel:
-        return Icons.account_tree;
-      case AIStrategy.consensus:
-        return Icons.how_to_vote;
-      case AIStrategy.adaptive:
-        return Icons.auto_awesome;
-      case AIStrategy.sequential:
-        return Icons.timeline;
-      case AIStrategy.weighted:
-        return Icons.balance;
-    }
+    return strategy.icon;
   }
 
   IconData _getHealthIcon(HealthStatus status) {
@@ -981,6 +1024,8 @@ class _MainScreenState extends ConsumerState<MainScreen>
         return Icons.warning;
       case HealthStatus.unhealthy:
         return Icons.error;
+      case HealthStatus.critical:
+        return Icons.dangerous;
       case HealthStatus.unknown:
         return Icons.help;
     }
@@ -994,13 +1039,15 @@ class _MainScreenState extends ConsumerState<MainScreen>
         return Colors.orange;
       case HealthStatus.unhealthy:
         return Colors.red;
+      case HealthStatus.critical:
+        return Colors.red.shade900;
       case HealthStatus.unknown:
         return Colors.grey;
     }
   }
 
   void _insertQuickPrompt(String prompt) {
-    ref.read(chatControllerProvider.notifier).updateInput(prompt);
+    ref.read(chatControllerProvider.notifier).updateCurrentInput(prompt);
   }
 }
 

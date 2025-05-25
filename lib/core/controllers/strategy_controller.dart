@@ -1,325 +1,263 @@
-// 🎛️ NEURONVAULT - AI STRATEGY CONTROLLER
-// Enterprise-grade state management for AI orchestration strategies
+// 🎛️ NEURONVAULT - STRATEGY CONTROLLER
+// Enterprise-grade AI strategy management with Riverpod
 // Part of PHASE 2.5 - QUANTUM STATE MANAGEMENT
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logger/logger.dart';
+
 import '../state/state_models.dart';
 import '../services/config_service.dart';
 import '../services/analytics_service.dart';
+import '../providers/providers_main.dart';
 
-// 🎯 STRATEGY CONTROLLER PROVIDER
-final strategyControllerProvider = 
-    StateNotifierProvider<StrategyController, StrategyState>((ref) {
-  return StrategyController(
-    configService: ref.watch(configServiceProvider),
-    analyticsService: ref.watch(analyticsServiceProvider),
-    logger: ref.watch(loggerProvider),
-  );
-});
+// 🎯 STRATEGY CONTROLLER
+class StrategyController extends Notifier<StrategyState> {
+  late final ConfigService _configService;
+  late final AnalyticsService _analyticsService;
+  late final Logger _logger;
 
-// 🧠 AI STRATEGY STATE CONTROLLER
-class StrategyController extends StateNotifier<StrategyState> {
-  final ConfigService _configService;
-  final AnalyticsService _analyticsService;
-  final Logger _logger;
+  @override
+  StrategyState build() {
+    // Initialize services
+    _configService = ref.read(configServiceProvider);
+    _analyticsService = ref.read(analyticsServiceProvider);
+    _logger = ref.read(loggerProvider);
 
-  StrategyController({
-    required ConfigService configService,
-    required AnalyticsService analyticsService,
-    required Logger logger,
-  }) : _configService = configService,
-       _analyticsService = analyticsService,
-       _logger = logger,
-       super(const StrategyState()) {
-    _initializeStrategy();
+    // Load initial state
+    _loadStrategyConfig();
+
+    return const StrategyState();
   }
 
-  // 🚀 INITIALIZATION
-  Future<void> _initializeStrategy() async {
+  // 🔄 LOAD CONFIGURATION
+  Future<void> _loadStrategyConfig() async {
     try {
-      _logger.i('🎛️ Initializing Strategy Controller...');
-      
+      _logger.d('🔄 Loading strategy configuration...');
+
       final savedStrategy = await _configService.getStrategy();
       if (savedStrategy != null) {
         state = savedStrategy;
-        _logger.i('✅ Strategy loaded from config: ${state.activeStrategy}');
+        _logger.i('✅ Strategy configuration loaded: ${savedStrategy.activeStrategy.displayName}');
       } else {
-        await _setDefaultStrategy();
+        _logger.d('ℹ️ No saved strategy found, using defaults');
       }
-      
-      _analyticsService.trackEvent('strategy_initialized', {
-        'strategy': state.activeStrategy.name,
-        'model_count': state.activeModelCount,
-      });
-      
+
     } catch (e, stackTrace) {
-      _logger.e('❌ Failed to initialize strategy', error: e, stackTrace: stackTrace);
-      await _setDefaultStrategy();
+      _logger.e('❌ Failed to load strategy config', error: e, stackTrace: stackTrace);
     }
   }
 
-  // 🎯 STRATEGY MANAGEMENT
-  Future<void> setStrategy(AIStrategy strategy) async {
-    if (state.isProcessing) {
-      _logger.w('⚠️ Cannot change strategy while processing');
-      return;
-    }
+  // 🎛️ SET ACTIVE STRATEGY
+  Future<void> setActiveStrategy(AIStrategy strategy) async {
+    if (state.activeStrategy == strategy) return;
 
     try {
-      _logger.i('🔄 Changing strategy: ${state.activeStrategy} → $strategy');
-      
+      _logger.i('🎛️ Setting active strategy: ${strategy.displayName}');
+
       state = state.copyWith(
         activeStrategy: strategy,
-        isProcessing: true,
+        isProcessing: false,
       );
 
-      // Apply strategy-specific optimizations
-      await _applyStrategyOptimizations(strategy);
-      
       // Save configuration
       await _configService.saveStrategy(state);
-      
-      state = state.copyWith(isProcessing: false);
-      
-      _analyticsService.trackEvent('strategy_changed', {
-        'old_strategy': state.activeStrategy.name,
-        'new_strategy': strategy.name,
-        'model_count': state.activeModelCount,
+
+      // Track analytics
+      _analyticsService.trackEvent('strategy_changed', properties: {
+        'strategy': strategy.name,
+        'previous_strategy': state.activeStrategy.name,
       });
-      
-      _logger.i('✅ Strategy changed successfully to: $strategy');
-      
+
+      _logger.i('✅ Active strategy set: ${strategy.displayName}');
+
     } catch (e, stackTrace) {
-      _logger.e('❌ Failed to change strategy', error: e, stackTrace: stackTrace);
-      state = state.copyWith(isProcessing: false);
-      rethrow;
+      _logger.e('❌ Failed to set active strategy', error: e, stackTrace: stackTrace);
     }
   }
 
-  // ⚖️ MODEL WEIGHT MANAGEMENT
-  Future<void> setModelWeight(AIModel model, double weight) async {
-    if (weight < 0.0 || weight > 1.0) {
-      throw ArgumentError('Weight must be between 0.0 and 1.0');
-    }
-
-    try {
-      _logger.d('⚖️ Setting weight for $model: $weight');
-      
-      final newWeights = Map<AIModel, double>.from(state.modelWeights);
-      
-      if (weight == 0.0) {
-        newWeights.remove(model);
-      } else {
-        newWeights[model] = weight;
-      }
-      
-      state = state.copyWith(modelWeights: newWeights);
-      await _configService.saveStrategy(state);
-      
-      _analyticsService.trackEvent('model_weight_changed', {
-        'model': model.name,
-        'weight': weight,
-        'active_models': state.activeModelCount,
-      });
-      
-    } catch (e, stackTrace) {
-      _logger.e('❌ Failed to set model weight', error: e, stackTrace: stackTrace);
-      rethrow;
-    }
-  }
-
-  // 🎛️ BATCH MODEL CONFIGURATION
+  // ⚖️ SET MODEL WEIGHTS
   Future<void> setModelWeights(Map<AIModel, double> weights) async {
     try {
-      _logger.i('🎛️ Setting batch model weights: ${weights.length} models');
-      
-      // Validate all weights
-      for (final entry in weights.entries) {
-        if (entry.value < 0.0 || entry.value > 1.0) {
-          throw ArgumentError('Weight for ${entry.key} must be between 0.0 and 1.0');
-        }
-      }
-      
-      // Remove zero weights
-      final cleanWeights = Map<AIModel, double>.fromEntries(
-        weights.entries.where((e) => e.value > 0.0)
+      _logger.d('⚖️ Setting model weights...');
+
+      // Normalize weights to sum to 1.0
+      final totalWeight = weights.values.fold(0.0, (sum, weight) => sum + weight);
+      final normalizedWeights = totalWeight > 0
+          ? weights.map((model, weight) => MapEntry(model, weight / totalWeight))
+          : weights;
+
+      state = state.copyWith(
+        modelWeights: normalizedWeights,
       );
-      
-      state = state.copyWith(modelWeights: cleanWeights);
+
+      // Save configuration
       await _configService.saveStrategy(state);
-      
-      _analyticsService.trackEvent('batch_weights_changed', {
-        'model_count': cleanWeights.length,
-        'total_weight': state.totalWeight,
+
+      // Track analytics
+      _analyticsService.trackEvent('model_weights_changed', properties: {
+        'model_count': weights.length,
+        'total_weight': totalWeight,
       });
-      
-      _logger.i('✅ Batch weights set successfully');
-      
+
+      _logger.i('✅ Model weights updated: ${weights.length} models');
+
     } catch (e, stackTrace) {
-      _logger.e('❌ Failed to set batch weights', error: e, stackTrace: stackTrace);
-      rethrow;
+      _logger.e('❌ Failed to set model weights', error: e, stackTrace: stackTrace);
     }
   }
 
-  // 🔧 STRATEGY PARAMETERS
+  // 🔄 SET PROCESSING STATE
+  void setProcessingState(bool isProcessing) {
+    if (state.isProcessing == isProcessing) return;
+
+    state = state.copyWith(isProcessing: isProcessing);
+
+    _logger.d('🔄 Processing state: ${isProcessing ? 'Started' : 'Stopped'}');
+
+    if (isProcessing) {
+      _analyticsService.trackEvent('strategy_processing_started');
+    } else {
+      _analyticsService.trackEvent('strategy_processing_completed');
+    }
+  }
+
+  // 🎯 SET CONFIDENCE THRESHOLD
   Future<void> setConfidenceThreshold(double threshold) async {
-    if (threshold < 0.0 || threshold > 1.0) {
-      throw ArgumentError('Confidence threshold must be between 0.0 and 1.0');
-    }
+    try {
+      final clampedThreshold = threshold.clamp(0.0, 1.0);
 
-    state = state.copyWith(confidenceThreshold: threshold);
-    await _configService.saveStrategy(state);
-    
-    _logger.d('🎯 Confidence threshold set to: $threshold');
+      state = state.copyWith(confidenceThreshold: clampedThreshold);
+
+      await _configService.saveStrategy(state);
+
+      _logger.d('🎯 Confidence threshold set: $clampedThreshold');
+
+    } catch (e, stackTrace) {
+      _logger.e('❌ Failed to set confidence threshold', error: e, stackTrace: stackTrace);
+    }
   }
 
+  // ⚡ SET MAX CONCURRENT REQUESTS
   Future<void> setMaxConcurrentRequests(int maxRequests) async {
-    if (maxRequests < 1 || maxRequests > 20) {
-      throw ArgumentError('Max concurrent requests must be between 1 and 20');
-    }
+    try {
+      final clampedMax = maxRequests.clamp(1, 20);
 
-    state = state.copyWith(maxConcurrentRequests: maxRequests);
-    await _configService.saveStrategy(state);
-    
-    _logger.d('🚀 Max concurrent requests set to: $maxRequests');
+      state = state.copyWith(maxConcurrentRequests: clampedMax);
+
+      await _configService.saveStrategy(state);
+
+      _logger.d('⚡ Max concurrent requests set: $clampedMax');
+
+    } catch (e, stackTrace) {
+      _logger.e('❌ Failed to set max concurrent requests', error: e, stackTrace: stackTrace);
+    }
   }
 
+  // ⏱️ SET TIMEOUT
   Future<void> setTimeout(int seconds) async {
-    if (seconds < 5 || seconds > 300) {
-      throw ArgumentError('Timeout must be between 5 and 300 seconds');
+    try {
+      final clampedTimeout = seconds.clamp(5, 300); // 5 seconds to 5 minutes
+
+      state = state.copyWith(timeoutSeconds: clampedTimeout);
+
+      await _configService.saveStrategy(state);
+
+      _logger.d('⏱️ Timeout set: ${clampedTimeout}s');
+
+    } catch (e, stackTrace) {
+      _logger.e('❌ Failed to set timeout', error: e, stackTrace: stackTrace);
     }
-
-    state = state.copyWith(timeoutSeconds: seconds);
-    await _configService.saveStrategy(state);
-    
-    _logger.d('⏱️ Timeout set to: ${seconds}s');
   }
 
-  // 🔍 FILTERS MANAGEMENT
+  // 🔍 ADD FILTER
   Future<void> addFilter(String filter) async {
-    if (state.activeFilters.contains(filter)) return;
-    
-    final newFilters = [...state.activeFilters, filter];
-    state = state.copyWith(activeFilters: newFilters);
-    await _configService.saveStrategy(state);
-    
-    _logger.d('🔍 Filter added: $filter');
+    try {
+      if (state.activeFilters.contains(filter)) return;
+
+      final newFilters = [...state.activeFilters, filter];
+      state = state.copyWith(activeFilters: newFilters);
+
+      await _configService.saveStrategy(state);
+
+      _logger.d('🔍 Filter added: $filter');
+
+    } catch (e, stackTrace) {
+      _logger.e('❌ Failed to add filter', error: e, stackTrace: stackTrace);
+    }
   }
 
+  // ❌ REMOVE FILTER
   Future<void> removeFilter(String filter) async {
-    final newFilters = state.activeFilters.where((f) => f != filter).toList();
-    state = state.copyWith(activeFilters: newFilters);
-    await _configService.saveStrategy(state);
-    
-    _logger.d('🗑️ Filter removed: $filter');
+    try {
+      final newFilters = state.activeFilters.where((f) => f != filter).toList();
+      state = state.copyWith(activeFilters: newFilters);
+
+      await _configService.saveStrategy(state);
+
+      _logger.d('❌ Filter removed: $filter');
+
+    } catch (e, stackTrace) {
+      _logger.e('❌ Failed to remove filter', error: e, stackTrace: stackTrace);
+    }
   }
 
-  // 🎯 STRATEGY OPTIMIZATIONS
-  Future<void> _applyStrategyOptimizations(AIStrategy strategy) async {
+  // 🔄 RESET TO DEFAULTS
+  Future<void> resetToDefaults() async {
+    try {
+      _logger.i('🔄 Resetting strategy to defaults...');
+
+      state = const StrategyState();
+
+      await _configService.saveStrategy(state);
+
+      _analyticsService.trackEvent('strategy_reset_to_defaults');
+
+      _logger.i('✅ Strategy reset to defaults');
+
+    } catch (e, stackTrace) {
+      _logger.e('❌ Failed to reset strategy', error: e, stackTrace: stackTrace);
+    }
+  }
+
+  // 🎯 GET STRATEGY DESCRIPTION
+  String getStrategyDescription(AIStrategy strategy) {
     switch (strategy) {
       case AIStrategy.parallel:
-        await _optimizeForParallel();
-        break;
+        return 'All AI models process simultaneously for fastest response';
       case AIStrategy.consensus:
-        await _optimizeForConsensus();
-        break;
+        return 'Models collaborate to reach consensus on best answer';
       case AIStrategy.adaptive:
-        await _optimizeForAdaptive();
-        break;
+        return 'Dynamically selects best model based on query type';
       case AIStrategy.sequential:
-        await _optimizeForSequential();
-        break;
+        return 'Processes through models sequentially for refined output';
+      case AIStrategy.cascade:
+        return 'Cascades through models based on confidence levels';
       case AIStrategy.weighted:
-        await _optimizeForWeighted();
-        break;
+        return 'Uses weighted voting based on model strengths';
     }
   }
 
-  Future<void> _optimizeForParallel() async {
-    state = state.copyWith(
-      maxConcurrentRequests: 5,
-      confidenceThreshold: 0.7,
-      timeoutSeconds: 30,
-    );
-    _logger.d('🚀 Optimized for parallel strategy');
-  }
-
-  Future<void> _optimizeForConsensus() async {
-    state = state.copyWith(
-      maxConcurrentRequests: 3,
-      confidenceThreshold: 0.8,
-      timeoutSeconds: 45,
-    );
-    _logger.d('🤝 Optimized for consensus strategy');
-  }
-
-  Future<void> _optimizeForAdaptive() async {
-    state = state.copyWith(
-      maxConcurrentRequests: 4,
-      confidenceThreshold: 0.75,
-      timeoutSeconds: 40,
-    );
-    _logger.d('🧠 Optimized for adaptive strategy');
-  }
-
-  Future<void> _optimizeForSequential() async {
-    state = state.copyWith(
-      maxConcurrentRequests: 1,
-      confidenceThreshold: 0.6,
-      timeoutSeconds: 20,
-    );
-    _logger.d('📝 Optimized for sequential strategy');
-  }
-
-  Future<void> _optimizeForWeighted() async {
-    state = state.copyWith(
-      maxConcurrentRequests: 3,
-      confidenceThreshold: 0.7,
-      timeoutSeconds: 35,
-    );
-    _logger.d('⚖️ Optimized for weighted strategy');
-  }
-
-  // 🎯 DEFAULT CONFIGURATION
-  Future<void> _setDefaultStrategy() async {
-    const defaultState = StrategyState(
-      activeStrategy: AIStrategy.parallel,
-      modelWeights: {
-        AIModel.claude: 0.3,
-        AIModel.gpt: 0.3,
-        AIModel.deepseek: 0.2,
-        AIModel.gemini: 0.2,
-      },
-      confidenceThreshold: 0.7,
-      maxConcurrentRequests: 4,
-      timeoutSeconds: 30,
-    );
-    
-    state = defaultState;
-    await _configService.saveStrategy(state);
-    
-    _logger.i('🎯 Default strategy configuration applied');
-  }
-
-  // 🔄 RESET & CLEANUP
-  Future<void> resetToDefaults() async {
-    _logger.i('🔄 Resetting strategy to defaults...');
-    await _setDefaultStrategy();
-    
-    _analyticsService.trackEvent('strategy_reset', {
-      'timestamp': DateTime.now().toIso8601String(),
-    });
-  }
-
-  @override
-  void dispose() {
-    _logger.d('🧹 Strategy Controller disposed');
-    super.dispose();
+  // 📊 GET STRATEGY METRICS
+  Map<String, dynamic> getStrategyMetrics() {
+    return {
+      'active_strategy': state.activeStrategy.name,
+      'model_count': state.modelWeights.length,
+      'total_weight': state.totalWeight,
+      'is_configured': state.isConfigured,
+      'confidence_threshold': state.confidenceThreshold,
+      'max_concurrent': state.maxConcurrentRequests,
+      'timeout_seconds': state.timeoutSeconds,
+      'active_filters': state.activeFilters.length,
+    };
   }
 }
 
-// 🎯 COMPUTED PROVIDERS FOR STRATEGY
+// 🎯 STRATEGY CONTROLLER PROVIDER
+final strategyControllerProvider = NotifierProvider<StrategyController, StrategyState>(
+      () => StrategyController(),
+);
+
+// 📊 COMPUTED PROVIDERS
 final activeStrategyProvider = Provider<AIStrategy>((ref) {
   return ref.watch(strategyControllerProvider).activeStrategy;
 });
@@ -338,4 +276,8 @@ final strategyConfigurationProvider = Provider<bool>((ref) {
 
 final activeModelCountProvider = Provider<int>((ref) {
   return ref.watch(strategyControllerProvider).activeModelCount;
+});
+
+final strategyMetricsProvider = Provider<Map<String, dynamic>>((ref) {
+  return ref.read(strategyControllerProvider.notifier).getStrategyMetrics();
 });

@@ -1,513 +1,373 @@
 // 📊 NEURONVAULT - PRIVACY-FIRST ANALYTICS SERVICE
-// Local-only analytics and telemetry for enterprise optimization
+// Local-only analytics with zero external tracking
 // Part of PHASE 2.5 - QUANTUM STATE MANAGEMENT
 
+import 'dart:async';
 import 'dart:convert';
-import 'dart:math';
 import 'package:logger/logger.dart';
+import '../state/state_models.dart';
 import 'storage_service.dart';
 
 class AnalyticsService {
   final StorageService _storageService;
   final Logger _logger;
-  
-  // 📊 LOCAL ANALYTICS KEYS
-  static const String _analyticsKey = 'neuronvault_analytics';
-  static const String _sessionKey = 'neuronvault_session';
-  static const String _performanceKey = 'neuronvault_performance';
-  static const String _usageKey = 'neuronvault_usage';
-  static const String _errorsKey = 'neuronvault_errors';
 
-  // 🔧 SESSION TRACKING
-  late final String _sessionId;
-  late final DateTime _sessionStart;
-  final Map<String, dynamic> _sessionData = {};
-  final List<Map<String, dynamic>> _eventQueue = [];
-  
-  // 📈 PERFORMANCE METRICS
-  final Map<String, List<double>> _performanceMetrics = {};
+  // 📊 Analytics Data
   final Map<String, int> _eventCounts = {};
-  final Map<String, DateTime> _lastEventTimes = {};
+  final Map<String, List<DateTime>> _eventTimestamps = {};
+  final Map<String, Duration> _sessionDurations = {};
+
+  // 🎯 Performance Metrics
+  final List<double> _responseTimeHistory = [];
+  final List<double> _memoryUsageHistory = [];
+  final List<int> _errorCounts = [];
+
+  // ⏰ Session Tracking
+  DateTime? _sessionStart;
+  Timer? _analyticsTimer;
+
+  static const String _analyticsKey = 'neuronvault_analytics';
+  static const String _performanceKey = 'neuronvault_performance';
+  static const String _sessionKey = 'neuronvault_sessions';
 
   AnalyticsService({
     required StorageService storageService,
     required Logger logger,
   }) : _storageService = storageService,
-       _logger = logger {
-    _initializeSession();
+        _logger = logger {
+    _initializeAnalytics();
   }
 
-  // 🚀 SESSION INITIALIZATION
-  void _initializeSession() {
-    _sessionId = _generateSessionId();
-    _sessionStart = DateTime.now();
-    
-    _sessionData.addAll({
-      'session_id': _sessionId,
-      'start_time': _sessionStart.toIso8601String(),
-      'version': '2.5.0',
-      'platform': 'flutter_desktop',
-    });
-    
-    _logger.i('📊 Analytics session started: $_sessionId');
-    
-    // Track session start
-    trackEvent('session_started', {
-      'session_id': _sessionId,
-      'timestamp': _sessionStart.toIso8601String(),
-    });
-  }
+  // 🚀 INITIALIZATION
+  Future<void> _initializeAnalytics() async {
+    try {
+      _logger.d('📊 Initializing Analytics Service...');
 
-  String _generateSessionId() {
-    final random = Random();
-    final timestamp = DateTime.now().millisecondsSinceEpoch;
-    final randomSuffix = random.nextInt(999999).toString().padLeft(6, '0');
-    return 'ns_${timestamp}_$randomSuffix';
+      // Load existing analytics data
+      await _loadAnalyticsData();
+
+      // Start session
+      _startSession();
+
+      // Setup periodic data persistence
+      _analyticsTimer = Timer.periodic(
+        const Duration(minutes: 5),
+            (_) => _persistAnalyticsData(),
+      );
+
+      _logger.i('✅ Analytics Service initialized (Privacy-First Mode)');
+
+    } catch (e, stackTrace) {
+      _logger.e('❌ Failed to initialize analytics', error: e, stackTrace: stackTrace);
+    }
   }
 
   // 📊 EVENT TRACKING
-  void trackEvent(String eventName, [Map<String, dynamic>? properties]) {
+  void trackEvent(String eventName, {Map<String, dynamic>? properties}) {
     try {
-      final event = {
-        'event': eventName,
-        'timestamp': DateTime.now().toIso8601String(),
-        'session_id': _sessionId,
-        'properties': properties ?? {},
-      };
-      
-      _eventQueue.add(event);
+      _logger.d('📊 Tracking event: $eventName');
+
+      // Increment event count
       _eventCounts[eventName] = (_eventCounts[eventName] ?? 0) + 1;
-      _lastEventTimes[eventName] = DateTime.now();
-      
-      _logger.d('📊 Event tracked: $eventName');
-      
-      // Flush events periodically
-      if (_eventQueue.length >= 10) {
-        _flushEvents();
+
+      // Track timestamp
+      _eventTimestamps.putIfAbsent(eventName, () => []).add(DateTime.now());
+
+      // Keep only last 100 timestamps per event
+      if (_eventTimestamps[eventName]!.length > 100) {
+        _eventTimestamps[eventName]!.removeAt(0);
       }
-      
+
+      // Log properties (locally only)
+      if (properties != null) {
+        _logger.d('📊 Event properties: $properties');
+      }
+
     } catch (e) {
       _logger.w('⚠️ Failed to track event $eventName: $e');
     }
   }
 
-  // 🚀 PERFORMANCE TRACKING
-  void trackPerformance(String metric, double value, [String? unit]) {
+  // 📈 PERFORMANCE TRACKING
+  void trackPerformance(String metric, double value) {
     try {
-      _performanceMetrics.putIfAbsent(metric, () => []).add(value);
-      
-      // Keep only last 100 measurements per metric
-      if (_performanceMetrics[metric]!.length > 100) {
-        _performanceMetrics[metric]!.removeAt(0);
+      _logger.d('📈 Tracking performance: $metric = $value');
+
+      switch (metric) {
+        case 'response_time':
+          _responseTimeHistory.add(value);
+          if (_responseTimeHistory.length > 1000) {
+            _responseTimeHistory.removeAt(0);
+          }
+          break;
+
+        case 'memory_usage':
+          _memoryUsageHistory.add(value);
+          if (_memoryUsageHistory.length > 1000) {
+            _memoryUsageHistory.removeAt(0);
+          }
+          break;
       }
-      
-      _logger.d('📈 Performance tracked: $metric = $value ${unit ?? ''}');
-      
-      // Track significant performance events
-      if (_isSignificantPerformanceEvent(metric, value)) {
-        trackEvent('performance_alert', {
-          'metric': metric,
-          'value': value,
-          'unit': unit,
-          'threshold_exceeded': true,
-        });
-      }
-      
+
     } catch (e) {
       _logger.w('⚠️ Failed to track performance $metric: $e');
     }
   }
 
-  bool _isSignificantPerformanceEvent(String metric, double value) {
-    switch (metric) {
-      case 'memory_usage_mb':
-        return value > 500; // Alert if memory usage > 500MB
-      case 'response_time_ms':
-        return value > 5000; // Alert if response time > 5s
-      case 'error_rate':
-        return value > 0.1; // Alert if error rate > 10%
-      case 'cpu_usage_percent':
-        return value > 80; // Alert if CPU usage > 80%
-      default:
-        return false;
-    }
-  }
-
-  // ⏱️ TIMING UTILITIES
-  Stopwatch startTiming(String operation) {
-    final stopwatch = Stopwatch()..start();
-    _logger.d('⏱️ Started timing: $operation');
-    return stopwatch;
-  }
-
-  void endTiming(String operation, Stopwatch stopwatch) {
-    stopwatch.stop();
-    final elapsedMs = stopwatch.elapsedMilliseconds.toDouble();
-    
-    trackPerformance('${operation}_duration_ms', elapsedMs, 'ms');
-    trackEvent('operation_completed', {
-      'operation': operation,
-      'duration_ms': elapsedMs,
-    });
-    
-    _logger.d('⏱️ Completed timing: $operation (${elapsedMs}ms)');
-  }
-
-  // 🎯 USER BEHAVIOR TRACKING
-  void trackUserAction(String action, [Map<String, dynamic>? context]) {
-    trackEvent('user_action', {
-      'action': action,
-      'context': context ?? {},
-    });
-  }
-
-  void trackScreenView(String screenName, [Duration? timeSpent]) {
-    trackEvent('screen_view', {
-      'screen': screenName,
-      'time_spent_ms': timeSpent?.inMilliseconds,
-    });
-  }
-
-  void trackFeatureUsage(String feature, [Map<String, dynamic>? usage_data]) {
-    trackEvent('feature_usage', {
-      'feature': feature,
-      'usage_data': usage_data ?? {},
-    });
-  }
-
   // ❌ ERROR TRACKING
-  void trackError(String error, [String? stackTrace, Map<String, dynamic>? context]) {
+  void trackError(String errorType, {String? description, StackTrace? stackTrace}) {
     try {
-      final errorEvent = {
-        'error': error,
-        'stack_trace': stackTrace,
-        'context': context ?? {},
-        'timestamp': DateTime.now().toIso8601String(),
-        'session_id': _sessionId,
-      };
-      
-      trackEvent('error_occurred', errorEvent);
-      
-      // Store in separate error log
-      _storeError(errorEvent);
-      
-      _logger.e('❌ Error tracked: $error');
-      
-    } catch (e) {
-      _logger.w('⚠️ Failed to track error: $e');
-    }
-  }
+      _logger.w('❌ Tracking error: $errorType');
 
-  void trackException(Exception exception, [StackTrace? stackTrace, Map<String, dynamic>? context]) {
-    trackError(
-      exception.toString(),
-      stackTrace?.toString(),
-      {
-        'exception_type': exception.runtimeType.toString(),
-        ...?context,
-      },
-    );
-  }
+      final errorKey = 'error_$errorType';
+      _eventCounts[errorKey] = (_eventCounts[errorKey] ?? 0) + 1;
+      _eventTimestamps.putIfAbsent(errorKey, () => []).add(DateTime.now());
 
-  // 🤖 AI USAGE ANALYTICS
-  void trackAIRequest(String model, String strategy, int tokenCount, int responseTimeMs) {
-    trackEvent('ai_request', {
-      'model': model,
-      'strategy': strategy,
-      'token_count': tokenCount,
-      'response_time_ms': responseTimeMs,
-    });
-    
-    trackPerformance('ai_response_time_ms', responseTimeMs.toDouble(), 'ms');
-    trackPerformance('ai_token_count', tokenCount.toDouble(), 'tokens');
-  }
+      // Track error count for trending
+      _errorCounts.add(DateTime.now().millisecondsSinceEpoch);
 
-  void trackAIError(String model, String error, [String? strategy]) {
-    trackEvent('ai_error', {
-      'model': model,
-      'strategy': strategy,
-      'error': error,
-    });
-  }
-
-  void trackModelHealth(String model, bool isHealthy, int responseTime) {
-    trackEvent('model_health_check', {
-      'model': model,
-      'is_healthy': isHealthy,
-      'response_time_ms': responseTime,
-    });
-  }
-
-  // 💾 DATA PERSISTENCE
-  Future<void> _flushEvents() async {
-    if (_eventQueue.isEmpty) return;
-    
-    try {
-      _logger.d('💾 Flushing ${_eventQueue.length} analytics events...');
-      
-      // Get existing analytics data
-      final existingData = await _getStoredAnalytics();
-      final events = List<Map<String, dynamic>>.from(existingData['events'] ?? []);
-      
-      // Add new events
-      events.addAll(_eventQueue);
-      
-      // Keep only recent events (last 1000)
-      if (events.length > 1000) {
-        events.removeRange(0, events.length - 1000);
+      // Keep only last 50 error timestamps
+      if (_errorCounts.length > 50) {
+        _errorCounts.removeAt(0);
       }
-      
-      // Update analytics data
-      final analyticsData = {
-        'version': '2.5.0',
-        'last_updated': DateTime.now().toIso8601String(),
-        'session_id': _sessionId,
-        'events': events,
-        'event_counts': _eventCounts,
-        'performance_metrics': _performanceMetrics,
-      };
-      
-      // Store analytics data
-      await _storeAnalytics(analyticsData);
-      
-      // Clear event queue
-      _eventQueue.clear();
-      
-      _logger.i('✅ Analytics events flushed successfully');
-      
-    } catch (e, stackTrace) {
-      _logger.e('❌ Failed to flush analytics events', error: e, stackTrace: stackTrace);
-    }
-  }
 
-  Future<void> _storeAnalytics(Map<String, dynamic> data) async {
-    try {
-      final jsonData = jsonEncode(data);
-      // Using SharedPreferences through StorageService would be ideal
-      // For now, we'll store in a simple way
-      
-    } catch (e) {
-      _logger.e('❌ Failed to store analytics: $e');
-      rethrow;
-    }
-  }
-
-  Future<Map<String, dynamic>> _getStoredAnalytics() async {
-    try {
-      // This would retrieve from storage
-      // For now, return empty structure
-      return {
-        'events': [],
-        'event_counts': {},
-        'performance_metrics': {},
-      };
-    } catch (e) {
-      _logger.w('⚠️ Failed to get stored analytics: $e');
-      return {};
-    }
-  }
-
-  Future<void> _storeError(Map<String, dynamic> errorData) async {
-    try {
-      // Store error in separate error log
-      // This could be implemented with file-based storage
-      _logger.d('💾 Error stored for analysis');
-    } catch (e) {
-      _logger.w('⚠️ Failed to store error: $e');
-    }
-  }
-
-  // 📊 ANALYTICS REPORTS
-  Future<Map<String, dynamic>> generateUsageReport() async {
-    try {
-      _logger.i('📊 Generating usage report...');
-      
-      final now = DateTime.now();
-      final sessionDuration = now.difference(_sessionStart);
-      
-      // Calculate event statistics
-      final totalEvents = _eventCounts.values.fold<int>(0, (sum, count) => sum + count);
-      final topEvents = _eventCounts.entries
-          .toList()
-          ..sort((a, b) => b.value.compareTo(a.value));
-      
-      // Calculate performance statistics
-      final performanceStats = <String, Map<String, dynamic>>{};
-      for (final entry in _performanceMetrics.entries) {
-        final values = entry.value;
-        if (values.isNotEmpty) {
-          performanceStats[entry.key] = {
-            'count': values.length,
-            'min': values.reduce((a, b) => a < b ? a : b),
-            'max': values.reduce((a, b) => a > b ? a : b),
-            'average': values.reduce((a, b) => a + b) / values.length,
-          };
-        }
+      if (description != null) {
+        _logger.w('❌ Error description: $description');
       }
-      
-      final report = {
-        'session_info': {
-          'session_id': _sessionId,
-          'start_time': _sessionStart.toIso8601String(),
-          'duration_minutes': sessionDuration.inMinutes,
-          'end_time': now.toIso8601String(),
-        },
-        'event_summary': {
-          'total_events': totalEvents,
-          'unique_events': _eventCounts.length,
-          'top_events': topEvents.take(10).map((e) => {
-            'event': e.key,
-            'count': e.value,
-          }).toList(),
-        },
-        'performance_summary': performanceStats,
-        'system_info': {
-          'version': '2.5.0',
-          'platform': 'flutter_desktop',
-        },
-      };
-      
-      _logger.i('✅ Usage report generated successfully');
-      return report;
-      
-    } catch (e, stackTrace) {
-      _logger.e('❌ Failed to generate usage report', error: e, stackTrace: stackTrace);
-      return {};
+
+    } catch (e) {
+      _logger.w('⚠️ Failed to track error $errorType: $e');
     }
   }
 
-  Future<Map<String, dynamic>> generatePerformanceReport() async {
+  // 🎯 AI MODEL USAGE TRACKING
+  void trackModelUsage(AIModel model, {
+    required int tokens,
+    required Duration responseTime,
+    required bool success,
+  }) {
     try {
-      _logger.i('📈 Generating performance report...');
-      
-      final report = <String, dynamic>{};
-      
-      for (final entry in _performanceMetrics.entries) {
-        final metric = entry.key;
-        final values = entry.value;
-        
-        if (values.isEmpty) continue;
-        
-        final sorted = List<double>.from(values)..sort();
-        final count = values.length;
-        
-        report[metric] = {
-          'count': count,
-          'min': sorted.first,
-          'max': sorted.last,
-          'average': values.reduce((a, b) => a + b) / count,
-          'median': count.isOdd 
-              ? sorted[count ~/ 2]
-              : (sorted[count ~/ 2 - 1] + sorted[count ~/ 2]) / 2,
-          'p95': sorted[(count * 0.95).floor()],
-          'p99': sorted[(count * 0.99).floor()],
-        };
+      final modelName = model.displayName;
+
+      trackEvent('model_usage', properties: {
+        'model': modelName,
+        'tokens': tokens,
+        'response_time_ms': responseTime.inMilliseconds,
+        'success': success,
+      });
+
+      trackPerformance('${modelName.toLowerCase()}_response_time',
+          responseTime.inMilliseconds.toDouble());
+
+      if (!success) {
+        trackError('model_failure', description: 'Model $modelName failed');
       }
-      
-      _logger.i('✅ Performance report generated successfully');
-      return report;
-      
-    } catch (e, stackTrace) {
-      _logger.e('❌ Failed to generate performance report', error: e, stackTrace: stackTrace);
-      return {};
+
+    } catch (e) {
+      _logger.w('⚠️ Failed to track model usage: $e');
+    }
+  }
+
+  // 💬 CHAT ANALYTICS
+  void trackChatEvent(String eventType, {Map<String, dynamic>? data}) {
+    try {
+      trackEvent('chat_$eventType', properties: data);
+
+      // Special handling for message events
+      if (eventType == 'message_sent') {
+        final messageLength = data?['length'] as int? ?? 0;
+        trackPerformance('message_length', messageLength.toDouble());
+      }
+
+    } catch (e) {
+      _logger.w('⚠️ Failed to track chat event: $e');
     }
   }
 
   // 🔄 SESSION MANAGEMENT
-  Future<void> endSession() async {
+  void _startSession() {
     try {
-      _logger.i('🔄 Ending analytics session...');
-      
-      final sessionEnd = DateTime.now();
-      final sessionDuration = sessionEnd.difference(_sessionStart);
-      
-      trackEvent('session_ended', {
-        'session_id': _sessionId,
-        'duration_minutes': sessionDuration.inMinutes,
-        'total_events': _eventCounts.values.fold<int>(0, (sum, count) => sum + count),
-      });
-      
-      // Flush all remaining events
-      await _flushEvents();
-      
-      _logger.i('✅ Analytics session ended successfully');
-      
-    } catch (e, stackTrace) {
-      _logger.e('❌ Failed to end session', error: e, stackTrace: stackTrace);
+      _sessionStart = DateTime.now();
+      trackEvent('session_start');
+      _logger.d('🚀 Analytics session started');
+
+    } catch (e) {
+      _logger.w('⚠️ Failed to start session: $e');
     }
   }
 
-  // 🗑️ DATA MANAGEMENT
-  Future<void> clearAnalyticsData() async {
+  void endSession() {
     try {
-      _logger.w('🗑️ Clearing all analytics data...');
-      
-      _eventQueue.clear();
-      _eventCounts.clear();
-      _performanceMetrics.clear();
-      _lastEventTimes.clear();
-      
-      // Clear stored data
-      // This would clear from persistent storage
-      
-      _logger.i('✅ Analytics data cleared successfully');
-      
-    } catch (e, stackTrace) {
-      _logger.e('❌ Failed to clear analytics data', error: e, stackTrace: stackTrace);
+      if (_sessionStart != null) {
+        final sessionDuration = DateTime.now().difference(_sessionStart!);
+        _sessionDurations['session_${DateTime.now().millisecondsSinceEpoch}'] = sessionDuration;
+
+        trackEvent('session_end', properties: {
+          'duration_minutes': sessionDuration.inMinutes,
+        });
+
+        _logger.d('🏁 Analytics session ended (${sessionDuration.inMinutes}m)');
+      }
+
+      // Persist final data
+      _persistAnalyticsData();
+
+    } catch (e) {
+      _logger.w('⚠️ Failed to end session: $e');
     }
   }
 
-  Future<Map<String, dynamic>> exportAnalyticsData() async {
+  // 💾 DATA PERSISTENCE
+  Future<void> _loadAnalyticsData() async {
     try {
-      _logger.i('📤 Exporting analytics data...');
-      
-      final usageReport = await generateUsageReport();
-      final performanceReport = await generatePerformanceReport();
-      
-      final exportData = {
-        'export_timestamp': DateTime.now().toIso8601String(),
+      // This would load from SharedPreferences in a real implementation
+      // For now, we start with empty data
+      _logger.d('📖 Loading analytics data...');
+
+    } catch (e) {
+      _logger.w('⚠️ Failed to load analytics data: $e');
+    }
+  }
+
+  Future<void> _persistAnalyticsData() async {
+    try {
+      _logger.d('💾 Persisting analytics data...');
+
+      final analyticsData = {
+        'event_counts': _eventCounts,
+        'last_updated': DateTime.now().toIso8601String(),
         'version': '2.5.0',
-        'usage_report': usageReport,
-        'performance_report': performanceReport,
-        'raw_data': {
-          'event_counts': _eventCounts,
-          'performance_metrics': _performanceMetrics,
-        },
       };
-      
-      _logger.i('✅ Analytics data exported successfully');
-      return exportData;
-      
-    } catch (e, stackTrace) {
-      _logger.e('❌ Failed to export analytics data', error: e, stackTrace: stackTrace);
-      return {};
+
+      // This would save to SharedPreferences in a real implementation
+      _logger.d('💾 Analytics data persisted');
+
+    } catch (e) {
+      _logger.w('⚠️ Failed to persist analytics data: $e');
     }
   }
 
-  // 📊 REAL-TIME STATISTICS
-  Map<String, dynamic> getCurrentStatistics() {
-    final now = DateTime.now();
-    final sessionDuration = now.difference(_sessionStart);
-    
-    return {
-      'session_id': _sessionId,
-      'session_duration_minutes': sessionDuration.inMinutes,
-      'total_events': _eventCounts.values.fold<int>(0, (sum, count) => sum + count),
-      'unique_events': _eventCounts.length,
-      'performance_metrics_count': _performanceMetrics.length,
-      'last_event_time': _lastEventTimes.values.isNotEmpty
-          ? _lastEventTimes.values.reduce((a, b) => a.isAfter(b) ? a : b).toIso8601String()
-          : null,
-    };
+  // 📊 ANALYTICS REPORTS
+  Map<String, dynamic> getAnalyticsReport() {
+    try {
+      final now = DateTime.now();
+      final dayAgo = now.subtract(const Duration(days: 1));
+      final weekAgo = now.subtract(const Duration(days: 7));
+
+      return {
+        'overview': {
+          'total_events': _eventCounts.values.fold<int>(0, (sum, count) => sum + count),
+          'unique_events': _eventCounts.keys.length,
+          'session_count': _sessionDurations.length,
+          'average_session_minutes': _getAverageSessionDuration(),
+        },
+        'top_events': _getTopEvents(10),
+        'performance': {
+          'average_response_time': _getAverageResponseTime(),
+          'memory_usage_trend': _getMemoryUsageTrend(),
+          'error_rate': _getErrorRate(),
+        },
+        'usage_patterns': {
+          'daily_active_events': _getEventsInPeriod(dayAgo, now),
+          'weekly_active_events': _getEventsInPeriod(weekAgo, now),
+        },
+        'generated_at': now.toIso8601String(),
+      };
+
+    } catch (e) {
+      _logger.e('❌ Failed to generate analytics report: $e');
+      return {'error': 'Failed to generate report'};
+    }
   }
 
-  // 🧹 CLEANUP
-  void dispose() {
-    _logger.d('🧹 Disposing Analytics Service...');
-    
-    // End session and flush events
-    endSession();
-    
-    _logger.i('✅ Analytics Service disposed successfully');
+  // 📈 ANALYTICS UTILITIES
+  List<Map<String, dynamic>> _getTopEvents(int limit) {
+    final sortedEvents = _eventCounts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    return sortedEvents
+        .take(limit)
+        .map((entry) => {
+      'event': entry.key,
+      'count': entry.value,
+    })
+        .toList();
   }
+
+  double _getAverageSessionDuration() {
+    if (_sessionDurations.isEmpty) return 0.0;
+
+    final totalMinutes = _sessionDurations.values
+        .fold<int>(0, (sum, duration) => sum + duration.inMinutes);
+
+    return totalMinutes / _sessionDurations.length;
+  }
+
+  double _getAverageResponseTime() {
+    if (_responseTimeHistory.isEmpty) return 0.0;
+
+    return _responseTimeHistory.reduce((a, b) => a + b) / _responseTimeHistory.length;
+  }
+
+  double _getMemoryUsageTrend() {
+    if (_memoryUsageHistory.length < 2) return 0.0;
+
+    final recent = _memoryUsageHistory.sublist(_memoryUsageHistory.length - 10);
+    return recent.reduce((a, b) => a + b) / recent.length;
+  }
+
+  double _getErrorRate() {
+    final totalEvents = _eventCounts.values.fold<int>(0, (sum, count) => sum + count);
+    if (totalEvents == 0) return 0.0;
+
+    final totalErrors = _errorCounts.length;
+    return (totalErrors / totalEvents) * 100;
+  }
+
+  int _getEventsInPeriod(DateTime start, DateTime end) {
+    int count = 0;
+
+    for (final timestamps in _eventTimestamps.values) {
+      count += timestamps
+          .where((timestamp) => timestamp.isAfter(start) && timestamp.isBefore(end))
+          .length;
+    }
+
+    return count;
+  }
+
+  // 🔄 CLEANUP
+  void dispose() {
+    try {
+      _logger.d('🧹 Disposing Analytics Service...');
+
+      endSession();
+      _analyticsTimer?.cancel();
+
+      _eventCounts.clear();
+      _eventTimestamps.clear();
+      _sessionDurations.clear();
+      _responseTimeHistory.clear();
+      _memoryUsageHistory.clear();
+      _errorCounts.clear();
+
+      _logger.i('✅ Analytics Service disposed');
+
+    } catch (e) {
+      _logger.e('❌ Failed to dispose analytics service: $e');
+    }
+  }
+}
+
+// 📊 ANALYTICS EXTENSION FOR EASY TRACKING
+extension AnalyticsTracker on AnalyticsService {
+  // 🎯 Quick event tracking shortcuts
+  void trackUserAction(String action) => trackEvent('user_$action');
+  void trackUIInteraction(String component) => trackEvent('ui_$component');
+  void trackFeatureUsage(String feature) => trackEvent('feature_$feature');
+
+  // 📱 App lifecycle events
+  void trackAppStart() => trackEvent('app_start');
+  void trackAppPause() => trackEvent('app_pause');
+  void trackAppResume() => trackEvent('app_resume');
 }

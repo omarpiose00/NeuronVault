@@ -2,11 +2,10 @@
 // Professional loading experience with neural animations
 // Part of PHASE 2.5 - QUANTUM STATE MANAGEMENT
 
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lottie/lottie.dart';
 import '../core/design_system.dart';
-import '../core/theme/app_theme.dart';
 
 class LoadingScreen extends ConsumerStatefulWidget {
   final String message;
@@ -30,7 +29,7 @@ class LoadingScreen extends ConsumerStatefulWidget {
 
 class _LoadingScreenState extends ConsumerState<LoadingScreen>
     with TickerProviderStateMixin {
-  
+
   late AnimationController _pulseController;
   late AnimationController _rotateController;
   late Animation<double> _pulseAnimation;
@@ -49,7 +48,7 @@ class _LoadingScreenState extends ConsumerState<LoadingScreen>
       duration: const Duration(seconds: 2),
       vsync: this,
     );
-    
+
     _pulseAnimation = Tween<double>(
       begin: 0.8,
       end: 1.2,
@@ -63,7 +62,7 @@ class _LoadingScreenState extends ConsumerState<LoadingScreen>
       duration: const Duration(seconds: 3),
       vsync: this,
     );
-    
+
     _rotateAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
@@ -96,8 +95,7 @@ class _LoadingScreenState extends ConsumerState<LoadingScreen>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final neuralTheme = theme.extension<NeuralThemeExtension>();
-    
+
     return Scaffold(
       backgroundColor: theme.colorScheme.background,
       body: Container(
@@ -115,13 +113,13 @@ class _LoadingScreenState extends ConsumerState<LoadingScreen>
           child: Column(
             children: [
               // 🎨 Header with logo
-              _buildHeader(theme, neuralTheme),
-              
+              _buildHeader(theme),
+
               // 🔄 Main loading content
               Expanded(
-                child: _buildLoadingContent(theme, neuralTheme),
+                child: _buildLoadingContent(theme),
               ),
-              
+
               // 🔗 Footer with cancel option
               if (widget.onCancel != null)
                 _buildFooter(theme),
@@ -132,7 +130,7 @@ class _LoadingScreenState extends ConsumerState<LoadingScreen>
     );
   }
 
-  Widget _buildHeader(ThemeData theme, NeuralThemeExtension? neuralTheme) {
+  Widget _buildHeader(ThemeData theme) {
     return Padding(
       padding: const EdgeInsets.all(24.0),
       child: Row(
@@ -148,8 +146,7 @@ class _LoadingScreenState extends ConsumerState<LoadingScreen>
                   height: 48,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(12),
-                    gradient: neuralTheme?.primaryGradient ?? 
-                        NeuralDesignSystem.primaryGradient,
+                    gradient: _getPrimaryGradient(),
                     boxShadow: [
                       BoxShadow(
                         color: theme.colorScheme.primary.withOpacity(0.3),
@@ -167,9 +164,9 @@ class _LoadingScreenState extends ConsumerState<LoadingScreen>
               );
             },
           ),
-          
+
           const SizedBox(width: 16),
-          
+
           // 📱 App title
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -194,16 +191,16 @@ class _LoadingScreenState extends ConsumerState<LoadingScreen>
     );
   }
 
-  Widget _buildLoadingContent(ThemeData theme, NeuralThemeExtension? neuralTheme) {
+  Widget _buildLoadingContent(ThemeData theme) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           // 🎭 Neural network animation
-          _buildNeuralAnimation(theme, neuralTheme),
-          
+          _buildNeuralAnimation(theme),
+
           const SizedBox(height: 48),
-          
+
           // 📝 Loading message
           AnimatedBuilder(
             animation: _fadeAnimation,
@@ -220,7 +217,7 @@ class _LoadingScreenState extends ConsumerState<LoadingScreen>
                       ),
                       textAlign: TextAlign.center,
                     ),
-                    
+
                     if (widget.subtitle != null) ...[
                       const SizedBox(height: 8),
                       Text(
@@ -236,18 +233,18 @@ class _LoadingScreenState extends ConsumerState<LoadingScreen>
               );
             },
           ),
-          
+
           const SizedBox(height: 32),
-          
+
           // 📊 Progress indicator
           if (widget.showProgress)
-            _buildProgressIndicator(theme, neuralTheme),
+            _buildProgressIndicator(theme),
         ],
       ),
     );
   }
 
-  Widget _buildNeuralAnimation(ThemeData theme, NeuralThemeExtension? neuralTheme) {
+  Widget _buildNeuralAnimation(ThemeData theme) {
     return SizedBox(
       width: 120,
       height: 120,
@@ -259,7 +256,7 @@ class _LoadingScreenState extends ConsumerState<LoadingScreen>
             animation: _rotateAnimation,
             builder: (context, child) {
               return Transform.rotate(
-                angle: _rotateAnimation.value * 2 * 3.14159,
+                angle: _rotateAnimation.value * 2 * math.pi,
                 child: Container(
                   width: 120,
                   height: 120,
@@ -280,7 +277,7 @@ class _LoadingScreenState extends ConsumerState<LoadingScreen>
               );
             },
           ),
-          
+
           // 🧠 Inner pulsing core
           AnimatedBuilder(
             animation: _pulseAnimation,
@@ -292,8 +289,7 @@ class _LoadingScreenState extends ConsumerState<LoadingScreen>
                   height: 60,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: neuralTheme?.primaryGradient ?? 
-                        NeuralDesignSystem.primaryGradient,
+                    gradient: _getPrimaryGradient(),
                     boxShadow: [
                       BoxShadow(
                         color: theme.colorScheme.primary.withOpacity(0.4),
@@ -316,7 +312,7 @@ class _LoadingScreenState extends ConsumerState<LoadingScreen>
     );
   }
 
-  Widget _buildProgressIndicator(ThemeData theme, NeuralThemeExtension? neuralTheme) {
+  Widget _buildProgressIndicator(ThemeData theme) {
     return Column(
       children: [
         // 📊 Progress bar
@@ -336,9 +332,9 @@ class _LoadingScreenState extends ConsumerState<LoadingScreen>
             ),
           ),
         ),
-        
+
         const SizedBox(height: 12),
-        
+
         // 📈 Progress percentage
         if (widget.progress != null)
           Text(
@@ -369,6 +365,17 @@ class _LoadingScreenState extends ConsumerState<LoadingScreen>
       ),
     );
   }
+
+  LinearGradient _getPrimaryGradient() {
+    return const LinearGradient(
+      colors: [
+        Color(0xFF6366F1),
+        Color(0xFF8B5CF6),
+      ],
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+    );
+  }
 }
 
 // 🎨 NEURAL NETWORK PAINTER
@@ -390,24 +397,24 @@ class NeuralNetworkPainter extends CustomPainter {
 
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2;
-    
+
     // Draw neural network connections
     for (int i = 0; i < 8; i++) {
-      final angle = (i * 45 + animation * 360) * 3.14159 / 180;
+      final angle = (i * 45 + animation * 360) * math.pi / 180;
       final startAngle = angle - 0.5;
       final endAngle = angle + 0.5;
-      
-      final startX = center.dx + (radius - 20) * cos(startAngle);
-      final startY = center.dy + (radius - 20) * sin(startAngle);
-      final endX = center.dx + (radius - 20) * cos(endAngle);
-      final endY = center.dy + (radius - 20) * sin(endAngle);
-      
+
+      final startX = center.dx + (radius - 20) * math.cos(startAngle);
+      final startY = center.dy + (radius - 20) * math.sin(startAngle);
+      final endX = center.dx + (radius - 20) * math.cos(endAngle);
+      final endY = center.dy + (radius - 20) * math.sin(endAngle);
+
       canvas.drawLine(
         Offset(startX, startY),
         Offset(endX, endY),
         paint,
       );
-      
+
       // Draw nodes
       canvas.drawCircle(
         Offset(startX, startY),
@@ -427,31 +434,31 @@ class NeuralNetworkPainter extends CustomPainter {
 class InitializingScreen extends LoadingScreen {
   const InitializingScreen({super.key})
       : super(
-          message: 'Initializing NeuronVault',
-          subtitle: 'Setting up enterprise AI orchestration',
-        );
+    message: 'Initializing NeuronVault',
+    subtitle: 'Setting up enterprise AI orchestration',
+  );
 }
 
 class ConnectingScreen extends LoadingScreen {
   const ConnectingScreen({super.key})
       : super(
-          message: 'Connecting to AI Models',
-          subtitle: 'Establishing secure connections',
-        );
+    message: 'Connecting to AI Models',
+    subtitle: 'Establishing secure connections',
+  );
 }
 
 class ProcessingScreen extends LoadingScreen {
   final double? progress;
-  
+
   const ProcessingScreen({
     super.key,
     this.progress,
   }) : super(
-          message: 'Processing Request',
-          subtitle: 'AI models are generating response',
-          showProgress: true,
-          progress: progress,
-        );
+    message: 'Processing Request',
+    subtitle: 'AI models are generating response',
+    showProgress: true,
+    progress: progress,
+  );
 }
 
 // 📱 RESPONSIVE LOADING VARIATIONS
@@ -470,7 +477,7 @@ class CompactLoadingScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    
+
     return Container(
       padding: const EdgeInsets.all(16.0),
       child: Row(
@@ -484,9 +491,9 @@ class CompactLoadingScreen extends ConsumerWidget {
               valueColor: AlwaysStoppedAnimation(theme.colorScheme.primary),
             ),
           ),
-          
+
           const SizedBox(width: 12),
-          
+
           // 📝 Message
           Expanded(
             child: Text(
@@ -496,7 +503,7 @@ class CompactLoadingScreen extends ConsumerWidget {
               ),
             ),
           ),
-          
+
           // ❌ Cancel button
           if (showCancel && onCancel != null)
             IconButton(
@@ -543,9 +550,3 @@ class LoadingOverlay extends StatelessWidget {
     );
   }
 }
-
-// 📊 MATH UTILITIES
-double cos(double radians) => dart.math.cos(radians);
-double sin(double radians) => dart.math.sin(radians);
-
-import 'dart:math' as dart.math;

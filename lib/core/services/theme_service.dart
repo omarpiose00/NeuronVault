@@ -1,4 +1,4 @@
-// 🎨 NEURONVAULT - DYNAMIC THEME SERVICE
+// 🎨 NEURONVAULT - DYNAMIC THEME SERVICE - CORREZIONI
 // Enterprise-grade theme management and customization
 // Part of PHASE 2.5 - QUANTUM STATE MANAGEMENT
 
@@ -10,7 +10,7 @@ import 'config_service.dart';
 class ThemeService {
   final ConfigService _configService;
   final Logger _logger;
-  
+
   // 🎨 THEME CONFIGURATIONS
   static const Map<AppTheme, ThemeConfig> _themeConfigs = {
     AppTheme.neural: ThemeConfig(
@@ -73,7 +73,7 @@ class ThemeService {
     required ConfigService configService,
     required Logger logger,
   }) : _configService = configService,
-       _logger = logger {
+        _logger = logger {
     _initializeTheme();
   }
 
@@ -81,21 +81,21 @@ class ThemeService {
   Future<void> _initializeTheme() async {
     try {
       _logger.d('🎨 Initializing Theme Service...');
-      
+
       final themeConfig = await _configService.getThemeConfig();
       if (themeConfig != null) {
         _currentTheme = AppTheme.values.firstWhere(
-          (theme) => theme.name == themeConfig['theme'],
+              (theme) => theme.name == themeConfig['theme'],
           orElse: () => AppTheme.neural,
         );
         _isDarkMode = themeConfig['isDarkMode'] ?? true;
       }
-      
+
       // Pre-generate themes for performance
       await _generateThemes();
-      
+
       _logger.i('✅ Theme Service initialized: ${_currentTheme.name} (${_isDarkMode ? 'Dark' : 'Light'})');
-      
+
     } catch (e, stackTrace) {
       _logger.e('❌ Failed to initialize theme', error: e, stackTrace: stackTrace);
       _setDefaultTheme();
@@ -112,14 +112,14 @@ class ThemeService {
   Future<void> _generateThemes() async {
     try {
       _logger.d('🎨 Generating themes for ${_currentTheme.name}...');
-      
+
       final config = _themeConfigs[_currentTheme]!;
-      
+
       _cachedLightTheme = _buildLightTheme(config);
       _cachedDarkTheme = _buildDarkTheme(config);
-      
+
       _logger.d('✅ Themes generated successfully');
-      
+
     } catch (e, stackTrace) {
       _logger.e('❌ Failed to generate themes', error: e, stackTrace: stackTrace);
     }
@@ -144,23 +144,23 @@ class ThemeService {
       useMaterial3: true,
       colorScheme: colorScheme,
       brightness: Brightness.light,
-      
+
       // 🔤 TYPOGRAPHY
       textTheme: _buildTextTheme(colorScheme, Brightness.light),
-      
+
       // 🎨 COMPONENT THEMES
       appBarTheme: _buildAppBarTheme(colorScheme, Brightness.light),
-      cardTheme: _buildCardTheme(colorScheme, Brightness.light),
+      cardTheme: _buildCardThemeData(colorScheme, Brightness.light), // FIX: Changed to CardThemeData
       elevatedButtonTheme: _buildElevatedButtonTheme(colorScheme),
       outlinedButtonTheme: _buildOutlinedButtonTheme(colorScheme),
       textButtonTheme: _buildTextButtonTheme(colorScheme),
       inputDecorationTheme: _buildInputDecorationTheme(colorScheme),
-      dialogTheme: _buildDialogTheme(colorScheme, Brightness.light),
+      dialogTheme: _buildDialogThemeData(colorScheme, Brightness.light), // FIX: Changed to DialogThemeData
       bottomSheetTheme: _buildBottomSheetTheme(colorScheme, Brightness.light),
-      
+
       // 🎯 VISUAL DENSITY
       visualDensity: VisualDensity.adaptivePlatformDensity,
-      
+
       // 🎨 EXTENSIONS
       extensions: [
         NeuralThemeExtension(
@@ -195,23 +195,23 @@ class ThemeService {
       useMaterial3: true,
       colorScheme: colorScheme,
       brightness: Brightness.dark,
-      
+
       // 🔤 TYPOGRAPHY
       textTheme: _buildTextTheme(colorScheme, Brightness.dark),
-      
+
       // 🎨 COMPONENT THEMES
       appBarTheme: _buildAppBarTheme(colorScheme, Brightness.dark),
-      cardTheme: _buildCardTheme(colorScheme, Brightness.dark),
+      cardTheme: _buildCardThemeData(colorScheme, Brightness.dark), // FIX: Changed to CardThemeData
       elevatedButtonTheme: _buildElevatedButtonTheme(colorScheme),
       outlinedButtonTheme: _buildOutlinedButtonTheme(colorScheme),
       textButtonTheme: _buildTextButtonTheme(colorScheme),
       inputDecorationTheme: _buildInputDecorationTheme(colorScheme),
-      dialogTheme: _buildDialogTheme(colorScheme, Brightness.dark),
+      dialogTheme: _buildDialogThemeData(colorScheme, Brightness.dark), // FIX: Changed to DialogThemeData
       bottomSheetTheme: _buildBottomSheetTheme(colorScheme, Brightness.dark),
-      
+
       // 🎯 VISUAL DENSITY
       visualDensity: VisualDensity.adaptivePlatformDensity,
-      
+
       // 🎨 EXTENSIONS
       extensions: [
         NeuralThemeExtension(
@@ -229,10 +229,10 @@ class ThemeService {
 
   // 🔤 TYPOGRAPHY THEME
   TextTheme _buildTextTheme(ColorScheme colorScheme, Brightness brightness) {
-    final baseColor = brightness == Brightness.dark 
+    final baseColor = brightness == Brightness.dark
         ? Colors.white.withOpacity(0.9)
         : const Color(0xFF1E293B);
-    
+
     return TextTheme(
       displayLarge: TextStyle(
         fontSize: 32.0,
@@ -335,8 +335,9 @@ class ThemeService {
     );
   }
 
-  CardTheme _buildCardTheme(ColorScheme colorScheme, Brightness brightness) {
-    return CardTheme(
+  // FIX: Changed from CardTheme to CardThemeData
+  CardThemeData _buildCardThemeData(ColorScheme colorScheme, Brightness brightness) {
+    return CardThemeData(
       color: colorScheme.surface,
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -412,8 +413,9 @@ class ThemeService {
     );
   }
 
-  DialogTheme _buildDialogTheme(ColorScheme colorScheme, Brightness brightness) {
-    return DialogTheme(
+  // FIX: Changed from DialogTheme to DialogThemeData
+  DialogThemeData _buildDialogThemeData(ColorScheme colorScheme, Brightness brightness) {
+    return DialogThemeData(
       backgroundColor: colorScheme.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
@@ -476,16 +478,16 @@ class ThemeService {
   // 🔄 THEME SWITCHING
   Future<void> setTheme(AppTheme theme) async {
     if (_currentTheme == theme) return;
-    
+
     try {
       _logger.i('🎨 Switching theme to: ${theme.name}');
-      
+
       _currentTheme = theme;
       await _generateThemes();
       await _saveThemeConfig();
-      
+
       _logger.i('✅ Theme switched successfully');
-      
+
     } catch (e, stackTrace) {
       _logger.e('❌ Failed to switch theme', error: e, stackTrace: stackTrace);
       rethrow;
@@ -494,15 +496,15 @@ class ThemeService {
 
   Future<void> setDarkMode(bool isDark) async {
     if (_isDarkMode == isDark) return;
-    
+
     try {
       _logger.i('🌓 Switching to ${isDark ? 'dark' : 'light'} mode');
-      
+
       _isDarkMode = isDark;
       await _saveThemeConfig();
-      
+
       _logger.i('✅ Theme mode switched successfully');
-      
+
     } catch (e, stackTrace) {
       _logger.e('❌ Failed to switch theme mode', error: e, stackTrace: stackTrace);
       rethrow;
@@ -519,32 +521,32 @@ class ThemeService {
 
   // 🎨 THEME UTILITIES
   List<AppTheme> getAvailableThemes() => AppTheme.values;
-  
+
   ThemeConfig getThemeConfig(AppTheme theme) => _themeConfigs[theme]!;
-  
+
   String getThemeName(AppTheme theme) => _themeConfigs[theme]!.name;
-  
+
   String getThemeDescription(AppTheme theme) => _themeConfigs[theme]!.description;
 
-  Color getPrimaryColor([AppTheme? theme]) => 
+  Color getPrimaryColor([AppTheme? theme]) =>
       _themeConfigs[theme ?? _currentTheme]!.primaryColor;
-  
-  Color getSecondaryColor([AppTheme? theme]) => 
+
+  Color getSecondaryColor([AppTheme? theme]) =>
       _themeConfigs[theme ?? _currentTheme]!.secondaryColor;
-  
-  Color getAccentColor([AppTheme? theme]) => 
+
+  Color getAccentColor([AppTheme? theme]) =>
       _themeConfigs[theme ?? _currentTheme]!.accentColor;
 
   // 🔄 RESET
   Future<void> resetToDefault() async {
     try {
       _logger.i('🔄 Resetting theme to default...');
-      
+
       _setDefaultTheme();
       await _saveThemeConfig();
-      
+
       _logger.i('✅ Theme reset to default');
-      
+
     } catch (e, stackTrace) {
       _logger.e('❌ Failed to reset theme', error: e, stackTrace: stackTrace);
     }
@@ -624,7 +626,7 @@ class NeuralThemeExtension extends ThemeExtension<NeuralThemeExtension> {
     if (other is! NeuralThemeExtension) {
       return this;
     }
-    
+
     return NeuralThemeExtension(
       primaryGradient: LinearGradient.lerp(primaryGradient, other.primaryGradient, t)!,
       secondaryGradient: LinearGradient.lerp(secondaryGradient, other.secondaryGradient, t)!,
