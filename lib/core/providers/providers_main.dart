@@ -7,13 +7,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import '../state/state_models.dart';
+import '../state/state_models.dart'; // Contains OrchestrationStrategy enum
 import '../services/config_service.dart';
 import '../services/ai_service.dart';
 import '../services/storage_service.dart';
 import '../services/analytics_service.dart';
 import '../services/theme_service.dart';
 import '../services/websocket_orchestration_service.dart'; // CORRECTED PATH
+import '../services/websocket_orchestration_service.dart'; // CORRECTED PATH
+import '../services/spatial_audio_service.dart'; // NEW IMPORT
 
 // 🧠 CONTROLLER PROVIDERS - IMPORT CONTROLLERS
 // These import the actual controller providers from their files
@@ -152,8 +154,18 @@ final activeModelsProvider = StateProvider<List<String>>((ref) {
   return ['claude', 'gpt', 'deepseek', 'gemini']; // Default active models
 });
 
-final currentStrategyProvider = StateProvider<OrchestrationStrategy>((ref) {
-  return OrchestrationStrategy.parallel; // Default strategy
+// MODIFIED: currentStrategyProvider now stores a String
+final currentStrategyProvider = StateProvider<String>((ref) {
+  // Assumes OrchestrationStrategy enum has a .name property (standard in Dart 2.17+)
+  // And OrchestrationStrategy.parallel is a valid enum member.
+  // Ensure OrchestrationStrategy is imported (likely from state_models.dart)
+  return OrchestrationStrategy.parallel.name; // Default strategy as a string
+});
+
+// NEW: availableStrategiesProvider provides a list of strategy names as Strings
+final availableStrategiesProvider = Provider<List<String>>((ref) {
+  // Assumes OrchestrationStrategy enum has .values and .name properties
+  return OrchestrationStrategy.values.map((e) => e.name).toList();
 });
 
 final modelWeightsProvider = StateProvider<Map<String, double>>((ref) {

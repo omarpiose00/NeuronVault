@@ -1,12 +1,11 @@
 // lib/core/services/websocket_orchestration_service.dart
-// 🧠 Simplified WebSocket Orchestration Service
-// Basic working version for AI orchestration
+// 🧠 FIXED WebSocket Orchestration Service - SOCKET.IO COMPATIBLE
+// Compatible with both Socket.IO and native WebSocket backends
 
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:web_socket_channel/web_socket_channel.dart';
-import 'package:web_socket_channel/io.dart';
+import 'package:socket_io_client/socket_io_client.dart' as IO;
 
 /// Orchestration strategies
 enum OrchestrationStrategy {
@@ -35,11 +34,11 @@ class AIResponse {
 
   factory AIResponse.fromJson(Map<String, dynamic> json) {
     return AIResponse(
-      modelName: json['model_name'] as String,
-      content: json['content'] as String,
+      modelName: json['model_name'] as String? ?? json['model'] as String? ?? 'unknown',
+      content: json['content'] as String? ?? json['response'] as String? ?? '',
       confidence: (json['confidence'] as num?)?.toDouble() ?? 0.8,
       responseTime: Duration(milliseconds: json['response_time_ms'] as int? ?? 1000),
-      timestamp: DateTime.parse(json['timestamp'] as String? ?? DateTime.now().toIso8601String()),
+      timestamp: DateTime.tryParse(json['timestamp'] as String? ?? '') ?? DateTime.now(),
     );
   }
 }
@@ -68,16 +67,22 @@ class OrchestrationProgress {
   }
 }
 
-/// 🧠 Simplified WebSocket Orchestration Service
+/// 🧠 FIXED WebSocket Orchestration Service - SOCKET.IO COMPATIBLE
 class WebSocketOrchestrationService extends ChangeNotifier {
-  static const String _defaultUrl = 'ws://localhost:3001';
+  // Try multiple ports for auto-discovery
+  static const List<int> _defaultPorts = [3001, 3002, 3003, 3004, 3005];
+  static const String _defaultHost = 'localhost';
 
-  WebSocketChannel? _channel;
-  StreamSubscription? _streamSubscription;
+  IO.Socket? _socket;
+  Timer? _reconnectTimer;
+  Timer? _healthCheckTimer;
 
   // Connection state
   bool _isConnected = false;
   bool get isConnected => _isConnected;
+
+  int _currentPort = 3001;
+  int get currentPort => _currentPort;
 
   // AI Orchestration state
   List<AIResponse> _individualResponses = [];
@@ -102,68 +107,220 @@ class WebSocketOrchestrationService extends ChangeNotifier {
   String? get synthesizedResponse => _synthesizedResponse;
   OrchestrationStrategy get currentStrategy => _currentStrategy;
 
-  /// Initialize WebSocket connection to backend
-  Future<bool> connect({String? url}) async {
+  /// Initialize Socket.IO connection with auto-discovery
+  Future<bool> connect({String? host, int? port}) async {
     try {
       if (_isConnected) await disconnect();
 
-      final wsUrl = url ?? _defaultUrl;
-      debugPrint('🔗 Attempting to connect to $wsUrl');
+      final targetHost = host ?? _defaultHost;
+      final targetPorts = port != null ? [port] : _defaultPorts;
 
-      _channel = IOWebSocketChannel.connect(Uri.parse(wsUrl));
+      debugPrint('🔍 Auto-discovering NeuronVault backend...');
 
-      // Listen to messages from backend
-      _streamSubscription = _channel!.stream.listen(
-        _handleMessage,
-        onError: _handleError,
-        onDone: _handleDisconnection,
-      );
+      // Try each port until one works
+      for (final testPort in targetPorts) {
+        if (await _tryConnect(targetHost, testPort)) {
+          _currentPort = testPort;
+          debugPrint('✅ Connected to NeuronVault backend at $targetHost:$testPort');
+          return true;
+        }
+        debugPrint('❌ Port $testPort unavailable, trying next...');
+      }
 
-      _isConnected = true;
-      notifyListeners();
+      debugPrint('❌ No available NeuronVault backend found on ports: $targetPorts');
+      return false;
 
-      debugPrint('🔗 WebSocket connected to $wsUrl');
-
-      // Send a test ping
-      _sendPing();
-
-      return true;
     } catch (e) {
-      debugPrint('❌ WebSocket connection failed: $e');
+      debugPrint('❌ Connection failed: $e');
       _isConnected = false;
       notifyListeners();
       return false;
     }
   }
 
-  /// Send ping to test connection
-  void _sendPing() {
+  /// Try to connect to specific host:port
+  Future<bool> _tryConnect(String host, int port) async {
     try {
-      final pingMessage = {
-        'type': 'ping',
-        'timestamp': DateTime.now().toIso8601String(),
-      };
-      _channel?.sink.add(jsonEncode(pingMessage));
-      debugPrint('📡 Ping sent to backend');
+      final serverUrl = 'http://$host:$port';
+      debugPrint('🔗 Attempting Socket.IO connection to $serverUrl');
+
+      _socket = IO.io(serverUrl, <String, dynamic>{
+        'transports': ['websocket', 'polling'],
+        'timeout': 5000,
+        'autoConnect': false,
+        'forceNew': true,
+      });
+
+      // Setup event handlers BEFORE connecting
+      _setupSocketHandlers();
+
+      // Connect and wait for result
+      final completer = Completer<bool>();
+
+      _socket!.onConnect((_) {
+        debugPrint('🎉 Socket.IO connected successfully!');
+        if (!completer.isCompleted) completer.complete(true);
+      });
+
+      _socket!.onConnectError((error) {
+        debugPrint('❌ Socket.IO connection error: $error');
+        if (!completer.isCompleted) completer.complete(false);
+      });
+
+      _socket!.onError((error) {
+        debugPrint('❌ Socket.IO error: $error');
+        if (!completer.isCompleted) completer.complete(false);
+      });
+
+      // Start connection
+      _socket!.connect();
+
+      // Wait for connection result with timeout
+      final connected = await completer.future.timeout(
+        const Duration(seconds: 5),
+        onTimeout: () => false,
+      );
+
+      if (connected) {
+        _isConnected = true;
+        notifyListeners();
+        _startHealthCheck();
+        _sendInitialPing();
+        return true;
+      } else {
+        _socket?.dispose();
+        _socket = null;
+        return false;
+      }
+
+    } catch (e) {
+      debugPrint('❌ Connection attempt failed: $e');
+      _socket?.dispose();
+      _socket = null;
+      return false;
+    }
+  }
+
+  /// Setup Socket.IO event handlers
+  void _setupSocketHandlers() {
+    if (_socket == null) return;
+
+    // Connection events
+    _socket!.onDisconnect((reason) {
+      debugPrint('🔌 Socket.IO disconnected: $reason');
+      _isConnected = false;
+      notifyListeners();
+
+      // Auto-reconnect if not intentional
+      if (reason != 'io client disconnect') {
+        _scheduleReconnect();
+      }
+    });
+
+    // Server status
+    _socket!.on('server_status', (data) {
+      debugPrint('📡 Server status: $data');
+    });
+
+    // AI Orchestration events
+    _socket!.on('strategy_selected', (data) {
+      debugPrint('🎯 Strategy selected: ${data['strategy']}');
+    });
+
+    _socket!.on('stream_chunk', (data) {
+      _handleStreamChunk(data);
+    });
+
+    _socket!.on('streaming_completed', (data) {
+      _handleStreamingCompleted(data);
+    });
+
+    _socket!.on('stream_error', (data) {
+      debugPrint('❌ Stream error: ${data['error']}');
+    });
+
+    // AI orchestration events (if backend supports them)
+    _socket!.on('individual_response', (data) {
+      _handleIndividualResponse(data);
+    });
+
+    _socket!.on('orchestration_progress', (data) {
+      _handleOrchestrationProgress(data);
+    });
+
+    _socket!.on('synthesis_complete', (data) {
+      _handleSynthesisComplete(data);
+    });
+
+    _socket!.on('orchestration_error', (data) {
+      _handleOrchestrationError(data);
+    });
+
+    // Ping/Pong for latency
+    _socket!.on('pong', (data) {
+      debugPrint('🏓 Pong received');
+    });
+  }
+
+  /// Send initial ping to test connection
+  void _sendInitialPing() {
+    try {
+      _socket?.emit('ping', {
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+        'client': 'flutter'
+      });
+      debugPrint('📡 Initial ping sent');
     } catch (e) {
       debugPrint('❌ Failed to send ping: $e');
     }
   }
 
-  /// Disconnect from WebSocket
+  /// Start health check timer
+  void _startHealthCheck() {
+    _healthCheckTimer?.cancel();
+    _healthCheckTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      if (_isConnected && _socket?.connected == true) {
+        _socket?.emit('ping', {
+          'timestamp': DateTime.now().millisecondsSinceEpoch,
+        });
+      } else {
+        debugPrint('⚠️ Health check failed, connection lost');
+        _isConnected = false;
+        notifyListeners();
+      }
+    });
+  }
+
+  /// Schedule reconnect attempt
+  void _scheduleReconnect() {
+    _reconnectTimer?.cancel();
+    _reconnectTimer = Timer(const Duration(seconds: 5), () {
+      debugPrint('🔄 Attempting to reconnect...');
+      connect();
+    });
+  }
+
+  /// Disconnect from Socket.IO
   Future<void> disconnect() async {
     try {
-      await _streamSubscription?.cancel();
-      await _channel?.sink.close();
+      _reconnectTimer?.cancel();
+      _healthCheckTimer?.cancel();
+
+      if (_socket != null) {
+        _socket!.disconnect();
+        _socket?.dispose();
+        _socket = null;
+      }
+
       _isConnected = false;
       notifyListeners();
-      debugPrint('🔌 WebSocket disconnected');
+      debugPrint('🔌 Socket.IO disconnected');
     } catch (e) {
       debugPrint('⚠️ Error during disconnect: $e');
     }
   }
 
-  /// Send AI orchestration request
+  /// Send AI orchestration request (MAIN METHOD)
   Future<void> orchestrateAIRequest({
     required String prompt,
     required List<String> selectedModels,
@@ -171,38 +328,161 @@ class WebSocketOrchestrationService extends ChangeNotifier {
     Map<String, double>? modelWeights,
     String? conversationId,
   }) async {
-    if (!_isConnected) {
-      throw Exception('WebSocket not connected');
+    if (!_isConnected || _socket == null) {
+      throw Exception('Not connected to backend');
     }
 
-    // Reset state for new orchestration
+    // Reset state for new request
     _individualResponses.clear();
     _synthesizedResponse = null;
     _currentStrategy = strategy;
 
     final request = {
-      'type': 'orchestration_request',
-      'data': {
-        'prompt': prompt,
-        'models': selectedModels,
-        'strategy': strategy.name,
-        'weights': modelWeights ?? {},
-        'conversation_id': conversationId ?? _generateConversationId(),
-        'timestamp': DateTime.now().toIso8601String(),
-      }
+      'prompt': prompt,
+      'models': selectedModels,
+      'strategy': strategy.name,
+      'weights': modelWeights ?? {},
+      'conversation_id': conversationId ?? _generateConversationId(),
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
     };
 
     try {
-      _channel!.sink.add(jsonEncode(request));
-      debugPrint('🚀 Orchestration request sent: ${selectedModels.join(', ')}');
+      debugPrint('🚀 Starting AI orchestration: ${selectedModels.join(', ')}');
+      _socket!.emit('start_ai_stream', request);
 
-      // Simulate some progress for demo purposes if backend is not ready
-      _simulateOrchestrationForDemo(prompt, selectedModels);
+      // Start demo simulation if backend doesn't respond within 2 seconds
+      Timer(const Duration(seconds: 2), () {
+        if (_individualResponses.isEmpty) {
+          debugPrint('🧪 Backend not responding, starting demo simulation');
+          _simulateOrchestrationForDemo(prompt, selectedModels);
+        }
+      });
 
     } catch (e) {
-      debugPrint('❌ Failed to send orchestration request: $e');
-      throw Exception('Failed to send orchestration request: $e');
+      debugPrint('❌ Failed to send AI orchestration request: $e');
+      throw Exception('Failed to send AI orchestration request: $e');
     }
+  }
+
+  /// Alternative method name for compatibility
+  Future<void> startAIStream({
+    required String prompt,
+    required List<String> selectedModels,
+    required OrchestrationStrategy strategy,
+    Map<String, double>? modelWeights,
+    String? conversationId,
+  }) async {
+    return orchestrateAIRequest(
+      prompt: prompt,
+      selectedModels: selectedModels,
+      strategy: strategy,
+      modelWeights: modelWeights,
+      conversationId: conversationId,
+    );
+  }
+
+  /// Handle stream chunk from backend
+  void _handleStreamChunk(Map<String, dynamic> data) {
+    try {
+      final chunk = data['chunk'] as String? ?? '';
+      final buffer = data['buffer'] as String? ?? '';
+      final model = data['model'] as String? ?? 'unknown';
+      final isComplete = data['isComplete'] as bool? ?? false;
+
+      debugPrint('📥 Stream chunk from $model: ${chunk.length} chars');
+
+      if (isComplete && buffer.isNotEmpty) {
+        final response = AIResponse(
+          modelName: model,
+          content: buffer,
+          confidence: 0.8,
+          responseTime: const Duration(milliseconds: 1500),
+          timestamp: DateTime.now(),
+        );
+
+        _individualResponses.add(response);
+        _responsesController.add(List.unmodifiable(_individualResponses));
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('❌ Error handling stream chunk: $e');
+    }
+  }
+
+  /// Handle streaming completion
+  void _handleStreamingCompleted(Map<String, dynamic> data) {
+    try {
+      final finalResponse = data['finalResponse'] as String? ?? '';
+      debugPrint('✅ Streaming completed: ${finalResponse.length} chars');
+
+      if (finalResponse.isNotEmpty) {
+        _synthesizedResponse = finalResponse;
+        _synthesisController.add(finalResponse);
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('❌ Error handling streaming completion: $e');
+    }
+  }
+
+  /// Handle individual AI model response
+  void _handleIndividualResponse(Map<String, dynamic> data) {
+    try {
+      final response = AIResponse.fromJson(data);
+
+      // Update or add response
+      final existingIndex = _individualResponses.indexWhere(
+              (r) => r.modelName == response.modelName
+      );
+
+      if (existingIndex >= 0) {
+        _individualResponses[existingIndex] = response;
+      } else {
+        _individualResponses.add(response);
+      }
+
+      // Notify listeners
+      _responsesController.add(List.unmodifiable(_individualResponses));
+      notifyListeners();
+
+      debugPrint('📥 Individual response from ${response.modelName}: ${response.content.length} chars');
+    } catch (e) {
+      debugPrint('❌ Error handling individual response: $e');
+    }
+  }
+
+  /// Handle orchestration progress updates
+  void _handleOrchestrationProgress(Map<String, dynamic> data) {
+    try {
+      final progress = OrchestrationProgress.fromJson(data);
+      _progressController.add(progress);
+
+      debugPrint('⏳ Orchestration progress: ${progress.completedModels}/${progress.totalModels}');
+    } catch (e) {
+      debugPrint('❌ Error handling progress: $e');
+    }
+  }
+
+  /// Handle final synthesis completion
+  void _handleSynthesisComplete(Map<String, dynamic> data) {
+    try {
+      _synthesizedResponse = data['synthesis'] as String? ?? data['final_response'] as String? ?? '';
+      if (_synthesizedResponse!.isNotEmpty) {
+        _synthesisController.add(_synthesizedResponse!);
+        notifyListeners();
+        debugPrint('✨ Synthesis complete: ${_synthesizedResponse!.length} chars');
+      }
+    } catch (e) {
+      debugPrint('❌ Error handling synthesis: $e');
+    }
+  }
+
+  /// Handle orchestration errors
+  void _handleOrchestrationError(Map<String, dynamic> data) {
+    final errorMessage = data['message'] as String? ?? data['error'] as String? ?? 'Unknown error';
+    final errorCode = data['code'] as String?;
+
+    debugPrint('❌ Orchestration error [$errorCode]: $errorMessage');
   }
 
   /// Simulate orchestration for demo (when backend is not ready)
@@ -273,111 +553,6 @@ ${responses.map((r) => '• ${r.modelName}: ${r.content.split('.').first}.').joi
 By synthesizing multiple AI viewpoints, the optimal approach combines systematic analysis (Claude), practical application (GPT), technical depth (DeepSeek), and creative perspectives (Gemini). This multi-AI orchestration provides a more robust and comprehensive solution than any single AI could offer.
 
 *This response represents the collective intelligence of ${responses.length} AI models, orchestrated using the ${_currentStrategy.name} strategy.*""";
-  }
-
-  /// Handle incoming messages from backend
-  void _handleMessage(dynamic message) {
-    try {
-      final data = jsonDecode(message as String);
-      final type = data['type'] as String;
-
-      debugPrint('📥 Received message type: $type');
-
-      switch (type) {
-        case 'pong':
-          debugPrint('📡 Pong received from backend');
-          break;
-        case 'individual_response':
-          _handleIndividualResponse(data['data']);
-          break;
-        case 'orchestration_progress':
-          _handleOrchestrationProgress(data['data']);
-          break;
-        case 'synthesis_complete':
-          _handleSynthesisComplete(data['data']);
-          break;
-        case 'orchestration_error':
-          _handleOrchestrationError(data['data']);
-          break;
-        default:
-          debugPrint('🤔 Unknown message type: $type');
-      }
-    } catch (e) {
-      debugPrint('❌ Error parsing message: $e');
-    }
-  }
-
-  /// Handle individual AI model response
-  void _handleIndividualResponse(Map<String, dynamic> data) {
-    try {
-      final response = AIResponse.fromJson(data);
-
-      // Update or add response
-      final existingIndex = _individualResponses.indexWhere(
-              (r) => r.modelName == response.modelName
-      );
-
-      if (existingIndex >= 0) {
-        _individualResponses[existingIndex] = response;
-      } else {
-        _individualResponses.add(response);
-      }
-
-      // Notify listeners
-      _responsesController.add(List.unmodifiable(_individualResponses));
-      notifyListeners();
-
-      debugPrint('📥 Individual response from ${response.modelName}: ${response.content.length} chars');
-    } catch (e) {
-      debugPrint('❌ Error handling individual response: $e');
-    }
-  }
-
-  /// Handle orchestration progress updates
-  void _handleOrchestrationProgress(Map<String, dynamic> data) {
-    try {
-      final progress = OrchestrationProgress.fromJson(data);
-      _progressController.add(progress);
-
-      debugPrint('⏳ Orchestration progress: ${progress.completedModels}/${progress.totalModels}');
-    } catch (e) {
-      debugPrint('❌ Error handling progress: $e');
-    }
-  }
-
-  /// Handle final synthesis completion
-  void _handleSynthesisComplete(Map<String, dynamic> data) {
-    try {
-      _synthesizedResponse = data['synthesis'] as String;
-      _synthesisController.add(_synthesizedResponse!);
-      notifyListeners();
-
-      debugPrint('✨ Synthesis complete: ${_synthesizedResponse!.length} chars');
-    } catch (e) {
-      debugPrint('❌ Error handling synthesis: $e');
-    }
-  }
-
-  /// Handle orchestration errors
-  void _handleOrchestrationError(Map<String, dynamic> data) {
-    final errorMessage = data['message'] as String? ?? 'Unknown error';
-    final errorCode = data['code'] as String?;
-
-    debugPrint('❌ Orchestration error [$errorCode]: $errorMessage');
-  }
-
-  /// Handle WebSocket errors
-  void _handleError(error) {
-    debugPrint('❌ WebSocket error: $error');
-    _isConnected = false;
-    notifyListeners();
-  }
-
-  /// Handle WebSocket disconnection
-  void _handleDisconnection() {
-    debugPrint('🔌 WebSocket disconnected');
-    _isConnected = false;
-    notifyListeners();
   }
 
   /// Generate unique conversation ID

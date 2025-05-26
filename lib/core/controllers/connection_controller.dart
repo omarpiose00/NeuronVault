@@ -1,32 +1,26 @@
-// 🌐 NEURONVAULT - CONNECTION CONTROLLER
-// Enterprise-grade connection management with auto-reconnect
-// Part of PHASE 2.5 - QUANTUM STATE MANAGEMENT
+// 🌐 NEURONVAULT - CONNECTION CONTROLLER - SIMPLIFIED VERSION
+// Simplified enterprise-grade connection management that WORKS
+// Compatible with WebSocketOrchestrationService
 
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logger/logger.dart';
-import 'package:web_socket_channel/web_socket_channel.dart';
-import 'package:web_socket_channel/io.dart';
 
 import '../state/state_models.dart';
 import '../services/config_service.dart';
 import '../services/analytics_service.dart';
+import '../services/websocket_orchestration_service.dart';
 import '../providers/providers_main.dart' hide ConnectionStatus;
 
-// 🌐 CONNECTION CONTROLLER
+// 🌐 SIMPLIFIED CONNECTION CONTROLLER
 class ConnectionController extends Notifier<ConnectionState> {
   late final ConfigService _configService;
   late final AnalyticsService _analyticsService;
   late final Logger _logger;
+  late final WebSocketOrchestrationService _orchestrationService;
 
-  WebSocketChannel? _webSocketChannel;
   Timer? _reconnectTimer;
-  Timer? _pingTimer;
-  Timer? _latencyTimer;
-  StreamSubscription? _connectionSubscription;
-
-  DateTime? _lastPingTime;
+  Timer? _statusCheckTimer;
 
   @override
   ConnectionState build() {
@@ -34,6 +28,10 @@ class ConnectionController extends Notifier<ConnectionState> {
     _configService = ref.read(configServiceProvider);
     _analyticsService = ref.read(analyticsServiceProvider);
     _logger = ref.read(loggerProvider);
+    _orchestrationService = ref.read(webSocketOrchestrationServiceProvider);
+
+    // Listen to orchestration service connection state
+    _orchestrationService.addListener(_onOrchestrationServiceChanged);
 
     // Load configuration and auto-connect
     _loadConnectionConfig();
@@ -76,37 +74,42 @@ class ConnectionController extends Notifier<ConnectionState> {
     }
 
     try {
-      _logger.i('🔗 Connecting to ${state.serverUrl}:${state.port}...');
+      _logger.i('🔗 Connecting to backend...');
 
       state = state.copyWith(
         status: ConnectionStatus.connecting,
         lastError: null,
       );
 
-      final uri = Uri.parse('ws://${state.serverUrl}:${state.port}/ws');
-      _webSocketChannel = IOWebSocketChannel.connect(uri);
-
-      await _webSocketChannel!.ready;
-
-      state = state.copyWith(
-        status: ConnectionStatus.connected,
-        lastConnectionTime: DateTime.now(),
-        reconnectAttempts: 0,
-        latencyMs: 0,
+      // Use orchestration service to connect
+      final success = await _orchestrationService.connect(
+        host: state.serverUrl.isNotEmpty ? state.serverUrl : null,
+        port: state.port > 0 ? state.port : null,
       );
 
-      // Setup connection monitoring
-      _setupConnectionMonitoring();
+      if (success) {
+        state = state.copyWith(
+          status: ConnectionStatus.connected,
+          lastConnectionTime: DateTime.now(),
+          reconnectAttempts: 0,
+          port: _orchestrationService.currentPort, // Update with actual port used
+        );
 
-      // Save successful connection config
-      await _configService.saveConnectionConfig(state);
+        // Setup connection monitoring
+        _setupConnectionMonitoring();
 
-      _analyticsService.trackEvent('connection_established', properties: {
-        'server_url': state.serverUrl,
-        'port': state.port,
-      });
+        // Save successful connection config
+        await _configService.saveConnectionConfig(state);
 
-      _logger.i('✅ Connected successfully');
+        _analyticsService.trackEvent('connection_established', properties: {
+          'server_url': state.serverUrl,
+          'port': state.port,
+        });
+
+        _logger.i('✅ Connected successfully to port ${_orchestrationService.currentPort}');
+      } else {
+        _handleConnectionError('Failed to connect to any available backend port');
+      }
 
     } catch (e, stackTrace) {
       _handleConnectionError(e.toString());
@@ -121,15 +124,10 @@ class ConnectionController extends Notifier<ConnectionState> {
 
       // Cancel timers
       _reconnectTimer?.cancel();
-      _pingTimer?.cancel();
-      _latencyTimer?.cancel();
+      _statusCheckTimer?.cancel();
 
-      // Close connection
-      await _connectionSubscription?.cancel();
-      await _webSocketChannel?.sink.close();
-
-      _webSocketChannel = null;
-      _connectionSubscription = null;
+      // Disconnect orchestration service
+      await _orchestrationService.disconnect();
 
       state = state.copyWith(
         status: ConnectionStatus.disconnected,
@@ -187,91 +185,64 @@ class ConnectionController extends Notifier<ConnectionState> {
 
   // 📡 SETUP CONNECTION MONITORING
   void _setupConnectionMonitoring() {
-    if (_webSocketChannel == null) return;
-
-    // Listen to connection events
-    _connectionSubscription = _webSocketChannel!.stream.listen(
-      _handleMessage,
-      onError: _handleConnectionError,
-      onDone: _handleConnectionClosed,
-    );
-
-    // Start ping monitoring
-    _startPingMonitoring();
+    // Start status check timer
+    _statusCheckTimer?.cancel();
+    _statusCheckTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
+      _checkConnectionStatus();
+    });
   }
 
-  // 📨 HANDLE MESSAGE
-  void _handleMessage(dynamic message) {
-    try {
-      _logger.d('📨 Received message: $message');
+  // 🔍 CHECK CONNECTION STATUS
+  void _checkConnectionStatus() {
+    final isOrchestrationConnected = _orchestrationService.isConnected;
 
-      // Handle ping/pong for latency calculation
-      if (message == 'pong' && _lastPingTime != null) {
-        final latency = DateTime.now().difference(_lastPingTime!).inMilliseconds;
-        state = state.copyWith(latencyMs: latency);
-        _lastPingTime = null;
+    if (state.status == ConnectionStatus.connected && !isOrchestrationConnected) {
+      _logger.w('⚠️ Connection lost detected');
+      _handleConnectionError('Connection lost');
+    } else if (state.status != ConnectionStatus.connected && isOrchestrationConnected) {
+      _logger.i('✅ Connection restored');
+      state = state.copyWith(
+        status: ConnectionStatus.connected,
+        lastConnectionTime: DateTime.now(),
+        reconnectAttempts: 0,
+      );
+    }
+  }
+
+  // 📡 LISTEN TO ORCHESTRATION SERVICE CHANGES
+  void _onOrchestrationServiceChanged() {
+    final isOrchestrationConnected = _orchestrationService.isConnected;
+
+    if (state.status == ConnectionStatus.connected && !isOrchestrationConnected) {
+      // Connection was lost
+      state = state.copyWith(status: ConnectionStatus.disconnected);
+      if (state.canReconnect) {
+        _scheduleReconnect();
       }
-
-    } catch (e) {
-      _logger.w('⚠️ Failed to handle message: $e');
+    } else if (state.status != ConnectionStatus.connected && isOrchestrationConnected) {
+      // Connection was established
+      state = state.copyWith(
+        status: ConnectionStatus.connected,
+        lastConnectionTime: DateTime.now(),
+        reconnectAttempts: 0,
+        port: _orchestrationService.currentPort,
+      );
     }
   }
 
   // ❌ HANDLE CONNECTION ERROR
-  void _handleConnectionError(dynamic error) {
+  void _handleConnectionError(String error) {
     _logger.e('❌ Connection error: $error');
 
     state = state.copyWith(
       status: ConnectionStatus.error,
-      lastError: error.toString(),
+      lastError: error,
     );
 
-    _analyticsService.trackError('connection_error', description: error.toString());
+    _analyticsService.trackError('connection_error', description: error);
 
     if (state.canReconnect) {
       _scheduleReconnect();
-    }
-  }
-
-  // 🔒 HANDLE CONNECTION CLOSED
-  void _handleConnectionClosed() {
-    _logger.w('🔒 Connection closed');
-
-    if (state.status == ConnectionStatus.connected) {
-      // Unexpected disconnection
-      state = state.copyWith(status: ConnectionStatus.disconnected);
-
-      if (state.canReconnect) {
-        _scheduleReconnect();
-      }
-    }
-  }
-
-  // 🏓 START PING MONITORING
-  void _startPingMonitoring() {
-    _pingTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
-      if (state.status == ConnectionStatus.connected && _webSocketChannel != null) {
-        _sendPing();
-      }
-    });
-  }
-
-  // 📡 SEND PING
-  void _sendPing() {
-    try {
-      _lastPingTime = DateTime.now();
-      _webSocketChannel?.sink.add('ping');
-
-      // Timeout for pong response
-      _latencyTimer = Timer(const Duration(seconds: 5), () {
-        if (_lastPingTime != null) {
-          // No pong received, connection might be dead
-          _handleConnectionError('Ping timeout');
-        }
-      });
-
-    } catch (e) {
-      _logger.w('⚠️ Failed to send ping: $e');
     }
   }
 
@@ -313,11 +284,18 @@ class ConnectionController extends Notifier<ConnectionState> {
     try {
       _logger.d('🧪 Testing connection to $serverUrl:$port...');
 
-      final socket = await Socket.connect(serverUrl, port, timeout: const Duration(seconds: 5));
-      await socket.close();
+      // Use orchestration service to test connection
+      final success = await _orchestrationService.connect(host: serverUrl, port: port);
 
-      _logger.i('✅ Connection test successful');
-      return true;
+      if (success) {
+        // Disconnect after test
+        await _orchestrationService.disconnect();
+        _logger.i('✅ Connection test successful');
+        return true;
+      } else {
+        _logger.w('❌ Connection test failed');
+        return false;
+      }
 
     } catch (e) {
       _logger.w('❌ Connection test failed: $e');
@@ -331,6 +309,7 @@ class ConnectionController extends Notifier<ConnectionState> {
       'status': state.status.name,
       'server_url': state.serverUrl,
       'port': state.port,
+      'actual_port': _orchestrationService.currentPort,
       'is_connected': state.isConnected,
       'is_connecting': state.isConnecting,
       'has_error': state.hasError,
@@ -340,6 +319,7 @@ class ConnectionController extends Notifier<ConnectionState> {
       'latency_ms': state.latencyMs,
       'last_connection_time': state.lastConnectionTime?.toIso8601String(),
       'last_error': state.lastError,
+      'orchestration_connected': _orchestrationService.isConnected,
     };
   }
 
@@ -353,10 +333,9 @@ class ConnectionController extends Notifier<ConnectionState> {
   @override
   void dispose() {
     _reconnectTimer?.cancel();
-    _pingTimer?.cancel();
-    _latencyTimer?.cancel();
-    _connectionSubscription?.cancel();
-    _webSocketChannel?.sink.close();
+    _statusCheckTimer?.cancel();
+    _orchestrationService.removeListener(_onOrchestrationServiceChanged);
+
   }
 }
 
@@ -394,9 +373,7 @@ final connectionStatisticsProvider = Provider<Map<String, dynamic>>((ref) {
   return ref.read(connectionControllerProvider.notifier).getConnectionStatistics();
 });
 
-// 📡 CONNECTION MESSAGE STREAM
-final connectionMessageStreamProvider = StreamProvider<String>((ref) {
-  // This would be implemented to stream connection messages
-  // For now, return an empty stream
-  return const Stream<String>.empty();
+// 🧠 ORCHESTRATION SERVICE PROVIDER (if not already defined)
+final webSocketOrchestrationServiceProvider = Provider<WebSocketOrchestrationService>((ref) {
+  return WebSocketOrchestrationService();
 });

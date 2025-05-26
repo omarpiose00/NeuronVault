@@ -100,7 +100,7 @@ class InitializationWrapper extends ConsumerWidget {
       ),
       data: (initialized) {
         if (initialized) {
-          return const RealOrchestrationMainScreen();
+          return const OrchestrationMainScreen();
         } else {
           return InitializationErrorScreen(
             error: 'Initialization failed',

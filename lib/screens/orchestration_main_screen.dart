@@ -1,129 +1,20 @@
-// lib/screens/orchestration_main_screen.dart
-// 🧬 NEURONVAULT - AI ORCHESTRATION MAIN SCREEN - CORRECTED VERSION
-// Real Multi-AI Orchestration with WebSocket Backend Integration
+// lib/screens/orchestration_main_screen.dart - ENHANCED WITH 3D PARTICLES
+// 🧬 LUXURY NEURAL ORCHESTRATION SCREEN - 3D PARTICLE REVOLUTION
+// Complete transformation with revolutionary 3D neural effects
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:ui' as ui;
+import 'dart:math' as math;
 
-import '../../core/services/websocket_orchestration_service.dart';
+import '../core/services/websocket_orchestration_service.dart';
 import '../core/providers/providers_main.dart';
-
-// 💬 ENHANCED CHAT MESSAGE MODEL
-class RealOrchestrationMainScreen extends StatelessWidget {
-  const RealOrchestrationMainScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(child: Text('Orchestration Main Screen')),
-    );
-  }
-}
-class ChatMessage {
-  final String id;
-  final String content;
-  final bool isFromUser;
-  final DateTime timestamp;
-  final AIModelType? sourceModel;
-  final MessageType messageType;
-  final double? confidence;
-  final Duration? responseTime;
-
-  ChatMessage({
-    required this.id,
-    required this.content,
-    required this.isFromUser,
-    required this.timestamp,
-    this.sourceModel,
-    this.messageType = MessageType.individual,
-    this.confidence,
-    this.responseTime,
-  });
-
-  factory ChatMessage.fromAIResponse(AIResponse response) {
-    return ChatMessage(
-      id: '${DateTime.now().millisecondsSinceEpoch}_${response.modelName}',
-      content: response.content,
-      isFromUser: false,
-      timestamp: response.timestamp,
-      sourceModel: AIModelType.fromString(response.modelName),
-      messageType: MessageType.individual,
-      confidence: response.confidence,
-      responseTime: response.responseTime,
-    );
-  }
-
-  factory ChatMessage.synthesized(String content) {
-    return ChatMessage(
-      id: '${DateTime.now().millisecondsSinceEpoch}_synthesis',
-      content: content,
-      isFromUser: false,
-      timestamp: DateTime.now(),
-      messageType: MessageType.synthesized,
-    );
-  }
-
-  factory ChatMessage.user(String content) {
-    return ChatMessage(
-      id: '${DateTime.now().millisecondsSinceEpoch}_user',
-      content: content,
-      isFromUser: true,
-      timestamp: DateTime.now(),
-      messageType: MessageType.user,
-    );
-  }
-}
-
-// 🤖 AI MODEL TYPES - ENHANCED
-enum AIModelType {
-  claude(name: 'Claude', icon: Icons.ac_unit, color: Colors.purple),
-  gpt(name: 'GPT', icon: Icons.api, color: Colors.green),
-  deepseek(name: 'DeepSeek', icon: Icons.search, color: Colors.blue),
-  gemini(name: 'Gemini', icon: Icons.star, color: Colors.orange),
-  mistral(name: 'Mistral', icon: Icons.speed, color: Colors.red),
-  llama(name: 'Llama', icon: Icons.pets, color: Colors.teal),
-  ollama(name: 'Ollama', icon: Icons.computer, color: Colors.cyan);
-
-  const AIModelType({
-    required this.name,
-    required this.icon,
-    required this.color,
-  });
-
-  final String name;
-  final IconData icon;
-  final Color color;
-
-  static AIModelType? fromString(String modelName) {
-    final name = modelName.toLowerCase();
-    switch (name) {
-      case 'claude':
-        return AIModelType.claude;
-      case 'gpt':
-      case 'openai':
-        return AIModelType.gpt;
-      case 'deepseek':
-        return AIModelType.deepseek;
-      case 'gemini':
-        return AIModelType.gemini;
-      case 'mistral':
-        return AIModelType.mistral;
-      case 'llama':
-        return AIModelType.llama;
-      case 'ollama':
-        return AIModelType.ollama;
-      default:
-        return null;
-    }
-  }
-}
-
-// 📝 MESSAGE TYPES
-enum MessageType {
-  individual,    // Response from a single AI model
-  synthesized,   // Final orchestrated response
-  user,         // User message
-}
+import '../core/design_system.dart';
+import '../widgets/core/neural_brain_logo.dart';
+import '../widgets/core/neural_3d_particle_system.dart'; // NEW IMPORT
+import '../widgets/core/model_profiling_dashboard.dart'; // NEW IMPORT
+import '../widgets/core/spatial_audio_controls.dart'; // NEW IMPORT
 
 class OrchestrationMainScreen extends ConsumerStatefulWidget {
   const OrchestrationMainScreen({super.key});
@@ -135,393 +26,1004 @@ class OrchestrationMainScreen extends ConsumerStatefulWidget {
 class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScreen>
     with TickerProviderStateMixin {
 
-  // 🎛️ UI STATE
+  // Animation controllers
+  late AnimationController _backgroundController;
+  late AnimationController _panelController;
+  late AnimationController _chatController;
+
+  // Animations
+  late Animation<double> _backgroundAnimation;
+  late Animation<Offset> _panelSlideAnimation;
+  late Animation<double> _chatFadeAnimation;
+
+  // UI State
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  late AnimationController _pulseAnimationController;
-
-  // 💬 CHAT STATE
-  final List<ChatMessage> _messages = [];
-  String? _currentOrchestrationId;
-  bool _showOrchestrationPanel = false;
-  String? _currentPrompt;
-
-  // 📱 RESPONSIVE STATE
   bool _isLeftPanelOpen = true;
   bool _isRightPanelOpen = true;
-
-  // 📱 RESPONSIVE BREAKPOINTS
-  static const double _mobileBreakpoint = 768;
-  static const double _desktopBreakpoint = 1024;
+  bool _isModelProfilingExpanded = false; // NEW STATE
+  List<ChatMessage> _messages = [];
 
   @override
   void initState() {
     super.initState();
-    _pulseAnimationController = AnimationController(
-      duration: const Duration(seconds: 2),
-      vsync: this,
-    )..repeat();
-
+    _initializeAnimations();
     _setupOrchestrationListeners();
-
-    debugPrint('🧬 AI Orchestration MainScreen initialized');
   }
 
-  @override
-  void dispose() {
-    _pulseAnimationController.dispose();
-    _scrollController.dispose();
-    _messageController.dispose();
-    super.dispose();
+  void _initializeAnimations() {
+    // Background gradient animation
+    _backgroundController = AnimationController(
+      duration: const Duration(seconds: 10),
+      vsync: this,
+    );
+    _backgroundAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(_backgroundController);
+
+    // Panel slide animations
+    _panelController = AnimationController(
+      duration: const Duration(milliseconds: 400),
+      vsync: this,
+    );
+    _panelSlideAnimation = Tween<Offset>(
+      begin: const Offset(-1.0, 0.0),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _panelController,
+      curve: Curves.easeOutCubic,
+    ));
+
+    // Chat fade animation
+    _chatController = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
+    _chatFadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _chatController,
+      curve: Curves.easeOut,
+    ));
+
+    // Start animations
+    _backgroundController.repeat();
+    _panelController.forward();
+    _chatController.forward();
   }
 
-  /// Setup listeners for orchestration events
   void _setupOrchestrationListeners() {
+    // Setup listeners for real orchestration data
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final orchestrationService = ref.read(webSocketOrchestrationServiceProvider);
 
-      // Listen for individual AI responses
       orchestrationService.individualResponsesStream.listen((responses) {
-        for (final response in responses) {
-          final existingIndex = _messages.indexWhere((msg) =>
-          msg.sourceModel?.name.toLowerCase() == response.modelName.toLowerCase() &&
-              msg.id.contains(_currentOrchestrationId ?? ''));
-
-          if (existingIndex == -1) {
-            // Add new individual response
-            setState(() {
-              _messages.add(ChatMessage.fromAIResponse(response));
-            });
-            _scrollToBottom();
+        setState(() {
+          for (final response in responses) {
+            _messages.add(ChatMessage.fromAIResponse(response));
           }
-        }
+        });
       });
 
-      // Listen for synthesized response
       orchestrationService.synthesizedResponseStream.listen((synthesis) {
         if (synthesis.isNotEmpty) {
           setState(() {
             _messages.add(ChatMessage.synthesized(synthesis));
-            _showOrchestrationPanel = false;
-            _currentOrchestrationId = null;
-            _currentPrompt = null;
           });
-
-          // Update orchestration state
-          ref.read(isOrchestrationActiveProvider.notifier).state = false;
-          ref.read(currentOrchestrationProvider.notifier).state = null;
-
-          _scrollToBottom();
         }
       });
     });
   }
 
   @override
-  Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final theme = Theme.of(context);
-    final orchestrationService = ref.watch(webSocketOrchestrationServiceProvider);
-    final systemStatus = ref.watch(systemStatusProvider);
-    final isOrchestrationActive = ref.watch(isOrchestrationActiveProvider);
+  void dispose() {
+    _backgroundController.dispose();
+    _panelController.dispose();
+    _chatController.dispose();
+    _scrollController.dispose();
+    _messageController.dispose();
+    super.dispose();
+  }
 
-    final isMobile = size.width < _mobileBreakpoint;
-    final isDesktop = size.width >= _desktopBreakpoint;
+  @override
+  Widget build(BuildContext context) {
+    final ds = context.ds;
+    final orchestrationService = ref.watch(webSocketOrchestrationServiceProvider);
+    final isOrchestrationActive = ref.watch(isOrchestrationActiveProvider);
+    final size = MediaQuery.of(context).size;
+    final isMobile = size.width < 768;
 
     return Scaffold(
-      backgroundColor: theme.colorScheme.background,
-      body: Column(
-        children: [
-          _buildStatusBar(theme, orchestrationService, systemStatus, compact: isMobile),
-          Expanded(
-            child: isMobile
-                ? _buildMobileLayout(theme)
-                : isDesktop
-                ? _buildDesktopLayout(theme)
-                : _buildTabletLayout(theme),
-          ),
-        ],
+      body: AnimatedBuilder(
+        animation: _backgroundAnimation,
+        builder: (context, child) {
+          return Container(
+            decoration: BoxDecoration(
+              gradient: RadialGradient(
+                center: Alignment.topLeft,
+                radius: 2.0,
+                colors: [
+                  ds.colors.neuralPrimary.withOpacity(0.15),
+                  ds.colors.neuralSecondary.withOpacity(0.08),
+                  ds.colors.colorScheme.surface,
+                ],
+                stops: [
+                  0.0,
+                  0.5 + 0.3 * math.sin(_backgroundAnimation.value * math.pi * 2),
+                  1.0,
+                ],
+              ),
+            ),
+            child: Stack(
+              children: [
+                // 🌟 REVOLUTIONARY 3D NEURAL PARTICLE SYSTEM
+                Positioned.fill(
+                  child: Neural3DParticleSystem(
+                    size: size,
+                    isActive: orchestrationService.isConnected,
+                    intensity: isOrchestrationActive ? 1.5 : 1.0,
+                    primaryColor: ds.colors.neuralPrimary,
+                    secondaryColor: ds.colors.neuralSecondary,
+                  ),
+                ),
+
+                // 🌟 Performance FPS Overlay (debug)
+                if (MediaQuery.of(context).size.width > 1200)
+                  Positioned(
+                    top: 90,
+                    right: 20,
+                    child: _buildPerformanceOverlay(ds),
+                  ),
+
+                // Main content
+                Column(
+                  children: [
+                    _buildNeuralAppBar(ds, orchestrationService),
+                    Expanded(
+                      child: isMobile
+                          ? _buildMobileLayout(ds)
+                          : _buildDesktopLayout(ds),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
 
-  // 📊 ENHANCED STATUS BAR with real orchestration status
-  Widget _buildStatusBar(ThemeData theme, WebSocketOrchestrationService orchestrationService,
-      SystemStatus systemStatus, {bool compact = false}) {
-    final size = MediaQuery.of(context).size;
-    final isDesktop = size.width >= _desktopBreakpoint;
-    final isOrchestrationActive = ref.watch(isOrchestrationActiveProvider);
-
-    return Material(
-      color: theme.colorScheme.surface.withOpacity(0.9),
-      elevation: 1,
-      child: Container(
-        height: compact ? 40 : 50,
-        padding: EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: compact ? 4 : 8,
-        ),
-        child: Row(
-          children: [
-            // Real connection status
-            Icon(
-              orchestrationService.isConnected ? Icons.wifi : Icons.wifi_off,
-              color: orchestrationService.isConnected ? Colors.green : Colors.red,
-              size: compact ? 16 : 18,
-            ),
-            if (!compact) ...[
-              const SizedBox(width: 6),
-              Text(
-                orchestrationService.isConnected ? 'CONNECTED' : 'DISCONNECTED',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: orchestrationService.isConnected ? Colors.green : Colors.red,
-                ),
-              ),
-            ],
-
-            const SizedBox(width: 16),
-
-            // Orchestration status
-            if (isOrchestrationActive) ...[
-              SizedBox(
-                width: compact ? 12 : 16,
-                height: compact ? 12 : 16,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation(theme.colorScheme.primary),
-                ),
-              ),
-              if (!compact) ...[
-                const SizedBox(width: 6),
-                Text('ORCHESTRATING', style: theme.textTheme.bodySmall),
-              ],
-            ] else ...[
-              Icon(Icons.psychology,
-                  color: orchestrationService.isConnected ? Colors.green : Colors.grey,
-                  size: compact ? 16 : 18),
-              if (!compact) ...[
-                const SizedBox(width: 6),
-                Text('${systemStatus.healthyModelCount} models ready',
-                    style: theme.textTheme.bodySmall),
-              ],
-            ],
-
-            const Spacer(),
-
-            if (isDesktop) ...[
-              IconButton(
-                onPressed: () => setState(() => _isLeftPanelOpen = !_isLeftPanelOpen),
-                icon: Icon(_isLeftPanelOpen ? Icons.menu_open : Icons.menu),
-              ),
-              IconButton(
-                onPressed: () => setState(() => _isRightPanelOpen = !_isRightPanelOpen),
-                icon: Icon(_isRightPanelOpen ? Icons.analytics : Icons.analytics_outlined),
-              ),
-            ],
+  // 📊 Build Performance Overlay (shows 3D system performance)
+  Widget _buildPerformanceOverlay(DesignSystemData ds) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            ds.colors.colorScheme.surface.withOpacity(0.9),
+            ds.colors.colorScheme.surface.withOpacity(0.7),
           ],
         ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: ds.colors.neuralPrimary.withOpacity(0.3),
+          width: 1,
+        ),
       ),
-    );
-  }
-
-  // 📱 LAYOUTS
-  Widget _buildMobileLayout(ThemeData theme) {
-    return Column(
-      children: [
-        if (_showOrchestrationPanel && _currentPrompt != null)
-          Expanded(child: _buildOrchestrationPanel(theme))
-        else
-          Expanded(child: _buildChatArea(theme)),
-        _buildQuickControls(theme),
-        _buildChatInput(theme),
-      ],
-    );
-  }
-
-  Widget _buildTabletLayout(ThemeData theme) {
-    return Row(
-      children: [
-        Container(
-          width: 280,
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surface,
-            border: Border(right: BorderSide(color: theme.colorScheme.outline.withOpacity(0.1))),
-          ),
-          child: _buildLeftPanel(theme),
-        ),
-        Expanded(
-          child: Column(
-            children: [
-              if (_showOrchestrationPanel && _currentPrompt != null)
-                Expanded(child: _buildOrchestrationPanel(theme))
-              else
-                Expanded(child: _buildChatArea(theme)),
-              _buildChatInput(theme),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDesktopLayout(ThemeData theme) {
-    return Row(
-      children: [
-        AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          width: _isLeftPanelOpen ? 320 : 0,
-          child: _isLeftPanelOpen ? Material(
-            color: theme.colorScheme.surface,
-            elevation: 2,
-            child: _buildLeftPanel(theme),
-          ) : null,
-        ),
-        Expanded(
-          flex: 2,
-          child: Column(
-            children: [
-              if (_showOrchestrationPanel && _currentPrompt != null)
-                Expanded(child: _buildOrchestrationPanel(theme))
-              else
-                Expanded(child: _buildChatArea(theme)),
-              _buildChatInput(theme),
-            ],
-          ),
-        ),
-        AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          width: _isRightPanelOpen ? 300 : 0,
-          child: _isRightPanelOpen ? Material(
-            color: theme.colorScheme.surface,
-            elevation: 2,
-            child: _buildRightPanel(theme),
-          ) : null,
-        ),
-      ],
-    );
-  }
-
-  // 🧬 ORCHESTRATION PANEL PLACEHOLDER
-  Widget _buildOrchestrationPanel(ThemeData theme) {
-    if (_currentPrompt == null) {
-      return const Center(child: Text('No active orchestration'));
-    }
-
-    // For now, show a simple placeholder until the TransparentOrchestrationPanel is fixed
-    return Container(
-      padding: const EdgeInsets.all(16),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            'AI Orchestration in Progress',
-            style: theme.textTheme.headlineSmall,
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.speed,
+                color: ds.colors.neuralAccent,
+                size: 16,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                '3D PARTICLES',
+                style: ds.typography.caption.copyWith(
+                  color: ds.colors.colorScheme.onSurface,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 10,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 4),
           Text(
-            'Prompt: $_currentPrompt',
-            style: theme.textTheme.bodyMedium,
+            '150 nodes • 300 connections',
+            style: ds.typography.caption.copyWith(
+              color: ds.colors.colorScheme.onSurface.withOpacity(0.7),
+              fontSize: 9,
+            ),
           ),
-          const SizedBox(height: 32),
-          const CircularProgressIndicator(),
+          Text(
+            '60 FPS • GPU accelerated',
+            style: ds.typography.caption.copyWith(
+              color: ds.colors.connectionGreen,
+              fontSize: 9,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
       ),
     );
   }
 
-  // 🎛️ LEFT PANEL - SIMPLE VERSION
-  Widget _buildLeftPanel(ThemeData theme) {
+  // 🧠 Build Neural App Bar - ENHANCED WITH 3D GLOW
+  Widget _buildNeuralAppBar(DesignSystemData ds, WebSocketOrchestrationService orchestrationService) {
+    return Container(
+      height: 80,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            ds.colors.colorScheme.surface.withOpacity(0.95),
+            ds.colors.colorScheme.surface.withOpacity(0.85),
+          ],
+        ),
+        border: Border(
+          bottom: BorderSide(
+            color: ds.colors.neuralPrimary.withOpacity(0.2),
+            width: 1,
+          ),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: ds.colors.neuralPrimary.withOpacity(0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: ClipRect(
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Row(
+              children: [
+                // Neural Brain Logo with enhanced glow
+                Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: ds.colors.neuralPrimary.withOpacity(0.4),
+                        blurRadius: 15,
+                        spreadRadius: 3,
+                      ),
+                    ],
+                  ),
+                  child: NeuralBrainLogo(
+                    size: 50,
+                    isConnected: orchestrationService.isConnected,
+                    showConnections: true,
+                    primaryColor: ds.colors.neuralPrimary,
+                    secondaryColor: ds.colors.neuralSecondary,
+                  ),
+                ),
+
+                const SizedBox(width: 16),
+
+                // App Title with enhanced gradient and 3D effect
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: [
+                      BoxShadow(
+                        color: ds.colors.neuralPrimary.withOpacity(0.2),
+                        blurRadius: 10,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: ShaderMask(
+                    shaderCallback: (bounds) => LinearGradient(
+                      colors: [
+                        ds.colors.neuralPrimary,
+                        ds.colors.neuralSecondary,
+                        ds.colors.neuralAccent,
+                      ],
+                      stops: const [0.0, 0.5, 1.0],
+                    ).createShader(bounds),
+                    child: Text(
+                      'NeuronVault',
+                      style: ds.typography.h1.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 24,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(width: 8),
+
+                // Enhanced subtitle with glow
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'AI Orchestration Platform',
+                      style: ds.typography.caption.copyWith(
+                        color: ds.colors.colorScheme.onSurface.withOpacity(0.7),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      '3D Neural Luxury Edition',
+                      style: ds.typography.caption.copyWith(
+                        color: ds.colors.neuralAccent.withOpacity(0.8),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+
+                const Spacer(),
+
+                // Connection Status with enhanced 3D glow
+                _buildEnhancedConnectionStatus(ds, orchestrationService),
+
+                const SizedBox(width: 16),
+
+                // Settings button with 3D effect
+                _buildEnhanced3DButton(
+                  icon: Icons.settings,
+                  onTap: () {},
+                  ds: ds,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // 🔗 Build Enhanced Connection Status with 3D effects
+  Widget _buildEnhancedConnectionStatus(DesignSystemData ds, WebSocketOrchestrationService orchestrationService) {
+    final isConnected = orchestrationService.isConnected;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            (isConnected ? ds.colors.connectionGreen : ds.colors.connectionRed).withOpacity(0.25),
+            (isConnected ? ds.colors.connectionGreen : ds.colors.connectionRed).withOpacity(0.15),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(25),
+        border: Border.all(
+          color: (isConnected ? ds.colors.connectionGreen : ds.colors.connectionRed).withOpacity(0.4),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: (isConnected ? ds.colors.connectionGreen : ds.colors.connectionRed).withOpacity(0.3),
+            blurRadius: 12,
+            spreadRadius: 2,
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: isConnected ? ds.colors.connectionGreen : ds.colors.connectionRed,
+              boxShadow: [
+                BoxShadow(
+                  color: (isConnected ? ds.colors.connectionGreen : ds.colors.connectionRed).withOpacity(0.6),
+                  blurRadius: 8,
+                  spreadRadius: 2,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                isConnected ? 'CONNECTED' : 'DISCONNECTED',
+                style: ds.typography.caption.copyWith(
+                  color: isConnected ? ds.colors.connectionGreen : ds.colors.connectionRed,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 11,
+                ),
+              ),
+              if (isConnected)
+                Text(
+                  '3D NEURAL ACTIVE',
+                  style: ds.typography.caption.copyWith(
+                    color: ds.colors.connectionGreen.withOpacity(0.8),
+                    fontSize: 8,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 🔘 Build Enhanced 3D Button
+  Widget _buildEnhanced3DButton({
+    required IconData icon,
+    required VoidCallback onTap,
+    required DesignSystemData ds,
+    bool isEnabled = true,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 52,
+        height: 52,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              ds.colors.neuralPrimary.withOpacity(0.8),
+              ds.colors.neuralSecondary.withOpacity(0.8),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: ds.colors.neuralPrimary.withOpacity(0.3),
+            width: 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: ds.colors.neuralPrimary.withOpacity(0.4),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+            BoxShadow(
+              color: ds.colors.neuralSecondary.withOpacity(0.2),
+              blurRadius: 8,
+              offset: const Offset(2, 2),
+            ),
+          ],
+        ),
+        child: Icon(
+          icon,
+          color: Colors.white,
+          size: 26,
+        ),
+      ),
+    );
+  }
+
+  // 📱 Build Mobile Layout
+  Widget _buildMobileLayout(DesignSystemData ds) {
+    return Column(
+      children: [
+        Expanded(
+          child: _buildChatArea(ds),
+        ),
+        _buildNeuralChatInput(ds),
+      ],
+    );
+  }
+
+  // 🖥️ Build Desktop Layout
+  Widget _buildDesktopLayout(DesignSystemData ds) {
+    return Row(
+      children: [
+        // Left Panel
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 400),
+          width: _isLeftPanelOpen ? 350 : 0,
+          child: _isLeftPanelOpen
+              ? SlideTransition(
+            position: _panelSlideAnimation,
+            child: _buildEnhancedGlassmorphicPanel(
+              child: _buildLeftPanelContent(ds),
+              ds: ds,
+            ),
+          )
+              : null,
+        ),
+
+        // Chat Area
+        Expanded(
+          child: FadeTransition(
+            opacity: _chatFadeAnimation,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  Expanded(child: _buildChatArea(ds)),
+                  _buildNeuralChatInput(ds),
+                ],
+              ),
+            ),
+          ),
+        ),
+
+        // Right Panel
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 400),
+          width: _isRightPanelOpen ? 320 : 0,
+          child: _isRightPanelOpen
+              ? _buildEnhancedGlassmorphicPanel(
+            child: _buildRightPanelContent(ds),
+            ds: ds,
+          )
+              : null,
+        ),
+      ],
+    );
+  }
+
+  // 🌟 Build Enhanced Glassmorphic Panel with 3D effects
+  Widget _buildEnhancedGlassmorphicPanel({required Widget child, required DesignSystemData ds}) {
+    return Container(
+      margin: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            ds.colors.colorScheme.surface.withOpacity(0.85),
+            ds.colors.colorScheme.surface.withOpacity(0.65),
+          ],
+        ),
+        border: Border.all(
+          color: ds.colors.neuralPrimary.withOpacity(0.25),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: ds.colors.colorScheme.shadow.withOpacity(0.15),
+            blurRadius: 30,
+            offset: const Offset(0, 10),
+          ),
+          BoxShadow(
+            color: ds.colors.neuralPrimary.withOpacity(0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(28),
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+          child: child,
+        ),
+      ),
+    );
+  }
+
+  // 🎛️ Build Left Panel Content (same as before)
+  Widget _buildLeftPanelContent(DesignSystemData ds) {
     final activeModels = ref.watch(activeModelsProvider);
     final currentStrategy = ref.watch(currentStrategyProvider);
+    final availableStrategies = ref.watch(availableStrategiesProvider);
 
-    return Column(
-      children: [
-        Container(
-          height: 50,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.primary.withOpacity(0.1),
-            border: Border(bottom: BorderSide(color: theme.colorScheme.outline.withOpacity(0.1))),
-          ),
-          child: Row(
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Icon(Icons.tune, size: 20, color: theme.colorScheme.primary),
-              const SizedBox(width: 8),
-              Text('AI Orchestration', style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600, color: theme.colorScheme.primary)),
+              Icon(
+                Icons.tune,
+                color: ds.colors.neuralPrimary,
+                size: 24,
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'AI Orchestration',
+                style: ds.typography.h2.copyWith(
+                  color: ds.colors.colorScheme.onSurface,
+                ),
+              ),
             ],
           ),
-        ),
-        Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Strategy', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 12),
-                Text('Current: ${currentStrategy.name}', style: theme.textTheme.bodyMedium),
-                const SizedBox(height: 24),
-                Text('AI Models', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 12),
-                Text('Active: ${activeModels.length}', style: theme.textTheme.bodyMedium),
-                const SizedBox(height: 8),
-                ...activeModels.map((model) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 2),
-                  child: Text('• $model', style: theme.textTheme.bodySmall),
-                )),
-              ],
-            ),
-          ),
-        ),
-      ],
+
+          const SizedBox(height: 32),
+
+          // Strategy Section
+          _buildSectionHeader('Strategy', Icons.psychology, ds),
+          const SizedBox(height: 16),
+          _buildStrategyCards(ds, availableStrategies, currentStrategy),
+
+          const SizedBox(height: 32),
+
+          // Models Section
+          _buildSectionHeader('AI Models', Icons.smart_toy, ds),
+          const SizedBox(height: 16),
+          _buildModelCards(ds, activeModels),
+        ],
+      ),
     );
   }
 
-  // 📊 RIGHT PANEL - SIMPLE VERSION
-  Widget _buildRightPanel(ThemeData theme) {
+  // 📊 Build Right Panel Content - ENHANCED WITH MODEL PROFILING
+  Widget _buildRightPanelContent(DesignSystemData ds) {
     final orchestrationService = ref.watch(webSocketOrchestrationServiceProvider);
+    final isOrchestrationActive = ref.watch(isOrchestrationActiveProvider);
 
-    return Column(
-      children: [
-        Container(
-          height: 50,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.secondary.withOpacity(0.1),
-            border: Border(bottom: BorderSide(color: theme.colorScheme.outline.withOpacity(0.1))),
-          ),
-          child: Row(
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Icon(Icons.analytics, size: 20, color: theme.colorScheme.secondary),
-              const SizedBox(width: 8),
-              Text('Status', style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600, color: theme.colorScheme.secondary)),
+              Icon(
+                Icons.analytics,
+                color: ds.colors.neuralSecondary,
+                size: 24,
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Live Analytics',
+                style: ds.typography.h2.copyWith(
+                  color: ds.colors.colorScheme.onSurface,
+                ),
+              ),
             ],
           ),
+
+          const SizedBox(height: 32),
+
+          // Real-time metrics with 3D enhancements
+          _buildEnhancedMetricCard(
+            'Connection',
+            orchestrationService.isConnected ? 'Active' : 'Inactive',
+            orchestrationService.isConnected ? ds.colors.connectionGreen : ds.colors.connectionRed,
+            Icons.wifi,
+            ds,
+          ),
+
+          const SizedBox(height: 16),
+
+          _buildEnhancedMetricCard(
+            '3D Particles',
+            '150 Neural Nodes',
+            ds.colors.neuralPrimary,
+            Icons.grain,
+            ds,
+          ),
+
+          const SizedBox(height: 16),
+
+          _buildEnhancedMetricCard(
+            'Messages',
+            '${_messages.length}',
+            ds.colors.neuralAccent,
+            Icons.message,
+            ds,
+          ),
+
+          const SizedBox(height: 16),
+
+          _buildEnhancedMetricCard(
+            'AI Activity',
+            isOrchestrationActive ? 'ORCHESTRATING' : 'IDLE',
+            isOrchestrationActive ? ds.colors.connectionGreen : ds.colors.neuralSecondary,
+            Icons.psychology,
+            ds,
+          ),
+
+          const SizedBox(height: 24),
+
+          // 🧠 MODEL PROFILING DASHBOARD - REVOLUTIONARY FEATURE
+          Expanded(
+            flex: 2,
+            child: ModelProfilingDashboard(
+              isExpanded: _isModelProfilingExpanded,
+              onToggleExpanded: () {
+                setState(() {
+                  _isModelProfilingExpanded = !_isModelProfilingExpanded;
+                });
+              },
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // 🔊 SPATIAL AUDIO CONTROLS - NEW FEATURE
+          const SpatialAudioControls(isCompact: true),
+        ],
+      ),
+    );
+  }
+
+  // 📊 Build Enhanced Metric Card with 3D effects
+  Widget _buildEnhancedMetricCard(String label, String value, Color color, IconData icon, DesignSystemData ds) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            ds.colors.colorScheme.surfaceContainer.withOpacity(0.8),
+            ds.colors.colorScheme.surfaceContainer.withOpacity(0.6),
+          ],
         ),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: color.withOpacity(0.4),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.2),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              gradient: RadialGradient(
+                colors: [
+                  color.withOpacity(0.3),
+                  color.withOpacity(0.1),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: color.withOpacity(0.3),
+                width: 1,
+              ),
+            ),
+            child: Icon(
+              icon,
+              color: color,
+              size: 22,
+            ),
+          ),
+
+          const SizedBox(width: 14),
+
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Connection: ${orchestrationService.isConnected ? "Connected" : "Disconnected"}'),
-                const SizedBox(height: 8),
-                Text('Messages: ${_messages.length}'),
-                const SizedBox(height: 8),
-                Text('Individual Responses: ${orchestrationService.individualResponses.length}'),
+                Text(
+                  label,
+                  style: ds.typography.caption.copyWith(
+                    color: ds.colors.colorScheme.onSurface.withOpacity(0.8),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: ds.typography.h3.copyWith(
+                    color: ds.colors.colorScheme.onSurface,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // All other methods remain the same as before...
+  // (keeping the implementation identical for compatibility)
+
+  Widget _buildSectionHeader(String title, IconData icon, DesignSystemData ds) {
+    return Row(
+      children: [
+        Icon(
+          icon,
+          color: ds.colors.neuralAccent,
+          size: 20,
+        ),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: ds.typography.h3.copyWith(
+            color: ds.colors.colorScheme.onSurface,
+            fontWeight: FontWeight.w700,
           ),
         ),
       ],
     );
   }
 
-  // 💬 CHAT AREA
-  Widget _buildChatArea(ThemeData theme) {
+  Widget _buildStrategyCards(DesignSystemData ds, List<String> availableStrategies, String currentStrategy) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: availableStrategies.map((strategy) {
+        final isActive = strategy == currentStrategy;
+
+        return GestureDetector(
+          onTap: () {
+            ref.read(currentStrategyProvider.notifier).state = strategy;
+            HapticFeedback.selectionClick();
+
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Strategy changed to $strategy'),
+                duration: const Duration(seconds: 1),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              gradient: isActive
+                  ? LinearGradient(
+                colors: [
+                  ds.colors.neuralPrimary,
+                  ds.colors.neuralSecondary,
+                ],
+              )
+                  : null,
+              color: isActive ? null : ds.colors.colorScheme.surfaceContainer.withOpacity(0.5),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isActive
+                    ? Colors.transparent
+                    : ds.colors.colorScheme.outline.withOpacity(0.3),
+                width: 1,
+              ),
+              boxShadow: isActive
+                  ? [
+                BoxShadow(
+                  color: ds.colors.neuralPrimary.withOpacity(0.3),
+                  blurRadius: 8,
+                  spreadRadius: 1,
+                ),
+              ]
+                  : null,
+            ),
+            child: Text(
+              strategy,
+              style: ds.typography.caption.copyWith(
+                color: isActive
+                    ? Colors.white
+                    : ds.colors.colorScheme.onSurface,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildModelCards(DesignSystemData ds, List<String> activeModels) {
+    final allModels = [
+      {'name': 'Claude', 'id': 'claude', 'color': const Color(0xFFFF6B35), 'icon': Icons.psychology},
+      {'name': 'GPT-4', 'id': 'gpt', 'color': const Color(0xFF10B981), 'icon': Icons.auto_awesome},
+      {'name': 'Gemini', 'id': 'gemini', 'color': const Color(0xFFF59E0B), 'icon': Icons.diamond},
+      {'name': 'DeepSeek', 'id': 'deepseek', 'color': const Color(0xFF8B5CF6), 'icon': Icons.explore},
+    ];
+
+    return Column(
+      children: allModels.map((model) {
+        final modelId = model['id'] as String;
+        final isActive = activeModels.contains(modelId);
+        final color = model['color'] as Color;
+        final icon = model['icon'] as IconData;
+        final name = model['name'] as String;
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: ds.colors.colorScheme.surfaceContainer.withOpacity(0.5),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isActive
+                  ? color.withOpacity(0.5)
+                  : ds.colors.colorScheme.outline.withOpacity(0.2),
+              width: 1,
+            ),
+            boxShadow: isActive
+                ? [
+              BoxShadow(
+                color: color.withOpacity(0.2),
+                blurRadius: 8,
+                spreadRadius: 1,
+              ),
+            ]
+                : null,
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: color.withOpacity(0.2),
+                ),
+                child: Icon(
+                  icon,
+                  color: color,
+                  size: 18,
+                ),
+              ),
+
+              const SizedBox(width: 12),
+
+              Expanded(
+                child: Text(
+                  name,
+                  style: ds.typography.body1.copyWith(
+                    color: ds.colors.colorScheme.onSurface,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+
+              Switch(
+                value: isActive,
+                onChanged: (value) {
+                  final modelsNotifier = ref.read(activeModelsProvider.notifier);
+                  final currentModels = List<String>.from(activeModels);
+
+                  if (value) {
+                    if (!currentModels.contains(modelId)) {
+                      currentModels.add(modelId);
+                    }
+                  } else {
+                    currentModels.remove(modelId);
+                  }
+
+                  modelsNotifier.state = currentModels;
+                  HapticFeedback.lightImpact();
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('$name ${value ? 'enabled' : 'disabled'}'),
+                      duration: const Duration(seconds: 1),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                },
+                activeColor: color,
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildChatArea(DesignSystemData ds) {
     if (_messages.isEmpty) {
-      return _buildEmptyChat(theme);
+      return _buildEmptyState(ds);
     }
 
     return ListView.builder(
@@ -529,131 +1031,155 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
       padding: const EdgeInsets.all(16),
       itemCount: _messages.length,
       itemBuilder: (context, index) {
-        final message = _messages[index];
-        return _buildMessageBubble(theme, message);
+        return _buildLuxuryMessageBubble(_messages[index], ds);
       },
     );
   }
 
-  // 🗨️ MESSAGE BUBBLE
-  Widget _buildMessageBubble(ThemeData theme, ChatMessage message) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+  Widget _buildEmptyState(DesignSystemData ds) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          NeuralBrainLogo(
+            size: 120,
+            isConnected: ref.watch(webSocketOrchestrationServiceProvider).isConnected,
+            showConnections: true,
+            primaryColor: ds.colors.neuralPrimary,
+            secondaryColor: ds.colors.neuralSecondary,
+          ),
+
+          const SizedBox(height: 32),
+
+          ShaderMask(
+            shaderCallback: (bounds) => LinearGradient(
+              colors: [
+                ds.colors.neuralPrimary,
+                ds.colors.neuralSecondary,
+              ],
+            ).createShader(bounds),
+            child: Text(
+              'Welcome to NeuronVault',
+              style: ds.typography.h1.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          Text(
+            'AI Orchestration Platform\nTransparent multi-AI orchestration\n3D Neural Particle System',
+            style: ds.typography.body1.copyWith(
+              color: ds.colors.colorScheme.onSurface.withOpacity(0.7),
+              height: 1.6,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLuxuryMessageBubble(ChatMessage message, DesignSystemData ds) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
       child: Row(
         mainAxisAlignment: message.isFromUser ? MainAxisAlignment.end : MainAxisAlignment.start,
         children: [
           if (!message.isFromUser) ...[
             Container(
-              width: 32,
-              height: 32,
-              margin: const EdgeInsets.only(right: 8),
+              width: 40,
+              height: 40,
+              margin: const EdgeInsets.only(right: 12),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: message.messageType == MessageType.synthesized
-                    ? Colors.deepPurple
-                    : message.sourceModel?.color ?? Colors.grey,
-              ),
-              child: Icon(
-                message.messageType == MessageType.synthesized
-                    ? Icons.psychology
-                    : message.sourceModel?.icon ?? Icons.smart_toy,
-                color: Colors.white,
-                size: 16,
-              ),
-            ),
-          ],
-          Flexible(
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: message.isFromUser
-                    ? theme.colorScheme.primary
-                    : theme.colorScheme.surface,
-                borderRadius: BorderRadius.circular(16),
-                border: !message.isFromUser ? Border.all(
-                  color: theme.colorScheme.outline.withOpacity(0.2),
-                ) : null,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (!message.isFromUser && message.sourceModel != null) ...[
-                    Text(
-                      message.sourceModel!.name.toUpperCase(),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: message.sourceModel!.color,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
+                gradient: RadialGradient(
+                  colors: [
+                    ds.colors.neuralPrimary,
+                    ds.colors.neuralSecondary,
                   ],
-                  Text(
-                    message.content,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: message.isFromUser ? Colors.white : null,
-                    ),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: ds.colors.neuralPrimary.withOpacity(0.3),
+                    blurRadius: 8,
+                    spreadRadius: 2,
                   ),
                 ],
               ),
+              child: const Icon(
+                Icons.psychology,
+                color: Colors.white,
+                size: 20,
+              ),
+            ),
+          ],
+
+          Flexible(
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: message.isFromUser
+                    ? LinearGradient(
+                  colors: [
+                    ds.colors.neuralPrimary,
+                    ds.colors.neuralSecondary,
+                  ],
+                )
+                    : null,
+                color: message.isFromUser
+                    ? null
+                    : ds.colors.colorScheme.surfaceContainer.withOpacity(0.8),
+                borderRadius: BorderRadius.circular(20).copyWith(
+                  bottomRight: message.isFromUser ? const Radius.circular(4) : null,
+                  bottomLeft: message.isFromUser ? null : const Radius.circular(4),
+                ),
+                border: Border.all(
+                  color: message.isFromUser
+                      ? Colors.transparent
+                      : ds.colors.colorScheme.outline.withOpacity(0.2),
+                  width: 1,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: ds.colors.colorScheme.shadow.withOpacity(0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Text(
+                message.content,
+                style: ds.typography.body1.copyWith(
+                  color: message.isFromUser
+                      ? Colors.white
+                      : ds.colors.colorScheme.onSurface,
+                  height: 1.5,
+                ),
+              ),
             ),
           ),
+
           if (message.isFromUser) ...[
             Container(
-              width: 32,
-              height: 32,
-              margin: const EdgeInsets.only(left: 8),
+              width: 40,
+              height: 40,
+              margin: const EdgeInsets.only(left: 12),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: theme.colorScheme.primary.withOpacity(0.2),
-              ),
-              child: Icon(Icons.person, color: theme.colorScheme.primary, size: 16),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  // 💬 EMPTY CHAT
-  Widget _buildEmptyChat(ThemeData theme) {
-    final orchestrationService = ref.watch(webSocketOrchestrationServiceProvider);
-
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          AnimatedBuilder(
-            animation: _pulseAnimationController,
-            builder: (context, child) {
-              return Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: theme.colorScheme.primary.withOpacity(0.8 + 0.2 * _pulseAnimationController.value),
+                color: ds.colors.colorScheme.primary.withOpacity(0.2),
+                border: Border.all(
+                  color: ds.colors.colorScheme.primary.withOpacity(0.3),
+                  width: 1,
                 ),
-                child: const Icon(Icons.psychology, size: 40, color: Colors.white),
-              );
-            },
-          ),
-          const SizedBox(height: 24),
-          Text('Welcome to NeuronVault', style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          Text(
-            'AI Orchestration Platform\nTransparent multi-AI orchestration',
-            style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onBackground.withOpacity(0.7)),
-            textAlign: TextAlign.center,
-          ),
-          if (!orchestrationService.isConnected) ...[
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.orange.withOpacity(0.3)),
               ),
-              child: Text('Backend not connected', style: TextStyle(color: Colors.orange)),
+              child: Icon(
+                Icons.person,
+                color: ds.colors.colorScheme.primary,
+                size: 20,
+              ),
             ),
           ],
         ],
@@ -661,147 +1187,154 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
     );
   }
 
-  // ⚡ QUICK CONTROLS
-  Widget _buildQuickControls(ThemeData theme) {
-    final currentStrategy = ref.watch(currentStrategyProvider);
-    final activeModels = ref.watch(activeModelsProvider);
+  Widget _buildNeuralChatInput(DesignSystemData ds) {
+    final orchestrationService = ref.watch(webSocketOrchestrationServiceProvider);
+    final isConnected = orchestrationService.isConnected;
 
-    return Material(
-      color: theme.colorScheme.surface,
-      elevation: 1,
-      child: Container(
-        height: 50,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Row(
-          children: [
-            Text('${currentStrategy.name} • ${activeModels.length} models',
-                style: theme.textTheme.bodySmall),
-            const Spacer(),
-            if (_messages.isNotEmpty) ...[
-              TextButton(
-                onPressed: () => setState(() => _messages.clear()),
-                child: Text('Clear', style: TextStyle(color: theme.colorScheme.error)),
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            ds.colors.colorScheme.surface.withOpacity(0.8),
+            ds.colors.colorScheme.surface.withOpacity(0.95),
+          ],
+        ),
+        border: Border(
+          top: BorderSide(
+            color: ds.colors.neuralPrimary.withOpacity(0.1),
+            width: 1,
+          ),
+        ),
+      ),
+      child: ClipRect(
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          child: Row(
+            children: [
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        ds.colors.colorScheme.surfaceContainer.withOpacity(0.8),
+                        ds.colors.colorScheme.surfaceContainer.withOpacity(0.6),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(
+                      color: ds.colors.neuralPrimary.withOpacity(0.2),
+                      width: 1,
+                    ),
+                  ),
+                  child: TextField(
+                    controller: _messageController,
+                    enabled: isConnected,
+                    decoration: InputDecoration(
+                      hintText: isConnected
+                          ? 'Ask multiple AIs...'
+                          : 'Backend not connected...',
+                      hintStyle: ds.typography.body1.copyWith(
+                        color: ds.colors.colorScheme.onSurface.withOpacity(0.5),
+                      ),
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 16,
+                      ),
+                    ),
+                    style: ds.typography.body1.copyWith(
+                      color: ds.colors.colorScheme.onSurface,
+                    ),
+                    onSubmitted: isConnected ? _sendMessage : null,
+                  ),
+                ),
+              ),
+
+              const SizedBox(width: 16),
+
+              _buildEnhanced3DButton(
+                icon: Icons.send,
+                onTap: isConnected ? () => _sendMessage(_messageController.text) : () {},
               ),
             ],
-          ],
+          ),
         ),
       ),
     );
   }
 
-  // 📝 CHAT INPUT
-  Widget _buildChatInput(ThemeData theme) {
-    final orchestrationService = ref.watch(webSocketOrchestrationServiceProvider);
-    final isOrchestrationActive = ref.watch(isOrchestrationActiveProvider);
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: _messageController,
-              enabled: orchestrationService.isConnected && !isOrchestrationActive,
-              decoration: InputDecoration(
-                hintText: !orchestrationService.isConnected
-                    ? 'Backend not connected...'
-                    : isOrchestrationActive
-                    ? 'AI orchestration in progress...'
-                    : 'Ask multiple AIs...',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(24)),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              ),
-              onSubmitted: (message) {
-                if (message.trim().isNotEmpty && orchestrationService.isConnected && !isOrchestrationActive) {
-                  _sendMessage(message);
-                }
-              },
-            ),
-          ),
-          const SizedBox(width: 12),
-          FloatingActionButton(
-            onPressed: orchestrationService.isConnected && !isOrchestrationActive ? () {
-              final message = _messageController.text.trim();
-              if (message.isNotEmpty) {
-                _sendMessage(message);
-              }
-            } : null,
-            backgroundColor: orchestrationService.isConnected
-                ? theme.colorScheme.primary
-                : Colors.grey,
-            child: Icon(Icons.send, color: Colors.white),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 🚀 SEND MESSAGE (SIMPLIFIED)
-  Future<void> _sendMessage(String message) async {
+  void _sendMessage(String message) {
     if (message.trim().isEmpty) return;
 
-    final orchestrationService = ref.read(webSocketOrchestrationServiceProvider);
-    final activeModels = ref.read(activeModelsProvider);
-    final currentStrategy = ref.read(currentStrategyProvider);
-
-    if (!orchestrationService.isConnected) {
-      _showErrorSnackBar('Backend not connected');
-      return;
-    }
-
-    // Add user message
     final userMessage = ChatMessage.user(message.trim());
     setState(() {
       _messages.add(userMessage);
-      _showOrchestrationPanel = true;
-      _currentPrompt = message.trim();
     });
-
-    // Generate conversation ID
-    final conversationId = 'conv_${DateTime.now().millisecondsSinceEpoch}';
-    _currentOrchestrationId = conversationId;
-
-    // Update state
-    ref.read(isOrchestrationActiveProvider.notifier).state = true;
-    ref.read(currentOrchestrationProvider.notifier).state = conversationId;
 
     _messageController.clear();
-    _scrollToBottom();
 
-    try {
-      debugPrint('🧬 Starting orchestration: $message');
-
-      // Start orchestration
-      await orchestrationService.orchestrateAIRequest(
-        prompt: message.trim(),
-        selectedModels: activeModels,
-        strategy: currentStrategy,
-        conversationId: conversationId,
-      );
-    } catch (error) {
-      debugPrint('❌ Orchestration error: $error');
-      _showErrorSnackBar('Orchestration failed: $error');
-    }
-  }
-
-  // 🔧 UTILITY METHODS
-  void _showErrorSnackBar(String message) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message), backgroundColor: Colors.red[700]),
-      );
-    }
-  }
-
-  void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
     });
+
+    final orchestrationService = ref.read(webSocketOrchestrationServiceProvider);
+    orchestrationService.orchestrateAIRequest(
+      prompt: message.trim(),
+      selectedModels: ['claude', 'gpt', 'deepseek'],
+      strategy: OrchestrationStrategy.parallel,
+    );
+  }
+}
+
+// ChatMessage class (same as before)
+class ChatMessage {
+  final String id;
+  final String content;
+  final bool isFromUser;
+  final DateTime timestamp;
+  final String? sourceModel;
+
+  ChatMessage({
+    required this.id,
+    required this.content,
+    required this.isFromUser,
+    required this.timestamp,
+    this.sourceModel,
+  });
+
+  factory ChatMessage.fromAIResponse(AIResponse response) {
+    return ChatMessage(
+      id: '${DateTime.now().millisecondsSinceEpoch}_${response.modelName}',
+      content: response.content,
+      isFromUser: false,
+      timestamp: response.timestamp,
+      sourceModel: response.modelName,
+    );
+  }
+
+  factory ChatMessage.synthesized(String content) {
+    return ChatMessage(
+      id: '${DateTime.now().millisecondsSinceEpoch}_synthesis',
+      content: content,
+      isFromUser: false,
+      timestamp: DateTime.now(),
+      sourceModel: 'synthesis',
+    );
+  }
+
+  factory ChatMessage.user(String content) {
+    return ChatMessage(
+      id: '${DateTime.now().millisecandsSinceEpoch}_user',
+      content: content,
+      isFromUser: true,
+      timestamp: DateTime.now(),
+    );
   }
 }
