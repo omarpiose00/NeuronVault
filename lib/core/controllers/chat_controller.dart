@@ -376,7 +376,6 @@ class ChatController extends Notifier<ChatState> {
   }
 
   // 🧹 DISPOSE
-  @override
   void dispose() {
     _currentStreamSubscription?.cancel();
   }

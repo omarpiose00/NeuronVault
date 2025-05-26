@@ -11,10 +11,12 @@ import 'dart:math' as math;
 import '../core/services/websocket_orchestration_service.dart';
 import '../core/providers/providers_main.dart';
 import '../core/design_system.dart';
+import '../core/theme/neural_theme_system.dart'; // ADD THEME IMPORT
 import '../widgets/core/neural_brain_logo.dart';
 import '../widgets/core/neural_3d_particle_system.dart'; // NEW IMPORT
 import '../widgets/core/model_profiling_dashboard.dart'; // NEW IMPORT
 import '../widgets/core/spatial_audio_controls.dart'; // NEW IMPORT
+import '../widgets/core/neural_theme_selector.dart'; // NEW IMPORT
 
 class OrchestrationMainScreen extends ConsumerStatefulWidget {
   const OrchestrationMainScreen({super.key});
@@ -44,11 +46,18 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
   bool _isModelProfilingExpanded = false; // NEW STATE
   List<ChatMessage> _messages = [];
 
+  // Theme system state
+  NeuralThemeType _currentThemeType = NeuralThemeType.cosmos;
+  late NeuralThemeData _neuralTheme;
+
   @override
   void initState() {
     super.initState();
     _initializeAnimations();
     _setupOrchestrationListeners();
+
+    // Initialize theme system
+    _neuralTheme = NeuralThemeData.cosmos();
   }
 
   void _initializeAnimations() {
@@ -141,20 +150,7 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
         builder: (context, child) {
           return Container(
             decoration: BoxDecoration(
-              gradient: RadialGradient(
-                center: Alignment.topLeft,
-                radius: 2.0,
-                colors: [
-                  ds.colors.neuralPrimary.withOpacity(0.15),
-                  ds.colors.neuralSecondary.withOpacity(0.08),
-                  ds.colors.colorScheme.surface,
-                ],
-                stops: [
-                  0.0,
-                  0.5 + 0.3 * math.sin(_backgroundAnimation.value * math.pi * 2),
-                  1.0,
-                ],
-              ),
+              gradient: _neuralTheme.gradients.background, // USE LOCAL THEME
             ),
             child: Stack(
               children: [
@@ -164,8 +160,9 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
                     size: size,
                     isActive: orchestrationService.isConnected,
                     intensity: isOrchestrationActive ? 1.5 : 1.0,
-                    primaryColor: ds.colors.neuralPrimary,
-                    secondaryColor: ds.colors.neuralSecondary,
+                    primaryColor: _neuralTheme.colors.primary, // USE LOCAL THEME
+                    secondaryColor: _neuralTheme.colors.secondary, // USE LOCAL THEME
+                    neuralTheme: _neuralTheme, // PASS THEME DATA
                   ),
                 ),
 
@@ -750,6 +747,39 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
 
           // 🔊 SPATIAL AUDIO CONTROLS - NEW FEATURE
           const SpatialAudioControls(isCompact: true),
+
+          const SizedBox(height: 16),
+
+          // 🎨 NEURAL THEME SELECTOR - NEW FEATURE
+          NeuralThemeSelector(
+            isCompact: true,
+            onThemeChanged: (themeType) {
+              setState(() {
+                _currentThemeType = themeType;
+                // Update theme data based on type
+                switch (themeType) {
+                  case NeuralThemeType.cosmos:
+                    _neuralTheme = NeuralThemeData.cosmos();
+                    break;
+                  case NeuralThemeType.matrix:
+                    _neuralTheme = NeuralThemeData.matrix();
+                    break;
+                  case NeuralThemeType.sunset:
+                    _neuralTheme = NeuralThemeData.sunset();
+                    break;
+                  case NeuralThemeType.ocean:
+                    _neuralTheme = NeuralThemeData.ocean();
+                    break;
+                  case NeuralThemeType.midnight:
+                    _neuralTheme = NeuralThemeData.midnight();
+                    break;
+                  case NeuralThemeType.aurora:
+                    _neuralTheme = NeuralThemeData.aurora();
+                    break;
+                }
+              });
+            },
+          ),
         ],
       ),
     );
@@ -1258,6 +1288,7 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
               _buildEnhanced3DButton(
                 icon: Icons.send,
                 onTap: isConnected ? () => _sendMessage(_messageController.text) : () {},
+                ds: ds, // ADD MISSING ARGUMENT
               ),
             ],
           ),
@@ -1331,7 +1362,7 @@ class ChatMessage {
 
   factory ChatMessage.user(String content) {
     return ChatMessage(
-      id: '${DateTime.now().millisecandsSinceEpoch}_user',
+      id: '${DateTime.now().millisecondsSinceEpoch}_user',
       content: content,
       isFromUser: true,
       timestamp: DateTime.now(),

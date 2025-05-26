@@ -339,9 +339,10 @@ class _SpatialAudioControlsState extends ConsumerState<SpatialAudioControls>
           const SizedBox(height: 4),
           Text(
             value,
-            style: ds.typography.titleSmall.copyWith(
+            style: ds.typography.body1.copyWith(
               color: ds.colors.colorScheme.onSurface,
               fontWeight: FontWeight.w700,
+              fontSize: 16,
             ),
           ),
           Text(
@@ -480,9 +481,10 @@ class _SpatialAudioControlsState extends ConsumerState<SpatialAudioControls>
           const SizedBox(height: 8),
           Text(
             'Spatial Audio Disabled',
-            style: ds.typography.titleSmall.copyWith(
+            style: ds.typography.body1.copyWith(
               color: ds.colors.colorScheme.onSurface.withOpacity(0.7),
               fontWeight: FontWeight.w600,
+              fontSize: 16,
             ),
           ),
           const SizedBox(height: 4),

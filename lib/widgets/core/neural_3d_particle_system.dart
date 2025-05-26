@@ -10,6 +10,7 @@ import 'dart:ui' as ui;
 import '../../core/providers/providers_main.dart';
 import '../../core/design_system.dart';
 import '../../core/services/spatial_audio_service.dart'; // NEW IMPORT
+import '../../core/theme/neural_theme_system.dart'; // NEW IMPORT
 
 /// 🌟 3D Neural Particle System Widget
 class Neural3DParticleSystem extends ConsumerStatefulWidget {
@@ -18,6 +19,7 @@ class Neural3DParticleSystem extends ConsumerStatefulWidget {
   final double intensity;
   final Color primaryColor;
   final Color secondaryColor;
+  final NeuralThemeData? neuralTheme; // NEW PARAMETER
 
   const Neural3DParticleSystem({
     super.key,
@@ -26,6 +28,7 @@ class Neural3DParticleSystem extends ConsumerStatefulWidget {
     this.intensity = 1.0,
     this.primaryColor = const Color(0xFF6366F1),
     this.secondaryColor = const Color(0xFF8B5CF6),
+    this.neuralTheme, // NEW PARAMETER
   });
 
   @override
@@ -187,6 +190,9 @@ class _Neural3DParticleSystemState extends ConsumerState<Neural3DParticleSystem>
     final activeModels = ref.watch(activeModelsProvider);
     final spatialAudioService = ref.watch(spatialAudioServiceProvider); // NEW AUDIO SERVICE
 
+    // Use passed theme or default to cosmos
+    final neuralTheme = widget.neuralTheme ?? NeuralThemeData.cosmos();
+
     return AnimatedBuilder(
       animation: Listenable.merge([
         _masterAnimation,
@@ -202,14 +208,15 @@ class _Neural3DParticleSystemState extends ConsumerState<Neural3DParticleSystem>
             pulseValue: _pulseAnimation.value,
             rotationValue: _rotationAnimation.value,
             size: widget.size,
-            primaryColor: widget.primaryColor,
-            secondaryColor: widget.secondaryColor,
+            primaryColor: neuralTheme.colors.primary, // USE THEME COLORS
+            secondaryColor: neuralTheme.colors.secondary, // USE THEME COLORS
             intensity: widget.intensity,
             isAIActive: isOrchestrationActive,
             activeModelCount: activeModels.length,
             isConnected: orchestrationService.isConnected,
             currentFps: _currentFps,
             spatialAudioService: spatialAudioService, // PASS AUDIO SERVICE
+            neuralTheme: neuralTheme, // PASS THEME DATA
           ),
           size: widget.size,
         );
@@ -341,6 +348,7 @@ class Neural3DParticlesPainter extends CustomPainter {
   final bool isConnected;
   final double currentFps;
   final SpatialAudioService spatialAudioService; // NEW AUDIO SERVICE
+  final NeuralThemeData neuralTheme; // NEW THEME DATA
 
   // 3D Camera settings
   static const double cameraZ = 400.0;
@@ -365,12 +373,16 @@ class Neural3DParticlesPainter extends CustomPainter {
     required this.isConnected,
     required this.currentFps,
     required this.spatialAudioService, // NEW PARAMETER
+    required this.neuralTheme, // NEW PARAMETER
   });
 
   @override
   void paint(Canvas canvas, Size size) {
     // Performance check - reduce particles if FPS drops
     final performanceMultiplier = (currentFps > 45) ? 1.0 : 0.6;
+
+    // Apply theme-based background
+    _drawThemedBackground(canvas, size);
 
     // Update particle positions
     _updateParticles();
@@ -394,6 +406,15 @@ class Neural3DParticlesPainter extends CustomPainter {
     if (currentFps < 50) {
       _drawPerformanceWarning(canvas, size);
     }
+  }
+
+  /// 🎨 Draw Themed Background
+  void _drawThemedBackground(Canvas canvas, Size size) {
+    final rect = Rect.fromLTWH(0, 0, size.width, size.height);
+    final paint = Paint()
+      ..shader = neuralTheme.gradients.background.createShader(rect);
+
+    canvas.drawRect(rect, paint);
   }
 
   /// 🔊 Trigger AI Activity Audio Events
@@ -550,8 +571,8 @@ class Neural3DParticlesPainter extends CustomPainter {
 
       // Color interpolation based on AI activity
       final connectionColor = Color.lerp(
-        primaryColor.withOpacity(opacity),
-        secondaryColor.withOpacity(opacity),
+        neuralTheme.colors.connectionActive.withOpacity(opacity),
+        neuralTheme.colors.connectionInactive.withOpacity(opacity),
         pulseEffect,
       )!;
 
@@ -618,8 +639,8 @@ class Neural3DParticlesPainter extends CustomPainter {
           pos,
           size,
           [
-            primaryColor.withOpacity(opacity),
-            secondaryColor.withOpacity(opacity * 0.3),
+            neuralTheme.colors.particleNeuron.withOpacity(opacity),
+            neuralTheme.colors.particleNeuron.withOpacity(opacity * 0.3),
           ],
         );
         canvas.drawCircle(pos, size, paint);
@@ -629,7 +650,7 @@ class Neural3DParticlesPainter extends CustomPainter {
           pos,
           size * 2,
           [
-            primaryColor.withOpacity(opacity * 0.1),
+            neuralTheme.colors.neuralGlow.withOpacity(opacity * 0.1),
             Colors.transparent,
           ],
         );
@@ -638,7 +659,7 @@ class Neural3DParticlesPainter extends CustomPainter {
 
       case NeuralParticleType.synapse:
       // Synaptic connection point
-        paint.color = secondaryColor.withOpacity(opacity);
+        paint.color = neuralTheme.colors.particleSynapse.withOpacity(opacity);
         canvas.drawCircle(pos, size * 0.7, paint);
 
         // Synaptic spark
@@ -650,7 +671,7 @@ class Neural3DParticlesPainter extends CustomPainter {
 
       case NeuralParticleType.electrical:
       // Electric impulse
-        paint.color = Color.lerp(Colors.cyan, Colors.white, pulseEffect)!.withOpacity(opacity);
+        paint.color = Color.lerp(neuralTheme.colors.accent, Colors.white, pulseEffect)!.withOpacity(opacity);
         canvas.drawCircle(pos, size * (0.5 + pulseEffect * 0.5), paint);
 
         // Electric trails
@@ -660,19 +681,19 @@ class Neural3DParticlesPainter extends CustomPainter {
       case NeuralParticleType.quantum:
       // Quantum particle with uncertainty
         final quantumSize = size * (0.8 + math.sin(particle.phase * 3) * 0.4);
-        paint.color = primaryColor.withOpacity(opacity * (0.6 + pulseEffect * 0.4));
+        paint.color = neuralTheme.colors.primary.withOpacity(opacity * (0.6 + pulseEffect * 0.4));
         canvas.drawCircle(pos, quantumSize, paint);
 
         // Quantum interference pattern
         paint.style = PaintingStyle.stroke;
         paint.strokeWidth = 1.0;
-        paint.color = secondaryColor.withOpacity(opacity * 0.3);
+        paint.color = neuralTheme.colors.secondary.withOpacity(opacity * 0.3);
         canvas.drawCircle(pos, quantumSize * 1.5, paint);
         break;
 
       case NeuralParticleType.data:
       // Data packet
-        paint.color = Color.lerp(primaryColor, secondaryColor, pulseEffect)!.withOpacity(opacity);
+        paint.color = Color.lerp(neuralTheme.colors.particleData, neuralTheme.colors.accent, pulseEffect)!.withOpacity(opacity);
         final rect = Rect.fromCenter(center: pos, width: size * 1.2, height: size * 0.8);
         canvas.drawRRect(RRect.fromRectAndRadius(rect, Radius.circular(size * 0.2)), paint);
 

@@ -14,8 +14,8 @@ import '../services/storage_service.dart';
 import '../services/analytics_service.dart';
 import '../services/theme_service.dart';
 import '../services/websocket_orchestration_service.dart'; // CORRECTED PATH
-import '../services/websocket_orchestration_service.dart'; // CORRECTED PATH
 import '../services/spatial_audio_service.dart'; // NEW IMPORT
+import '../theme/neural_theme_system.dart'; // NEW IMPORT
 
 // 🧠 CONTROLLER PROVIDERS - IMPORT CONTROLLERS
 // These import the actual controller providers from their files
@@ -23,6 +23,14 @@ export '../controllers/strategy_controller.dart';
 export '../controllers/models_controller.dart';
 export '../controllers/chat_controller.dart';
 export '../controllers/connection_controller.dart';
+import '../services/spatial_audio_service.dart';
+
+final spatialAudioServiceProvider = Provider<SpatialAudioService>((ref) {
+  // Initialize your spatial audio service.
+  return SpatialAudioService();
+});
+
+
 
 // 🔧 CORE INFRASTRUCTURE PROVIDERS
 final loggerProvider = Provider<Logger>((ref) {
