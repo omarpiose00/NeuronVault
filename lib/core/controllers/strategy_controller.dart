@@ -48,7 +48,7 @@ class StrategyController extends Notifier<StrategyState> {
   }
 
   // 🎛️ SET ACTIVE STRATEGY
-  Future<void> setActiveStrategy(AIStrategy strategy) async {
+  Future<void> setActiveStrategy(OrchestrationStrategy strategy) async {
     if (state.activeStrategy == strategy) return;
 
     try {
@@ -220,19 +220,19 @@ class StrategyController extends Notifier<StrategyState> {
   }
 
   // 🎯 GET STRATEGY DESCRIPTION
-  String getStrategyDescription(AIStrategy strategy) {
+  String getStrategyDescription(OrchestrationStrategy strategy) {
     switch (strategy) {
-      case AIStrategy.parallel:
+      case OrchestrationStrategy.parallel:
         return 'All AI models process simultaneously for fastest response';
-      case AIStrategy.consensus:
+      case OrchestrationStrategy.consensus:
         return 'Models collaborate to reach consensus on best answer';
-      case AIStrategy.adaptive:
+      case OrchestrationStrategy.adaptive:
         return 'Dynamically selects best model based on query type';
-      case AIStrategy.sequential:
+      case OrchestrationStrategy.sequential:
         return 'Processes through models sequentially for refined output';
-      case AIStrategy.cascade:
+      case OrchestrationStrategy.cascade:
         return 'Cascades through models based on confidence levels';
-      case AIStrategy.weighted:
+      case OrchestrationStrategy.weighted:
         return 'Uses weighted voting based on model strengths';
     }
   }
@@ -258,7 +258,7 @@ final strategyControllerProvider = NotifierProvider<StrategyController, Strategy
 );
 
 // 📊 COMPUTED PROVIDERS
-final activeStrategyProvider = Provider<AIStrategy>((ref) {
+final activeStrategyProvider = Provider<OrchestrationStrategy>((ref) {
   return ref.watch(strategyControllerProvider).activeStrategy;
 });
 

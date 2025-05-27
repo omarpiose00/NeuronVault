@@ -1,9 +1,9 @@
+# 🧠 NeuronVault - CLEAN BUILD CONFIGURATION
+# Versione semplificata per eliminare 580 errori di build
+
 name: neuronvault
-description: "The first transparent AI orchestration platform - Multi-AI orchestration with real-time synthesis"
-
-# Prevent accidental publishing to pub.dev.
+description: "Neural Luxury AI Orchestration Platform"
 publish_to: 'none'
-
 version: 1.0.0+1
 
 environment:
@@ -18,91 +18,79 @@ dependencies:
   cupertino_icons: ^1.0.6
   google_fonts: ^6.1.0
 
-  # 🔄 STATE MANAGEMENT - RIVERPOD (CORRECTED)
+  # 🔄 STATE MANAGEMENT - FREEZED COMPATIBLE
   flutter_riverpod: ^2.4.9
-  riverpod_annotation: ^2.3.3
+  # REMOVED: riverpod_annotation (causes custom_lint conflicts)
 
-  # 💾 STORAGE & PERSISTENCE (NEEDED FOR CONTROLLERS)
+  # 💾 STORAGE & PERSISTENCE
   shared_preferences: ^2.2.2
   flutter_secure_storage: ^9.0.0
   path_provider: ^2.1.2
-  hive: ^2.2.3
-  hive_flutter: ^1.1.0
 
-  # 🌐 NETWORKING & WEBSOCKETS (ORCHESTRATION)
+  # 🌐 NETWORKING & WEBSOCKETS
   http: ^1.1.2
   web_socket_channel: ^2.4.0
   dio: ^5.4.0
   socket_io_client: ^2.0.3+1
 
-  # 📊 JSON & SERIALIZATION (FOR STATE MODELS)
-  json_annotation: ^4.8.1
+  # 📊 JSON & SERIALIZATION - FIXED COMPATIBLE VERSIONS
+  json_annotation: ^4.9.0
   freezed_annotation: ^2.4.1
 
-  # 🔧 UTILITIES (NEEDED FOR SERVICES)
+  # 🔐 SECURITY & ENCRYPTION
+  encrypt: ^5.0.3
+  crypto: ^3.0.3
+
+  # 🔧 UTILITIES
   logger: ^2.0.2+1
   uuid: ^4.2.1
   intl: ^0.19.0
-  collection: ^1.18.0
+  equatable: ^2.0.5
 
   # 🖥️ DESKTOP SUPPORT
   window_manager: ^0.3.7
 
-  # 🎯 PERFORMANCE & MONITORING (FOR ANALYTICS SERVICE)
-  flutter_displaymode: ^0.6.0
+  # 🎨 ANIMATIONS & UI ENHANCEMENTS
+  flutter_animate: ^4.5.0
 
-  # 🎨 ANIMATIONS & UI ENHANCEMENTS (FOR EXISTING UI)
-  lottie: ^2.7.0
-  flutter_staggered_animations: ^1.1.1
-  shimmer: ^3.0.0
-
-  # 📱 PLATFORM INTEGRATION (FOR SERVICES)
-  url_launcher: ^6.2.2
-  package_info_plus: ^4.2.0
-  device_info_plus: ^9.1.1
-
-  # 🔐 SECURITY (FOR SECURE STORAGE SERVICE)
-  crypto: ^3.0.3
-  encrypt: ^5.0.3
-
-  # 🧪 DEVELOPMENT HELPERS
-  flutter_launcher_icons: ^0.13.1
+  # 🔊 AUDIO & HAPTICS
+  audioplayers: ^6.0.0
+  vibration: ^1.8.4
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
 
-  # 📊 CODE GENERATION (FOR STATE MODELS)
+  # 📊 CODE GENERATION - COMPATIBLE VERSIONS
   build_runner: ^2.4.7
   json_serializable: ^6.7.1
   freezed: ^2.4.6
-  riverpod_generator: ^2.3.9
+  # REMOVED: riverpod_generator (causes custom_lint conflicts)
 
-  # 🧹 LINTING & ANALYSIS
+  # 🧹 LINTING & ANALYSIS - FIXED VERSION
   flutter_lints: ^3.0.1
-  very_good_analysis: ^5.1.0
 
-  # 🧪 TESTING
-  mockito: ^5.4.4
-  integration_test:
-    sdk: flutter
+# 🔧 DEPENDENCY OVERRIDES - CRITICAL FOR FREEZED COMPATIBILITY
+dependency_overrides:
+  # Fix analyzer version conflicts
+  analyzer: ^6.2.0
+  analyzer_plugin: ^0.11.2
 
-# Flutter configuration
+  # Remove problematic packages entirely
+  mockito: ^5.4.2
+
+# 🎯 FLUTTER CONFIGURATION
 flutter:
   uses-material-design: true
 
-  # 🎨 ASSETS (MAINTAINED FOR EXISTING SETUP)
   assets:
+    - assets/
     - assets/images/
     - assets/icons/
-    - assets/animations/
+    - assets/fonts/
     - assets/audio/
-    - assets/backend/
-    - assets/backend/ai-handlers/
-    - assets/backend/routes/
-    - assets/backend/streaming/
+    - assets/animations/
 
-  # 🔤 FONTS (MAINTAINED FOR EXISTING THEME)
   fonts:
     - family: Inter
       fonts:
@@ -121,34 +109,3 @@ flutter:
           weight: 500
         - asset: assets/fonts/JetBrainsMono-Bold.ttf
           weight: 700
-
-# 🖥️ DESKTOP CONFIGURATION (MAINTAINED)
-flutter_launcher_icons:
-  android: "launcher_icon"
-  ios: true
-  image_path: "assets/icons/app_icon.png"
-  min_sdk_android: 21
-  web:
-    generate: true
-    image_path: "assets/icons/app_icon.png"
-    background_color: "#0F0F23"
-    theme_color: "#6366F1"
-  windows:
-    generate: true
-    image_path: "assets/icons/app_icon.png"
-    icon_size: 48
-  macos:
-    generate: true
-    image_path: "assets/icons/app_icon.png"
-
-# 🔧 ANALYSIS OPTIONS (MAINTAINED)
-flutter_lints:
-  rules:
-    - prefer_const_constructors
-    - prefer_const_literals_to_create_immutables
-    - unnecessary_new
-    - unnecessary_const
-    - avoid_print
-    - prefer_single_quotes
-    - sort_child_properties_last
-    - use_key_in_widget_constructors

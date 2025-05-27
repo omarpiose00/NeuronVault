@@ -5,13 +5,12 @@ import 'package:flutter/services.dart';
 import '../../core/design_system.dart';
 import '../../core/accessibility/accessibility_manager.dart';
 import '../../core/state/state_models.dart';
-import '../../main.dart'; // For AIStrategy enum
 
 /// 🎯 STRATEGY SELECTOR
 /// Selettore strategia AI con animazioni moderne e accessibilità completa
 class StrategySelector extends StatefulWidget {
-  final AIStrategy currentStrategy;
-  final ValueChanged<AIStrategy> onStrategyChanged;
+  final OrchestrationStrategy currentStrategy;
+  final ValueChanged<OrchestrationStrategy> onStrategyChanged;
 
   const StrategySelector({
     Key? key,
@@ -38,7 +37,7 @@ class _StrategySelectorState extends State<StrategySelector> with TickerProvider
     super.initState();
     _initializeAnimations();
     _setupKeyboardHandling();
-    _focusedIndex = AIStrategy.values.indexOf(widget.currentStrategy);
+    _focusedIndex = OrchestrationStrategy.values.indexOf(widget.currentStrategy);
   }
 
   void _initializeAnimations() {
@@ -102,7 +101,7 @@ class _StrategySelectorState extends State<StrategySelector> with TickerProvider
           _selectStrategy(0);
           return KeyEventResult.handled;
         case LogicalKeyboardKey.end:
-          _selectStrategy(AIStrategy.values.length - 1);
+          _selectStrategy(OrchestrationStrategy.values.length - 1);
           return KeyEventResult.handled;
         case LogicalKeyboardKey.space:
         case LogicalKeyboardKey.enter:
@@ -116,11 +115,11 @@ class _StrategySelectorState extends State<StrategySelector> with TickerProvider
   /// 🔄 Navigate Strategy
   void _navigateStrategy(int direction) {
     setState(() {
-      _focusedIndex = (_focusedIndex + direction) % AIStrategy.values.length;
-      if (_focusedIndex < 0) _focusedIndex = AIStrategy.values.length - 1;
+      _focusedIndex = (_focusedIndex + direction) % OrchestrationStrategy.values.length;
+      if (_focusedIndex < 0) _focusedIndex = OrchestrationStrategy.values.length - 1;
     });
 
-    final strategy = AIStrategy.values[_focusedIndex];
+    final strategy = OrchestrationStrategy.values[_focusedIndex];
     AccessibilityManager().announce(
       'Focused on ${strategy.displayName} strategy',
     );
@@ -130,7 +129,7 @@ class _StrategySelectorState extends State<StrategySelector> with TickerProvider
 
   /// ✅ Select Strategy
   void _selectStrategy(int index) {
-    final strategy = AIStrategy.values[index];
+    final strategy = OrchestrationStrategy.values[index];
     if (strategy != widget.currentStrategy) {
       widget.onStrategyChanged(strategy);
       setState(() {
@@ -147,7 +146,7 @@ class _StrategySelectorState extends State<StrategySelector> with TickerProvider
   }
 
   /// 🎨 Build Strategy Pill
-  Widget _buildStrategyPill(AIStrategy strategy, int index, DesignSystemData ds) {
+  Widget _buildStrategyPill(OrchestrationStrategy strategy, int index, DesignSystemData ds) {
     final isActive = strategy == widget.currentStrategy;
     final isFocused = index == _focusedIndex && _containerFocus.hasFocus;
 
@@ -270,22 +269,20 @@ class _StrategySelectorState extends State<StrategySelector> with TickerProvider
   }
 
   /// 📝 Get Strategy Description
-  String _getStrategyDescription(AIStrategy strategy) {
+  String _getStrategyDescription(OrchestrationStrategy strategy) {
     switch (strategy) {
-      case AIStrategy.parallel:
+      case OrchestrationStrategy.parallel:
         return 'All AI models process simultaneously for fastest response';
-      case AIStrategy.consensus:
+      case OrchestrationStrategy.consensus:
         return 'Models collaborate to reach consensus on best answer';
-      case AIStrategy.adaptive:
+      case OrchestrationStrategy.adaptive:
         return 'Dynamically selects best model based on query type';
-      case AIStrategy.cascade:
-        return 'Processes through models sequentially for refined output';
-      case AIStrategy.sequential:
-        // TODO: Handle this case.
-        throw UnimplementedError();
-      case AIStrategy.weighted:
-        // TODO: Handle this case.
-        throw UnimplementedError();
+      case OrchestrationStrategy.sequential:
+        return 'Processes through models one by one for refined output';
+      case OrchestrationStrategy.cascade:
+        return 'Cascades through models based on confidence levels';
+      case OrchestrationStrategy.weighted:
+        return 'Uses weighted voting based on model strengths and preferences';
     }
   }
 
@@ -358,7 +355,7 @@ class _StrategySelectorState extends State<StrategySelector> with TickerProvider
               Wrap(
                 spacing: 12,
                 runSpacing: 12,
-                children: AIStrategy.values.asMap().entries.map((entry) {
+                children: OrchestrationStrategy.values.asMap().entries.map((entry) {
                   return _buildStrategyPill(entry.value, entry.key, ds);
                 }).toList(),
               ),

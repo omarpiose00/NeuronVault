@@ -1,36 +1,30 @@
-// 🎯 NEURONVAULT - CENTRAL PROVIDERS HUB - CORRECTED FULL VERSION
+// 🎯 NEURONVAULT - CENTRAL PROVIDERS HUB - IMPORT CONFLICTS FIXED
 // Enterprise-grade provider management and dependency injection
-// Part of PHASE 2.5 - QUANTUM STATE MANAGEMENT - FIXED VERSION
+// Part of PHASE 2.5 - QUANTUM STATE MANAGEMENT + ACHIEVEMENT SYSTEM
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import '../state/state_models.dart'; // Contains OrchestrationStrategy enum
+
+// 🔧 FIXED IMPORTS - AVOID AMBIGUOUS CONFLICTS
+import '../state/state_models.dart'; // Use state models versions
 import '../services/config_service.dart';
 import '../services/ai_service.dart';
 import '../services/storage_service.dart';
 import '../services/analytics_service.dart';
 import '../services/theme_service.dart';
-import '../services/websocket_orchestration_service.dart'; // CORRECTED PATH
-import '../services/spatial_audio_service.dart'; // NEW IMPORT
-import '../theme/neural_theme_system.dart'; // NEW IMPORT
+import '../services/websocket_orchestration_service.dart' as ws; // Alias for websocket service
+import '../services/spatial_audio_service.dart';
+import '../services/achievement_service.dart'; // 🏆 ACHIEVEMENT SERVICE
+import '../theme/neural_theme_system.dart';
 
 // 🧠 CONTROLLER PROVIDERS - IMPORT CONTROLLERS
-// These import the actual controller providers from their files
 export '../controllers/strategy_controller.dart';
 export '../controllers/models_controller.dart';
 export '../controllers/chat_controller.dart';
 export '../controllers/connection_controller.dart';
-import '../services/spatial_audio_service.dart';
-
-final spatialAudioServiceProvider = Provider<SpatialAudioService>((ref) {
-  // Initialize your spatial audio service.
-  return SpatialAudioService();
-});
-
-
 
 // 🔧 CORE INFRASTRUCTURE PROVIDERS
 final loggerProvider = Provider<Logger>((ref) {
@@ -112,15 +106,34 @@ final themeServiceProvider = Provider<ThemeService>((ref) {
   );
 });
 
-// 🧬 WEBSOCKET ORCHESTRATION SERVICE PROVIDER - NEW & CORRECTED!
-final webSocketOrchestrationServiceProvider = ChangeNotifierProvider<WebSocketOrchestrationService>((ref) {
+final spatialAudioServiceProvider = Provider<SpatialAudioService>((ref) {
+  return SpatialAudioService();
+});
+
+// 🏆 ACHIEVEMENT SERVICE PROVIDER
+final achievementServiceProvider = ChangeNotifierProvider<AchievementService>((ref) {
+  final logger = ref.watch(loggerProvider);
+  final sharedPreferences = ref.watch(sharedPreferencesProvider);
+
+  logger.i('🏆 Initializing Achievement Service...');
+
+  final service = AchievementService(
+    prefs: sharedPreferences,
+    logger: logger,
+  );
+
+  logger.i('✅ Achievement Service initialized successfully');
+  return service;
+});
+
+// 🧬 WEBSOCKET ORCHESTRATION SERVICE PROVIDER
+final webSocketOrchestrationServiceProvider = ChangeNotifierProvider<ws.WebSocketOrchestrationService>((ref) {
   final logger = ref.watch(loggerProvider);
 
   logger.i('🧬 Initializing WebSocket Orchestration Service...');
 
-  final service = WebSocketOrchestrationService();
+  final service = ws.WebSocketOrchestrationService();
 
-  // Auto-connect when service is created (non-blocking)
   Future.microtask(() async {
     try {
       final connected = await service.connect();
@@ -137,12 +150,12 @@ final webSocketOrchestrationServiceProvider = ChangeNotifierProvider<WebSocketOr
   return service;
 });
 
-// 📊 ORCHESTRATION STATE PROVIDERS - NEW!
+// 📊 ORCHESTRATION STATE PROVIDERS
 final currentOrchestrationProvider = StateProvider<String?>((ref) => null);
-
 final isOrchestrationActiveProvider = StateProvider<bool>((ref) => false);
 
-final individualResponsesProvider = StreamProvider<List<AIResponse>>((ref) {
+// 🔧 FIXED: Use websocket service types to match return types
+final individualResponsesProvider = StreamProvider<List<ws.AIResponse>>((ref) {
   final orchestrationService = ref.watch(webSocketOrchestrationServiceProvider);
   return orchestrationService.individualResponsesStream;
 });
@@ -152,27 +165,21 @@ final synthesizedResponseProvider = StreamProvider<String>((ref) {
   return orchestrationService.synthesizedResponseStream;
 });
 
-final orchestrationProgressProvider = StreamProvider<OrchestrationProgress>((ref) {
+final orchestrationProgressProvider = StreamProvider<ws.OrchestrationProgress>((ref) {
   final orchestrationService = ref.watch(webSocketOrchestrationServiceProvider);
   return orchestrationService.orchestrationProgressStream;
 });
 
 // 🧬 ORCHESTRATION CONFIGURATION PROVIDERS
 final activeModelsProvider = StateProvider<List<String>>((ref) {
-  return ['claude', 'gpt', 'deepseek', 'gemini']; // Default active models
+  return ['claude', 'gpt', 'deepseek', 'gemini'];
 });
 
-// MODIFIED: currentStrategyProvider now stores a String
 final currentStrategyProvider = StateProvider<String>((ref) {
-  // Assumes OrchestrationStrategy enum has a .name property (standard in Dart 2.17+)
-  // And OrchestrationStrategy.parallel is a valid enum member.
-  // Ensure OrchestrationStrategy is imported (likely from state_models.dart)
-  return OrchestrationStrategy.parallel.name; // Default strategy as a string
+  return OrchestrationStrategy.parallel.name;
 });
 
-// NEW: availableStrategiesProvider provides a list of strategy names as Strings
 final availableStrategiesProvider = Provider<List<String>>((ref) {
-  // Assumes OrchestrationStrategy enum has .values and .name properties
   return OrchestrationStrategy.values.map((e) => e.name).toList();
 });
 
@@ -188,16 +195,85 @@ final modelWeightsProvider = StateProvider<Map<String, double>>((ref) {
   };
 });
 
-// 📊 COMPUTED STATE PROVIDERS - ENHANCED WITH ORCHESTRATION
+// 🏆 ACHIEVEMENT SYSTEM PROVIDERS
+final achievementStateProvider = Provider<AchievementState>((ref) {
+  final service = ref.watch(achievementServiceProvider);
+  return service.state;
+});
+
+final unlockedAchievementsProvider = Provider<List<Achievement>>((ref) {
+  final state = ref.watch(achievementStateProvider);
+  return state.unlockedAchievements;
+});
+
+final achievementStatsProvider = Provider<AchievementStats>((ref) {
+  final state = ref.watch(achievementStateProvider);
+  return state.stats;
+});
+
+final pendingNotificationsProvider = Provider<List<AchievementNotification>>((ref) {
+  final state = ref.watch(achievementStateProvider);
+  return state.pendingNotifications;
+});
+
+final achievementProgressProvider = Provider.family<AchievementProgress?, String>((ref, achievementId) {
+  final state = ref.watch(achievementStateProvider);
+  return state.progress[achievementId];
+});
+
+final achievementByIdProvider = Provider.family<Achievement?, String>((ref, achievementId) {
+  final state = ref.watch(achievementStateProvider);
+  return state.achievements[achievementId];
+});
+
+final achievementsByCategoryProvider = Provider.family<List<Achievement>, AchievementCategory>((ref, category) {
+  final state = ref.watch(achievementStateProvider);
+  return state.visibleAchievements.where((a) => a.category == category).toList()
+    ..sort((a, b) => a.rarity.index.compareTo(b.rarity.index));
+});
+
+final categoryStatsProvider = Provider.family<Map<AchievementRarity, int>, AchievementCategory>((ref, category) {
+  final achievements = ref.watch(achievementsByCategoryProvider(category));
+  final unlocked = achievements.where((a) => a.isUnlocked).toList();
+
+  return {
+    AchievementRarity.common: unlocked.where((a) => a.rarity == AchievementRarity.common).length,
+    AchievementRarity.rare: unlocked.where((a) => a.rarity == AchievementRarity.rare).length,
+    AchievementRarity.epic: unlocked.where((a) => a.rarity == AchievementRarity.epic).length,
+    AchievementRarity.legendary: unlocked.where((a) => a.rarity == AchievementRarity.legendary).length,
+  };
+});
+
+final achievementNotificationStreamProvider = StreamProvider<AchievementNotification>((ref) {
+  final service = ref.watch(achievementServiceProvider);
+  return service.notificationStream;
+});
+
+final overallCompletionProvider = Provider<double>((ref) {
+  final state = ref.watch(achievementStateProvider);
+  return state.stats.completionPercentage;
+});
+
+final totalPointsProvider = Provider<int>((ref) {
+  final state = ref.watch(achievementStateProvider);
+  return state.totalPoints;
+});
+
+final recentAchievementsProvider = Provider<List<Achievement>>((ref) {
+  final state = ref.watch(achievementStateProvider);
+  return state.recentlyUnlocked.take(5).toList();
+});
+
+final achievementTrackerProvider = Provider<AchievementService>((ref) {
+  return ref.watch(achievementServiceProvider);
+});
+
+// 📊 COMPUTED STATE PROVIDERS
 final appReadyProvider = Provider<bool>((ref) {
-  // App is ready when core services are initialized
-  // Orchestration connection is optional for app readiness
   try {
     final configService = ref.watch(configServiceProvider);
     final storageService = ref.watch(storageServiceProvider);
     final aiService = ref.watch(aiServiceProvider);
-
-    // If we can access these services without error, app is ready
     return true;
   } catch (e) {
     return false;
@@ -206,12 +282,9 @@ final appReadyProvider = Provider<bool>((ref) {
 
 final overallHealthProvider = Provider<AppHealth>((ref) {
   final orchestrationService = ref.watch(webSocketOrchestrationServiceProvider);
-
-  // Determine health based on orchestration connection
   if (orchestrationService.isConnected) {
     return AppHealth.healthy;
   } else {
-    // App can still function without orchestration, so degraded not critical
     return AppHealth.degraded;
   }
 });
@@ -232,29 +305,20 @@ final systemStatusProvider = Provider<SystemStatus>((ref) {
   );
 });
 
-// 🎨 THEME & UI PROVIDERS - MAINTAINED
+// 🎨 THEME & UI PROVIDERS
 final currentThemeProvider = StateProvider<AppTheme>((ref) {
   return AppTheme.neural;
 });
 
-// AppTheme enum for controller compatibility
-enum AppTheme {
-  neural,
-  cyber,
-  matrix,
-  quantum,
-}
-
 final isDarkModeProvider = StateProvider<bool>((ref) {
-  return true; // Default to dark mode
+  return true;
 });
 
 final adaptiveLayoutProvider = Provider<LayoutBreakpoint>((ref) {
-  // This would be connected to MediaQuery in actual implementation
   return LayoutBreakpoint.desktop;
 });
 
-// 🌍 LOCALIZATION PROVIDERS - MAINTAINED
+// 🌍 LOCALIZATION PROVIDERS
 final currentLocaleProvider = StateProvider<String>((ref) {
   return 'en_US';
 });
@@ -264,27 +328,21 @@ final localizationProvider = Provider<Map<String, String>>((ref) {
   return _getLocalizationForLocale(locale);
 });
 
-// 🔄 ASYNC DATA PROVIDERS - ENHANCED WITH ORCHESTRATION
+// 🔄 ASYNC DATA PROVIDERS
 final initializationProvider = FutureProvider<bool>((ref) async {
   final logger = ref.watch(loggerProvider);
 
   try {
     logger.i('🚀 Starting application initialization...');
-
-    // Initialize services one by one to avoid circular dependencies
     await Future.delayed(const Duration(milliseconds: 100));
 
-    // Initialize core services first
     final configService = ref.read(configServiceProvider);
     final storageService = ref.read(storageServiceProvider);
     final aiService = ref.read(aiServiceProvider);
 
     logger.i('✅ Core services initialized successfully');
 
-    // Orchestration service initialization is handled separately and non-blocking
     final orchestrationService = ref.read(webSocketOrchestrationServiceProvider);
-
-    // Give some time for orchestration service to attempt connection
     await Future.delayed(const Duration(milliseconds: 500));
 
     if (orchestrationService.isConnected) {
@@ -298,12 +356,10 @@ final initializationProvider = FutureProvider<bool>((ref) async {
 
   } catch (e, stackTrace) {
     logger.e('❌ Application initialization failed', error: e, stackTrace: stackTrace);
-    // Don't fail app initialization just because of orchestration issues
-    return true; // App can still function
+    return true;
   }
 });
 
-// 📈 PERFORMANCE MONITORING PROVIDERS - ENHANCED
 final performanceMetricsProvider = StreamProvider<PerformanceMetrics>((ref) {
   return Stream.periodic(const Duration(seconds: 5), (count) {
     final orchestrationService = ref.read(webSocketOrchestrationServiceProvider);
@@ -318,7 +374,7 @@ final performanceMetricsProvider = StreamProvider<PerformanceMetrics>((ref) {
   });
 });
 
-// 🔧 UTILITY FUNCTIONS - MAINTAINED
+// 🔧 UTILITY FUNCTIONS
 Map<String, String> _getLocalizationForLocale(String locale) {
   switch (locale) {
     case 'en_US':
@@ -350,9 +406,9 @@ Map<String, String> _getLocalizationForLocale(String locale) {
 
 double _getCurrentMemoryUsage() => 0.0;
 double _getCurrentCpuUsage() => 0.0;
-double _getAverageRenderTime() => 16.67; // 60 FPS
+double _getAverageRenderTime() => 16.67;
 
-// 📊 SUPPORTING MODELS - MAINTAINED FOR CONTROLLER COMPATIBILITY
+// 📊 SUPPORTING MODELS
 enum AppHealth {
   healthy,
   degraded,
@@ -365,12 +421,6 @@ enum LayoutBreakpoint {
   tablet,
   desktop,
   ultrawide,
-}
-
-enum ConnectionStatus {
-  connected,
-  disconnected,
-  connecting,
 }
 
 class SystemStatus {
