@@ -1,6 +1,6 @@
-// 🧠 NEURONVAULT - ENTERPRISE STATE MODELS
-// Immutable state models with Freezed for optimal performance
-// Part of PHASE 2.5 - QUANTUM STATE MANAGEMENT
+// 🧠 NEURONVAULT - ENTERPRISE STATE MODELS WITH FREEZED
+// Fixed analyzer conflicts for build compatibility
+// Part of PHASE 2.5 - QUANTUM STATE MANAGEMENT + ACHIEVEMENT SYSTEM
 
 import 'package:flutter/material.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
@@ -9,29 +9,8 @@ import 'package:flutter/foundation.dart';
 part 'state_models.freezed.dart';
 part 'state_models.g.dart';
 
-// 🔧 JSON CONVERTERS
-class LocaleConverter implements JsonConverter<Locale, String> {
-  const LocaleConverter();
-
-  @override
-  Locale fromJson(String json) {
-    final parts = json.split('_');
-    if (parts.length == 2) {
-      return Locale(parts[0], parts[1]);
-    }
-    return Locale(parts[0]);
-  }
-
-  @override
-  String toJson(Locale object) {
-    return object.countryCode != null
-        ? '${object.languageCode}_${object.countryCode}'
-        : object.languageCode;
-  }
-}
-
-// 🎯 ENUMS & TYPES
-enum AIStrategy {
+// 🎯 ENUMS & TYPES - ORCHESTRATION
+enum OrchestrationStrategy {
   @JsonValue('parallel')
   parallel,
   @JsonValue('consensus')
@@ -47,34 +26,34 @@ enum AIStrategy {
 
   String get displayName {
     switch (this) {
-      case AIStrategy.parallel:
+      case OrchestrationStrategy.parallel:
         return 'Parallel';
-      case AIStrategy.consensus:
+      case OrchestrationStrategy.consensus:
         return 'Consensus';
-      case AIStrategy.adaptive:
+      case OrchestrationStrategy.adaptive:
         return 'Adaptive';
-      case AIStrategy.sequential:
+      case OrchestrationStrategy.sequential:
         return 'Sequential';
-      case AIStrategy.cascade:
+      case OrchestrationStrategy.cascade:
         return 'Cascade';
-      case AIStrategy.weighted:
+      case OrchestrationStrategy.weighted:
         return 'Weighted';
     }
   }
 
   IconData get icon {
     switch (this) {
-      case AIStrategy.parallel:
+      case OrchestrationStrategy.parallel:
         return Icons.account_tree;
-      case AIStrategy.consensus:
+      case OrchestrationStrategy.consensus:
         return Icons.how_to_vote;
-      case AIStrategy.adaptive:
+      case OrchestrationStrategy.adaptive:
         return Icons.auto_awesome;
-      case AIStrategy.sequential:
+      case OrchestrationStrategy.sequential:
         return Icons.timeline;
-      case AIStrategy.cascade:
+      case OrchestrationStrategy.cascade:
         return Icons.waterfall_chart;
-      case AIStrategy.weighted:
+      case OrchestrationStrategy.weighted:
         return Icons.balance;
     }
   }
@@ -131,10 +110,6 @@ enum AIModel {
       case AIModel.ollama: return Colors.grey;
     }
   }
-
-  bool get isActive => true; // This will be managed by state
-  double get health => 0.9; // This will be managed by state
-  int get tokensUsed => 0; // This will be managed by state
 }
 
 enum ConnectionStatus {
@@ -148,26 +123,6 @@ enum ConnectionStatus {
   error,
   @JsonValue('reconnecting')
   reconnecting,
-}
-
-enum AppTheme {
-  @JsonValue('neural')
-  neural,
-  @JsonValue('quantum')
-  quantum,
-  @JsonValue('cyber')
-  cyber,
-  @JsonValue('minimal')
-  minimal;
-
-  String get displayName {
-    switch (this) {
-      case AppTheme.neural: return 'Neural';
-      case AppTheme.quantum: return 'Quantum';
-      case AppTheme.cyber: return 'Cyber';
-      case AppTheme.minimal: return 'Minimal';
-    }
-  }
 }
 
 enum HealthStatus {
@@ -194,7 +149,128 @@ enum MessageType {
   error,
 }
 
-// 🔧 COMPLEX TYPES
+// 🏆 ACHIEVEMENT SYSTEM ENUMS
+enum AchievementCategory {
+  @JsonValue('particles')
+  particles,
+  @JsonValue('orchestration')
+  orchestration,
+  @JsonValue('themes')
+  themes,
+  @JsonValue('audio')
+  audio,
+  @JsonValue('profiling')
+  profiling,
+  @JsonValue('exploration')
+  exploration;
+
+  String get displayName {
+    switch (this) {
+      case AchievementCategory.particles:
+        return '3D Particles';
+      case AchievementCategory.orchestration:
+        return 'AI Orchestration';
+      case AchievementCategory.themes:
+        return 'Theme Master';
+      case AchievementCategory.audio:
+        return 'Spatial Audio';
+      case AchievementCategory.profiling:
+        return 'Model Profiling';
+      case AchievementCategory.exploration:
+        return 'Neural Explorer';
+    }
+  }
+
+  IconData get icon {
+    switch (this) {
+      case AchievementCategory.particles:
+        return Icons.auto_awesome;
+      case AchievementCategory.orchestration:
+        return Icons.account_tree;
+      case AchievementCategory.themes:
+        return Icons.palette;
+      case AchievementCategory.audio:
+        return Icons.spatial_audio;
+      case AchievementCategory.profiling:
+        return Icons.analytics;
+      case AchievementCategory.exploration:
+        return Icons.explore;
+    }
+  }
+}
+
+enum AchievementRarity {
+  @JsonValue('common')
+  common,
+  @JsonValue('rare')
+  rare,
+  @JsonValue('epic')
+  epic,
+  @JsonValue('legendary')
+  legendary;
+
+  String get displayName {
+    switch (this) {
+      case AchievementRarity.common:
+        return 'Common';
+      case AchievementRarity.rare:
+        return 'Rare';
+      case AchievementRarity.epic:
+        return 'Epic';
+      case AchievementRarity.legendary:
+        return 'Legendary';
+    }
+  }
+
+  Color get color {
+    switch (this) {
+      case AchievementRarity.common:
+        return const Color(0xFF9CA3AF);
+      case AchievementRarity.rare:
+        return const Color(0xFF3B82F6);
+      case AchievementRarity.epic:
+        return const Color(0xFFA855F7);
+      case AchievementRarity.legendary:
+        return const Color(0xFFF59E0B);
+    }
+  }
+
+  double get glowIntensity {
+    switch (this) {
+      case AchievementRarity.common:
+        return 0.3;
+      case AchievementRarity.rare:
+        return 0.6;
+      case AchievementRarity.epic:
+        return 0.9;
+      case AchievementRarity.legendary:
+        return 1.2;
+    }
+  }
+}
+
+// 🎨 APP THEME ENUM
+enum AppTheme {
+  @JsonValue('neural')
+  neural,
+  @JsonValue('quantum')
+  quantum,
+  @JsonValue('cyber')
+  cyber,
+  @JsonValue('minimal')
+  minimal;
+
+  String get displayName {
+    switch (this) {
+      case AppTheme.neural: return 'Neural';
+      case AppTheme.quantum: return 'Quantum';
+      case AppTheme.cyber: return 'Cyber';
+      case AppTheme.minimal: return 'Minimal';
+    }
+  }
+}
+
+// 🔧 FREEZED DATA MODELS
 @freezed
 class ModelConfig with _$ModelConfig {
   const factory ModelConfig({
@@ -246,11 +322,114 @@ class ChatMessage with _$ChatMessage {
       _$ChatMessageFromJson(json);
 }
 
+// 🏆 ACHIEVEMENT DATA MODELS
+@freezed
+class Achievement with _$Achievement {
+  const factory Achievement({
+    required String id,
+    required String title,
+    required String description,
+    required AchievementCategory category,
+    required AchievementRarity rarity,
+    @Default(false) bool isUnlocked,
+    @Default(0) int currentProgress,
+    @Default(1) int targetProgress,
+    @Default(null) DateTime? unlockedAt,
+    @Default({}) Map<String, dynamic> metadata,
+    @Default(false) bool isHidden,
+    @Default([]) List<String> requirements,
+  }) = _Achievement;
+
+  factory Achievement.fromJson(Map<String, dynamic> json) =>
+      _$AchievementFromJson(json);
+}
+
+// 🎨 Achievement Extensions per Icon Logic
+extension AchievementIconX on Achievement {
+  IconData get icon {
+    // Icon logic based on category and rarity
+    switch (category) {
+      case AchievementCategory.particles:
+        return Icons.auto_awesome;
+      case AchievementCategory.orchestration:
+        return Icons.psychology;
+      case AchievementCategory.themes:
+        return Icons.palette;
+      case AchievementCategory.audio:
+        return Icons.spatial_audio;
+      case AchievementCategory.profiling:
+        return Icons.analytics;
+      case AchievementCategory.exploration:
+        return Icons.explore;
+    }
+  }
+}
+
+@freezed
+class AchievementProgress with _$AchievementProgress {
+  const factory AchievementProgress({
+    required String achievementId,
+    @Default(0) int currentValue,
+    @Default(0) int targetValue,
+    @Default(null) DateTime? lastUpdated,
+    @Default({}) Map<String, dynamic> progressData,
+  }) = _AchievementProgress;
+
+  factory AchievementProgress.fromJson(Map<String, dynamic> json) =>
+      _$AchievementProgressFromJson(json);
+}
+
+@freezed
+class AchievementNotification with _$AchievementNotification {
+  const factory AchievementNotification({
+    required String id,
+    required Achievement achievement,
+    required DateTime timestamp,
+    @Default(false) bool isShown,
+    @Default(Duration(seconds: 5)) Duration displayDuration,
+  }) = _AchievementNotification;
+
+  factory AchievementNotification.fromJson(Map<String, dynamic> json) =>
+      _$AchievementNotificationFromJson(json);
+}
+
+@freezed
+class AchievementStats with _$AchievementStats {
+  const factory AchievementStats({
+    @Default(0) int totalAchievements,
+    @Default(0) int unlockedAchievements,
+    @Default(0) int commonUnlocked,
+    @Default(0) int rareUnlocked,
+    @Default(0) int epicUnlocked,
+    @Default(0) int legendaryUnlocked,
+    @Default(0.0) double completionPercentage,
+    @Default(null) DateTime? lastAchievementDate,
+  }) = _AchievementStats;
+
+  factory AchievementStats.fromJson(Map<String, dynamic> json) =>
+      _$AchievementStatsFromJson(json);
+}
+
+@freezed
+class AchievementState with _$AchievementState {
+  const factory AchievementState({
+    @Default({}) Map<String, Achievement> achievements,
+    @Default({}) Map<String, AchievementProgress> progress,
+    @Default([]) List<AchievementNotification> notifications,
+    @Default(AchievementStats()) AchievementStats stats,
+    @Default(false) bool isInitialized,
+    @Default(true) bool showNotifications,
+  }) = _AchievementState;
+
+  factory AchievementState.fromJson(Map<String, dynamic> json) =>
+      _$AchievementStateFromJson(json);
+}
+
 // 🎛️ AI STRATEGY STATE
 @freezed
 class StrategyState with _$StrategyState {
   const factory StrategyState({
-    @Default(AIStrategy.parallel) AIStrategy activeStrategy,
+    @Default(OrchestrationStrategy.parallel) OrchestrationStrategy activeStrategy,
     @JsonKey(includeFromJson: false, includeToJson: false) @Default({}) Map<AIModel, double> modelWeights,
     @Default(false) bool isProcessing,
     @Default(0.0) double confidenceThreshold,
@@ -324,14 +503,45 @@ class AppState with _$AppState {
     @Default(ModelsState()) ModelsState models,
     @Default(ChatState()) ChatState chat,
     @Default(ConnectionState()) ConnectionState connection,
-    @Default(AppTheme.neural) AppTheme theme,
+    @Default(AchievementState()) AchievementState achievements,
+    @Default('neural') String theme,
     @Default(true) bool isDarkMode,
-    @LocaleConverter() @Default(Locale('en', 'US')) Locale locale,
     @Default(false) bool isFirstLaunch,
   }) = _AppState;
 
   factory AppState.fromJson(Map<String, dynamic> json) =>
       _$AppStateFromJson(json);
+}
+
+// 🔗 ORCHESTRATION RESPONSE MODELS
+@freezed
+class AIResponse with _$AIResponse {
+  const factory AIResponse({
+    required String modelName,
+    required String content,
+    required DateTime timestamp,
+    @Default(null) String? requestId,
+    @Default(1.0) double confidence,
+    @Default({}) Map<String, dynamic> metadata,
+  }) = _AIResponse;
+
+  factory AIResponse.fromJson(Map<String, dynamic> json) =>
+      _$AIResponseFromJson(json);
+}
+
+@freezed
+class OrchestrationProgress with _$OrchestrationProgress {
+  const factory OrchestrationProgress({
+    required String requestId,
+    @Default(0) int completedModels,
+    @Default(0) int totalModels,
+    @Default([]) List<String> activeModels,
+    @Default(null) DateTime? startTime,
+    @Default(null) DateTime? estimatedCompletion,
+  }) = _OrchestrationProgress;
+
+  factory OrchestrationProgress.fromJson(Map<String, dynamic> json) =>
+      _$OrchestrationProgressFromJson(json);
 }
 
 // 📊 COMPUTED STATE EXTENSIONS
@@ -366,4 +576,57 @@ extension ConnectionStateX on ConnectionState {
   bool get hasError => status == ConnectionStatus.error;
   bool get canReconnect => reconnectAttempts < maxReconnects;
   String get displayStatus => status.name.toUpperCase();
+}
+
+// 🏆 ACHIEVEMENT EXTENSIONS
+extension AchievementX on Achievement {
+  bool get isCompleted => currentProgress >= targetProgress;
+  double get progressPercentage => targetProgress > 0
+      ? (currentProgress / targetProgress * 100).clamp(0, 100)
+      : 0.0;
+  bool get canBeShown => !isHidden || isUnlocked;
+}
+
+extension AchievementStateX on AchievementState {
+  List<Achievement> get unlockedAchievements =>
+      achievements.values.where((a) => a.isUnlocked).toList();
+
+  List<Achievement> get lockedAchievements =>
+      achievements.values.where((a) => !a.isUnlocked).toList();
+
+  List<Achievement> get visibleAchievements =>
+      achievements.values.where((a) => a.canBeShown).toList();
+
+  List<Achievement> get recentlyUnlocked =>
+      unlockedAchievements
+        ..sort((a, b) => (b.unlockedAt ?? DateTime(0))
+            .compareTo(a.unlockedAt ?? DateTime(0)));
+
+  List<AchievementNotification> get pendingNotifications =>
+      notifications.where((n) => !n.isShown).toList();
+
+  int get totalPoints => unlockedAchievements
+      .map((a) => _getAchievementPoints(a.rarity))
+      .fold(0, (a, b) => a + b);
+}
+
+// Helper function for points calculation
+int _getAchievementPoints(AchievementRarity rarity) {
+  switch (rarity) {
+    case AchievementRarity.common:
+      return 10;
+    case AchievementRarity.rare:
+      return 25;
+    case AchievementRarity.epic:
+      return 50;
+    case AchievementRarity.legendary:
+      return 100;
+  }
+}
+
+// 🤖 AIMODEL EXTENSIONS - Fix for missing getters
+extension AIModelStateX on AIModel {
+  bool get isActive => true; // Default active state - managed by ModelsState
+  double get health => 0.9; // Default health - managed by ModelHealth
+  int get tokensUsed => 0; // Default tokens - managed by usage tracking
 }

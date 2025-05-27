@@ -1,6 +1,6 @@
 // 🧬 NEURONVAULT - MAIN APPLICATION ENTRY POINT
 // Real AI Orchestration with Riverpod State Management
-// Updated for transparent multi-AI orchestration integration
+// Updated for transparent multi-AI orchestration integration + Achievement System
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -92,20 +92,25 @@ class InitializationWrapper extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final initializationAsync = ref.watch(providers.initializationProvider);
 
+    // 🏆 WATCH ACHIEVEMENT SERVICE INITIALIZATION
+    final achievementService = ref.watch(providers.achievementServiceProvider);
+    final achievementInitialized = achievementService.state.isInitialized;
+
     return initializationAsync.when(
       loading: () => const InitializationLoadingScreen(),
       error: (error, stackTrace) => InitializationErrorScreen(
         error: error,
-        onRetry: () => ref.invalidate(providers.initializationProvider),
+        onRetry: () {
+          ref.invalidate(providers.initializationProvider);
+          ref.invalidate(providers.achievementServiceProvider); // 🏆 ADD THIS
+        },
       ),
       data: (initialized) {
-        if (initialized) {
+        // 🏆 ENSURE BOTH CORE AND ACHIEVEMENT SYSTEMS ARE READY
+        if (initialized && achievementInitialized) {
           return const OrchestrationMainScreen();
         } else {
-          return InitializationErrorScreen(
-            error: 'Initialization failed',
-            onRetry: () => ref.invalidate(providers.initializationProvider),
-          );
+          return const InitializationLoadingScreen();
         }
       },
     );
@@ -227,6 +232,40 @@ class _InitializationLoadingScreenState extends State<InitializationLoadingScree
               ),
             ),
 
+            // 🏆 ADD ACHIEVEMENT SYSTEM STATUS
+            const SizedBox(height: 16),
+
+            Consumer(
+              builder: (context, ref, child) {
+                return Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.emoji_events, color: Colors.amber, size: 16),
+                        const SizedBox(width: 8),
+                        Text(
+                          '25+ Neural Achievements Loading...',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: Colors.amber,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '🏆 3D Particles • 🧠 AI Orchestration • 🎨 Neural Themes • 🔊 Spatial Audio',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: Colors.grey[500],
+                        fontSize: 10,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                );
+              },
+            ),
+
             const SizedBox(height: 40),
 
             // Loading indicator
@@ -251,10 +290,11 @@ class _InitializationLoadingScreenState extends State<InitializationLoadingScree
             const SizedBox(height: 8),
 
             Text(
-              'Connecting to backend services',
+              'Neural luxury experience • Real-time orchestration • Achievement system',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: Colors.grey[600],
               ),
+              textAlign: TextAlign.center,
             ),
           ],
         ),
