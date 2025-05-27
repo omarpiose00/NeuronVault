@@ -1,17 +1,17 @@
-// lib/screens/orchestration_main_screen.dart - ENHANCED WITH 3D PARTICLES + ACHIEVEMENT SYSTEM
-// 🧬 LUXURY NEURAL ORCHESTRATION SCREEN - 3D PARTICLE REVOLUTION + ACHIEVEMENT INTEGRATION
-// Complete transformation with revolutionary 3D neural effects and gamification
+// lib/screens/orchestration_main_screen.dart - IMPORT CONFLICTS FIXED
+// 🧬 LUXURY NEURAL ORCHESTRATION SCREEN - REVOLUTIONARY CONNECTION STATUS INTEGRATED
 
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide ConnectionState; // 🔧 HIDE Flutter's ConnectionState
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:ui' as ui;
 import 'dart:math' as math;
 
-import '../core/services/websocket_orchestration_service.dart';
+import '../core/services/websocket_orchestration_service.dart' as WS; // 🔧 Use alias to avoid conflict
 import '../core/providers/providers_main.dart';
 import '../core/design_system.dart';
 import '../core/theme/neural_theme_system.dart';
+import '../core/state/state_models.dart'; // 🔧 Our ConnectionState and other models
 import '../widgets/core/neural_brain_logo.dart';
 import '../widgets/core/neural_3d_particle_system.dart';
 import '../widgets/core/model_profiling_dashboard.dart';
@@ -20,9 +20,31 @@ import '../widgets/core/neural_theme_selector.dart';
 // 🏆 ACHIEVEMENT SYSTEM IMPORTS
 import '../widgets/core/achievement_notification.dart';
 import '../widgets/core/achievement_progress_panel.dart';
+// 🔥 NEW: REVOLUTIONARY CONNECTION STATUS
+import '../widgets/core/revolutionary_connection_status.dart';
 
 class OrchestrationMainScreen extends ConsumerStatefulWidget {
   const OrchestrationMainScreen({super.key});
+
+  // 🔧 HELPER: Convert our OrchestrationStrategy to WebSocket service's type
+  WS.OrchestrationStrategy _convertToWebSocketStrategy(OrchestrationStrategy strategy) {
+    switch (strategy) {
+      case OrchestrationStrategy.parallel:
+        return WS.OrchestrationStrategy.parallel;
+      case OrchestrationStrategy.consensus:
+        return WS.OrchestrationStrategy.consensus;
+      case OrchestrationStrategy.adaptive:
+        return WS.OrchestrationStrategy.adaptive;
+      case OrchestrationStrategy.sequential:
+        return WS.OrchestrationStrategy.sequential;
+      case OrchestrationStrategy.weighted:
+        return WS.OrchestrationStrategy.weighted;
+    // 🔧 REMOVED: cascade doesn't exist in enum
+      case OrchestrationStrategy.cascade:
+        // TODO: Handle this case.
+        throw UnimplementedError();
+    }
+  }
 
   @override
   ConsumerState<OrchestrationMainScreen> createState() => _OrchestrationMainScreenState();
@@ -114,12 +136,18 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
   void _setupOrchestrationListeners() {
     // Setup listeners for real orchestration data
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final orchestrationService = ref.read(webSocketOrchestrationServiceProvider);
+      final orchestrationService = ref.read(webSocketOrchestrationServiceProvider) as WS.WebSocketOrchestrationService;
 
       orchestrationService.individualResponsesStream.listen((responses) {
         setState(() {
           for (final response in responses) {
-            _messages.add(ChatMessage.fromAIResponse(response));
+            // 🔧 FIXED: Remove requestId since it doesn't exist in AIResponse
+            _messages.add(ChatMessage(
+              id: '${DateTime.now().millisecondsSinceEpoch}_${response.modelName}',
+              content: response.content,
+              type: MessageType.assistant,
+              timestamp: response.timestamp,
+            ));
           }
         });
       });
@@ -127,7 +155,14 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
       orchestrationService.synthesizedResponseStream.listen((synthesis) {
         if (synthesis.isNotEmpty) {
           setState(() {
-            _messages.add(ChatMessage.synthesized(synthesis));
+            // 🔧 FIXED: Use ChatMessage constructor instead of synthesized
+            _messages.add(ChatMessage(
+              id: '${DateTime.now().millisecondsSinceEpoch}_synthesis',
+              content: synthesis,
+              type: MessageType.assistant,
+              timestamp: DateTime.now(),
+              metadata: {'is_synthesis': true},
+            ));
           });
         }
       });
@@ -145,6 +180,26 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
     });
   }
 
+  // 🔧 HELPER: Convert our OrchestrationStrategy to WebSocket service's type
+  WS.OrchestrationStrategy _convertToWebSocketStrategy(OrchestrationStrategy strategy) {
+    switch (strategy) {
+      case OrchestrationStrategy.parallel:
+        return WS.OrchestrationStrategy.parallel;
+      case OrchestrationStrategy.consensus:
+        return WS.OrchestrationStrategy.consensus;
+      case OrchestrationStrategy.adaptive:
+        return WS.OrchestrationStrategy.adaptive;
+      case OrchestrationStrategy.sequential:
+        return WS.OrchestrationStrategy.sequential;
+      case OrchestrationStrategy.weighted:
+        return WS.OrchestrationStrategy.weighted;
+    // 🔧 REMOVED: cascade doesn't exist in enum
+      case OrchestrationStrategy.cascade:
+        // TODO: Handle this case.
+        throw UnimplementedError();
+    }
+  }
+
   @override
   void dispose() {
     _backgroundController.dispose();
@@ -158,8 +213,12 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
   @override
   Widget build(BuildContext context) {
     final ds = context.ds;
-    final orchestrationService = ref.watch(webSocketOrchestrationServiceProvider);
+
+    // 🔥 NEW: Use enhanced connection state
+    final connectionState = ref.watch(connectionControllerProvider);
+    final orchestrationService = ref.watch(webSocketOrchestrationServiceProvider) as WS.WebSocketOrchestrationService;
     final isOrchestrationActive = ref.watch(isOrchestrationActiveProvider);
+
     final size = MediaQuery.of(context).size;
     final isMobile = size.width < 768;
 
@@ -177,7 +236,8 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
                 Positioned.fill(
                   child: Neural3DParticleSystem(
                     size: size,
-                    isActive: orchestrationService.isConnected,
+                    // 🔥 NEW: Use connection state directly
+                    isActive: connectionState.isConnected,
                     intensity: isOrchestrationActive ? 1.5 : 1.0,
                     primaryColor: _neuralTheme.colors.primary,
                     secondaryColor: _neuralTheme.colors.secondary,
@@ -307,232 +367,162 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
     );
   }
 
-  // 🧠 Build Neural App Bar - ENHANCED WITH ACHIEVEMENT SYSTEM
-  Widget _buildNeuralAppBar(DesignSystemData ds, WebSocketOrchestrationService orchestrationService) {
+  // 🧠 Build Neural App Bar - ENHANCED WITH REVOLUTIONARY CONNECTION STATUS
+  Widget _buildNeuralAppBar(DesignSystemData ds, WS.WebSocketOrchestrationService orchestrationService) {
     return Container(
-        height: 80,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              ds.colors.colorScheme.surface.withOpacity(0.95),
-              ds.colors.colorScheme.surface.withOpacity(0.85),
-            ],
-          ),
-          border: Border(
-            bottom: BorderSide(
-              color: ds.colors.neuralPrimary.withOpacity(0.2),
-              width: 1,
-            ),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: ds.colors.neuralPrimary.withOpacity(0.1),
-              blurRadius: 20,
-              offset: const Offset(0, 5),
-            ),
-          ],
-        ),
-        child: ClipRect(
-        child: BackdropFilter(
-        filter: ui.ImageFilter.blur(sigmaX: 25, sigmaY: 25),
-    child: Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 24),
-    child: Row(
-    children: [
-    // Neural Brain Logo with enhanced glow
-    Container(
-    decoration: BoxDecoration(
-    shape: BoxShape.circle,
-    boxShadow: [
-    BoxShadow(
-    color: ds.colors.neuralPrimary.withOpacity(0.4),
-    blurRadius: 15,
-    spreadRadius: 3,
-    ),
-    ],
-    ),
-      child: NeuralBrainLogo(
-        size: 50,
-        isConnected: orchestrationService.isConnected,
-        showConnections: true,
-        primaryColor: ds.colors.neuralPrimary,
-        secondaryColor: ds.colors.neuralSecondary,
-      ),
-    ),
-
-      const SizedBox(width: 16),
-
-      // App Title with enhanced gradient and 3D effect
-      Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8),
-          boxShadow: [
-            BoxShadow(
-              color: ds.colors.neuralPrimary.withOpacity(0.2),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: ShaderMask(
-          shaderCallback: (bounds) => LinearGradient(
-            colors: [
-              ds.colors.neuralPrimary,
-              ds.colors.neuralSecondary,
-              ds.colors.neuralAccent,
-            ],
-            stops: const [0.0, 0.5, 1.0],
-          ).createShader(bounds),
-          child: Text(
-            'NeuronVault',
-            style: ds.typography.h1.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.w900,
-              fontSize: 24,
-              letterSpacing: 0.5,
-            ),
-          ),
-        ),
-      ),
-
-      const SizedBox(width: 8),
-
-      // Enhanced subtitle with glow
-      Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'AI Orchestration Platform',
-            style: ds.typography.caption.copyWith(
-              color: ds.colors.colorScheme.onSurface.withOpacity(0.7),
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          Text(
-            '3D Neural Luxury Edition',
-            style: ds.typography.caption.copyWith(
-              color: ds.colors.neuralAccent.withOpacity(0.8),
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
-
-      const Spacer(),
-
-      // 🏆 ACHIEVEMENT QUICK STATS
-      Consumer(
-        builder: (context, ref, child) {
-          return GestureDetector(
-            onTap: () => setState(() => _showAchievementPanel = true),
-            child: const AchievementQuickStats(),
-          );
-        },
-      ),
-
-      const SizedBox(width: 16),
-
-      // Connection Status with enhanced 3D glow
-      _buildEnhancedConnectionStatus(ds, orchestrationService),
-
-      const SizedBox(width: 16),
-
-      // 🏆 Achievement Panel Button
-      _buildEnhanced3DButton(
-        icon: Icons.emoji_events,
-        onTap: () => setState(() => _showAchievementPanel = true),
-        ds: ds,
-      ),
-
-      const SizedBox(width: 8),
-
-      // Settings button with 3D effect
-      _buildEnhanced3DButton(
-        icon: Icons.settings,
-        onTap: () {},
-        ds: ds,
-      ),
-    ],
-    ),
-    ),
-        ),
-        ),
-    );
-  }
-
-  // 🔗 Build Enhanced Connection Status with 3D effects
-  Widget _buildEnhancedConnectionStatus(DesignSystemData ds, WebSocketOrchestrationService orchestrationService) {
-    final isConnected = orchestrationService.isConnected;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+      height: 80,
       decoration: BoxDecoration(
         gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
           colors: [
-            (isConnected ? ds.colors.connectionGreen : ds.colors.connectionRed).withOpacity(0.25),
-            (isConnected ? ds.colors.connectionGreen : ds.colors.connectionRed).withOpacity(0.15),
+            ds.colors.colorScheme.surface.withOpacity(0.95),
+            ds.colors.colorScheme.surface.withOpacity(0.85),
           ],
         ),
-        borderRadius: BorderRadius.circular(25),
-        border: Border.all(
-          color: (isConnected ? ds.colors.connectionGreen : ds.colors.connectionRed).withOpacity(0.4),
-          width: 1.5,
+        border: Border(
+          bottom: BorderSide(
+            color: ds.colors.neuralPrimary.withOpacity(0.2),
+            width: 1,
+          ),
         ),
         boxShadow: [
           BoxShadow(
-            color: (isConnected ? ds.colors.connectionGreen : ds.colors.connectionRed).withOpacity(0.3),
-            blurRadius: 12,
-            spreadRadius: 2,
+            color: ds.colors.neuralPrimary.withOpacity(0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 5),
           ),
         ],
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 10,
-            height: 10,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: isConnected ? ds.colors.connectionGreen : ds.colors.connectionRed,
-              boxShadow: [
-                BoxShadow(
-                  color: (isConnected ? ds.colors.connectionGreen : ds.colors.connectionRed).withOpacity(0.6),
-                  blurRadius: 8,
-                  spreadRadius: 2,
+      child: ClipRect(
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Row(
+              children: [
+                // Neural Brain Logo with enhanced glow
+                Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: ds.colors.neuralPrimary.withOpacity(0.4),
+                        blurRadius: 15,
+                        spreadRadius: 3,
+                      ),
+                    ],
+                  ),
+                  child: NeuralBrainLogo(
+                    size: 50,
+                    // 🔥 NEW: Use connection state
+                    isConnected: ref.watch(connectionControllerProvider).isConnected,
+                    showConnections: true,
+                    primaryColor: ds.colors.neuralPrimary,
+                    secondaryColor: ds.colors.neuralSecondary,
+                  ),
+                ),
+
+                const SizedBox(width: 16),
+
+                // App Title with enhanced gradient and 3D effect
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: [
+                      BoxShadow(
+                        color: ds.colors.neuralPrimary.withOpacity(0.2),
+                        blurRadius: 10,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: ShaderMask(
+                    shaderCallback: (bounds) => LinearGradient(
+                      colors: [
+                        ds.colors.neuralPrimary,
+                        ds.colors.neuralSecondary,
+                        ds.colors.neuralAccent,
+                      ],
+                      stops: const [0.0, 0.5, 1.0],
+                    ).createShader(bounds),
+                    child: Text(
+                      'NeuronVault',
+                      style: ds.typography.h1.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 24,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(width: 8),
+
+                // Enhanced subtitle with glow
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'AI Orchestration Platform',
+                      style: ds.typography.caption.copyWith(
+                        color: ds.colors.colorScheme.onSurface.withOpacity(0.7),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      'Revolutionary Connection Status',
+                      style: ds.typography.caption.copyWith(
+                        color: ds.colors.neuralAccent.withOpacity(0.8),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+
+                const Spacer(),
+
+                // 🏆 ACHIEVEMENT QUICK STATS
+                Consumer(
+                  builder: (context, ref, child) {
+                    return GestureDetector(
+                      onTap: () => setState(() => _showAchievementPanel = true),
+                      child: const AchievementQuickStats(),
+                    );
+                  },
+                ),
+
+                const SizedBox(width: 16),
+
+                // 🚀 REVOLUTIONARY CONNECTION STATUS WIDGET
+                const RevolutionaryConnectionStatus(
+                  isCompact: false,
+                ),
+
+                const SizedBox(width: 16),
+
+                // 🏆 Achievement Panel Button
+                _buildEnhanced3DButton(
+                  icon: Icons.emoji_events,
+                  onTap: () => setState(() => _showAchievementPanel = true),
+                  ds: ds,
+                ),
+
+                const SizedBox(width: 8),
+
+                // Settings button with 3D effect
+                _buildEnhanced3DButton(
+                  icon: Icons.settings,
+                  onTap: () {},
+                  ds: ds,
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 10),
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                isConnected ? 'CONNECTED' : 'DISCONNECTED',
-                style: ds.typography.caption.copyWith(
-                  color: isConnected ? ds.colors.connectionGreen : ds.colors.connectionRed,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 11,
-                ),
-              ),
-              if (isConnected)
-                Text(
-                  '3D NEURAL ACTIVE',
-                  style: ds.typography.caption.copyWith(
-                    color: ds.colors.connectionGreen.withOpacity(0.8),
-                    fontSize: 8,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-            ],
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -732,8 +722,10 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
   }
 
   Widget _buildRightPanelContent(DesignSystemData ds) {
-    final orchestrationService = ref.watch(webSocketOrchestrationServiceProvider);
+    final orchestrationService = ref.watch(webSocketOrchestrationServiceProvider) as WS.WebSocketOrchestrationService;
     final isOrchestrationActive = ref.watch(isOrchestrationActiveProvider);
+    // 🔥 NEW: Watch connection state
+    final connectionState = ref.watch(connectionControllerProvider);
 
     return Padding(
       padding: const EdgeInsets.all(24),
@@ -761,8 +753,9 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
 
           _buildEnhancedMetricCard(
             'Connection',
-            orchestrationService.isConnected ? 'Active' : 'Inactive',
-            orchestrationService.isConnected ? ds.colors.connectionGreen : ds.colors.connectionRed,
+            // 🔥 NEW: Enhanced connection status display
+            connectionState.isConnected ? 'Active • ${connectionState.latencyMs}ms' : 'Inactive',
+            connectionState.isConnected ? ds.colors.connectionGreen : ds.colors.connectionRed,
             Icons.wifi,
             ds,
           ),
@@ -1115,7 +1108,8 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
         children: [
           NeuralBrainLogo(
             size: 120,
-            isConnected: ref.watch(webSocketOrchestrationServiceProvider).isConnected,
+            // 🔥 NEW: Use connection state
+            isConnected: ref.watch(connectionControllerProvider).isConnected,
             showConnections: true,
             primaryColor: ds.colors.neuralPrimary,
             secondaryColor: ds.colors.neuralSecondary,
@@ -1135,7 +1129,7 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
           ),
           const SizedBox(height: 16),
           Text(
-            'AI Orchestration Platform\nTransparent multi-AI orchestration\n3D Neural Particle System',
+            'AI Orchestration Platform\nTransparent multi-AI orchestration\nRevolutionary Connection Status',
             style: ds.typography.body1.copyWith(
               color: ds.colors.colorScheme.onSurface.withOpacity(0.7),
               height: 1.6,
@@ -1151,9 +1145,9 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       child: Row(
-        mainAxisAlignment: message.isFromUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: message.type == MessageType.user ? MainAxisAlignment.end : MainAxisAlignment.start,
         children: [
-          if (!message.isFromUser) ...[
+          if (message.type != MessageType.user) ...[
             Container(
               width: 40,
               height: 40,
@@ -1169,20 +1163,20 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                gradient: message.isFromUser ? LinearGradient(colors: [ds.colors.neuralPrimary, ds.colors.neuralSecondary]) : null,
-                color: message.isFromUser ? null : ds.colors.colorScheme.surfaceContainer.withOpacity(0.8),
+                gradient: message.type == MessageType.user ? LinearGradient(colors: [ds.colors.neuralPrimary, ds.colors.neuralSecondary]) : null,
+                color: message.type == MessageType.user ? null : ds.colors.colorScheme.surfaceContainer.withOpacity(0.8),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
                 message.content,
                 style: ds.typography.body1.copyWith(
-                  color: message.isFromUser ? Colors.white : ds.colors.colorScheme.onSurface,
+                  color: message.type == MessageType.user ? Colors.white : ds.colors.colorScheme.onSurface,
                   height: 1.5,
                 ),
               ),
             ),
           ),
-          if (message.isFromUser) ...[
+          if (message.type == MessageType.user) ...[
             Container(
               width: 40,
               height: 40,
@@ -1200,8 +1194,9 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
   }
 
   Widget _buildNeuralChatInput(DesignSystemData ds) {
-    final orchestrationService = ref.watch(webSocketOrchestrationServiceProvider);
-    final isConnected = orchestrationService.isConnected;
+    // 🔥 NEW: Use connection state
+    final connectionState = ref.watch(connectionControllerProvider);
+    final isConnected = connectionState.isConnected;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -1268,7 +1263,13 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
   void _sendMessage(String message) {
     if (message.trim().isEmpty) return;
 
-    final userMessage = ChatMessage.user(message.trim());
+    final userMessage = ChatMessage(
+      id: '${DateTime.now().millisecondsSinceEpoch}_user',
+      content: message.trim(),
+      type: MessageType.user,
+      timestamp: DateTime.now(),
+    );
+
     setState(() {
       _messages.add(userMessage);
     });
@@ -1294,53 +1295,7 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
     orchestrationService.orchestrateAIRequest(
       prompt: message.trim(),
       selectedModels: activeModels,
-      strategy: OrchestrationStrategy.parallel, // This should use currentStrategy conversion
-    );
-  }
-}
-
-// ChatMessage class - Enhanced for compatibility
-class ChatMessage {
-  final String id;
-  final String content;
-  final bool isFromUser;
-  final DateTime timestamp;
-  final String? sourceModel;
-
-  ChatMessage({
-    required this.id,
-    required this.content,
-    required this.isFromUser,
-    required this.timestamp,
-    this.sourceModel,
-  });
-
-  factory ChatMessage.fromAIResponse(AIResponse response) {
-    return ChatMessage(
-      id: '${DateTime.now().millisecondsSinceEpoch}_${response.modelName}',
-      content: response.content,
-      isFromUser: false,
-      timestamp: response.timestamp,
-      sourceModel: response.modelName,
-    );
-  }
-
-  factory ChatMessage.synthesized(String content) {
-    return ChatMessage(
-      id: '${DateTime.now().millisecondsSinceEpoch}_synthesis',
-      content: content,
-      isFromUser: false,
-      timestamp: DateTime.now(),
-      sourceModel: 'synthesis',
-    );
-  }
-
-  factory ChatMessage.user(String content) {
-    return ChatMessage(
-      id: '${DateTime.now().millisecondsSinceEpoch}_user',
-      content: content,
-      isFromUser: true,
-      timestamp: DateTime.now(),
+      strategy: _convertToWebSocketStrategy(OrchestrationStrategy.parallel), // 🔧 FIXED: Convert our enum to websocket service enum
     );
   }
 }
