@@ -3,8 +3,6 @@
 // Revolutionary theme system with 6 distinct neural luxury experiences
 
 import 'package:flutter/material.dart';
-import 'dart:ui' as ui;
-import 'dart:math' as math;
 
 /// 🌟 Neural Theme System - Master Controller
 class NeuralThemeSystem {

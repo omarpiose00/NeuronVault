@@ -15,13 +15,13 @@ class ChatInputBar extends StatefulWidget {
   final String? typingIndicatorText;
 
   const ChatInputBar({
-    Key? key,
+    super.key,
     required this.onMessageSent,
     this.onVoiceInput,
     this.onFileUpload,
     this.isTyping = false,
     this.typingIndicatorText,
-  }) : super(key: key);
+  });
 
   @override
   State<ChatInputBar> createState() => _ChatInputBarState();

@@ -11,8 +11,6 @@ import 'dart:io';
 
 import '../core/providers/providers_main.dart' as providers;
 import 'package:neuronvault/core/theme/app_theme.dart';
-import '../../core/services/websocket_orchestration_service.dart';
-import '../core/state/state_models.dart' hide AppTheme;
 import 'package:neuronvault/screens/orchestration_main_screen.dart';
 
 void main() async {

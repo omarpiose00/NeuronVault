@@ -5,7 +5,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../core/design_system.dart';
 
 class LoadingScreen extends ConsumerStatefulWidget {
   final String message;
@@ -448,6 +447,7 @@ class ConnectingScreen extends LoadingScreen {
 }
 
 class ProcessingScreen extends LoadingScreen {
+  @override
   final double? progress;
 
   const ProcessingScreen({

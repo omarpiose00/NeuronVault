@@ -5,9 +5,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../core/design_system.dart';
 import '../core/providers/providers_main.dart' hide ConnectionStatus;
-import '../core/services/analytics_service.dart';
 import '../core/state/state_models.dart';
 
 enum ErrorSeverity {
@@ -755,7 +753,7 @@ Context: ${widget.errorContext ?? {}}
 
 // 🎯 ERROR SCREEN VARIANTS
 class ConnectionErrorScreen extends ErrorScreen {
-  ConnectionErrorScreen({super.key})
+  const ConnectionErrorScreen({super.key})
       : super(
           title: 'Connection Failed',
           message: 'Unable to connect to AI services. Please check your internet connection and try again.',
@@ -766,7 +764,7 @@ class ConnectionErrorScreen extends ErrorScreen {
 }
 
 class ModelErrorScreen extends ErrorScreen {
-  ModelErrorScreen({super.key})
+  const ModelErrorScreen({super.key})
       : super(
           title: 'AI Model Error',
           message: 'One or more AI models are currently unavailable. Some features may be limited.',
@@ -776,7 +774,7 @@ class ModelErrorScreen extends ErrorScreen {
 }
 
 class CriticalErrorScreen extends ErrorScreen {
-  CriticalErrorScreen({super.key})
+  const CriticalErrorScreen({super.key})
       : super(
           title: 'Critical System Error',
           message: 'A critical error has occurred. The application may need to be restarted.',

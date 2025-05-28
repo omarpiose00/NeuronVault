@@ -13,10 +13,10 @@ class StrategySelector extends StatefulWidget {
   final ValueChanged<OrchestrationStrategy> onStrategyChanged;
 
   const StrategySelector({
-    Key? key,
+    super.key,
     required this.currentStrategy,
     required this.onStrategyChanged,
-  }) : super(key: key);
+  });
 
   @override
   State<StrategySelector> createState() => _StrategySelectorState();

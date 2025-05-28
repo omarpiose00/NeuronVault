@@ -14,13 +14,13 @@ class NeuralBrainLogo extends StatefulWidget {
   final Color? secondaryColor;
 
   const NeuralBrainLogo({
-    Key? key,
+    super.key,
     this.size = 80.0,
     this.isConnected = false,
     this.showConnections = true,
     this.primaryColor,
     this.secondaryColor,
-  }) : super(key: key);
+  });
 
   @override
   State<NeuralBrainLogo> createState() => _NeuralBrainLogoState();
@@ -41,7 +41,7 @@ class _NeuralBrainLogoState extends State<NeuralBrainLogo>
 
   // Neural connection points
   List<Offset> _connectionPoints = [];
-  List<NeuralConnection> _connections = [];
+  final List<NeuralConnection> _connections = [];
 
   @override
   void initState() {

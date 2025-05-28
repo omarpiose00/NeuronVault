@@ -13,11 +13,11 @@ class NeuralAppBar extends StatefulWidget implements PreferredSizeWidget {
   final Animation<double> pulseAnimation;
 
   const NeuralAppBar({
-    Key? key,
+    super.key,
     required this.isConnected,
     required this.onConnectionToggle,
     required this.pulseAnimation,
-  }) : super(key: key);
+  });
 
   @override
   State<NeuralAppBar> createState() => _NeuralAppBarState();

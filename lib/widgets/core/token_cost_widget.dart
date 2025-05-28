@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 import '../../core/design_system.dart';
 import '../../core/accessibility/accessibility_manager.dart';
 import '../../core/state/state_models.dart';
-import '../../main.dart'; // For AIModel
+// For AIModel
 
 /// 💰 TOKEN COST WIDGET
 /// Widget per monitoraggio costi token con analytics avanzate
@@ -16,12 +16,12 @@ class TokenCostWidget extends StatefulWidget {
   final bool showDetailedBreakdown;
 
   const TokenCostWidget({
-    Key? key,
+    super.key,
     required this.totalTokens,
     required this.models,
     required this.budgetLimit,
     this.showDetailedBreakdown = false,
-  }) : super(key: key);
+  });
 
   @override
   State<TokenCostWidget> createState() => _TokenCostWidgetState();

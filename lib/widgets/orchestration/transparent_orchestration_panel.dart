@@ -4,7 +4,6 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart'; // FIXED: Corrected import
-import 'dart:math' as math;
 
 import '../../core/services/websocket_orchestration_service.dart';
 import '../../core/providers/providers_main.dart'; // FIXED: Corrected import
@@ -18,12 +17,12 @@ class TransparentOrchestrationPanel extends ConsumerStatefulWidget {
   final Map<String, double>? modelWeights;
 
   const TransparentOrchestrationPanel({
-    Key? key,
+    super.key,
     required this.prompt,
     required this.selectedModels,
     required this.strategy,
     this.modelWeights,
-  }) : super(key: key);
+  });
 
   @override
   ConsumerState<TransparentOrchestrationPanel> createState() => _TransparentOrchestrationPanelState();

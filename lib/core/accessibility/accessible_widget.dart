@@ -11,7 +11,7 @@ class AccessibleWidget extends StatelessWidget {
   final ValueChanged<bool>? onHover;
 
   const AccessibleWidget({
-    Key? key,
+    super.key,
     required this.child,
     this.id,
     this.semanticLabel,
@@ -19,7 +19,7 @@ class AccessibleWidget extends StatelessWidget {
     this.enabled = true,
     this.onTap,
     this.onHover,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

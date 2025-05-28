@@ -1,5 +1,5 @@
-// lib/screens/orchestration_main_screen.dart - IMPORT CONFLICTS FIXED
-// 🧬 LUXURY NEURAL ORCHESTRATION SCREEN - REVOLUTIONARY CONNECTION STATUS INTEGRATED
+// lib/screens/orchestration_main_screen.dart - PHASE 3.3 ENHANCED INTEGRATION
+// 🧬 LUXURY NEURAL ORCHESTRATION SCREEN - Enhanced Achievement System + Live Analytics
 
 import 'package:flutter/material.dart' hide ConnectionState; // 🔧 HIDE Flutter's ConnectionState
 import 'package:flutter/services.dart';
@@ -17,7 +17,7 @@ import '../widgets/core/neural_3d_particle_system.dart';
 import '../widgets/core/model_profiling_dashboard.dart';
 import '../widgets/core/spatial_audio_controls.dart';
 import '../widgets/core/neural_theme_selector.dart';
-// 🏆 ACHIEVEMENT SYSTEM IMPORTS
+// 🏆 PHASE 3.3: ENHANCED ACHIEVEMENT SYSTEM IMPORTS
 import '../widgets/core/achievement_notification.dart';
 import '../widgets/core/achievement_progress_panel.dart';
 // 🔥 NEW: REVOLUTIONARY CONNECTION STATUS
@@ -25,26 +25,6 @@ import '../widgets/core/revolutionary_connection_status.dart';
 
 class OrchestrationMainScreen extends ConsumerStatefulWidget {
   const OrchestrationMainScreen({super.key});
-
-  // 🔧 HELPER: Convert our OrchestrationStrategy to WebSocket service's type
-  WS.OrchestrationStrategy _convertToWebSocketStrategy(OrchestrationStrategy strategy) {
-    switch (strategy) {
-      case OrchestrationStrategy.parallel:
-        return WS.OrchestrationStrategy.parallel;
-      case OrchestrationStrategy.consensus:
-        return WS.OrchestrationStrategy.consensus;
-      case OrchestrationStrategy.adaptive:
-        return WS.OrchestrationStrategy.adaptive;
-      case OrchestrationStrategy.sequential:
-        return WS.OrchestrationStrategy.sequential;
-      case OrchestrationStrategy.weighted:
-        return WS.OrchestrationStrategy.weighted;
-    // 🔧 REMOVED: cascade doesn't exist in enum
-      case OrchestrationStrategy.cascade:
-        // TODO: Handle this case.
-        throw UnimplementedError();
-    }
-  }
 
   @override
   ConsumerState<OrchestrationMainScreen> createState() => _OrchestrationMainScreenState();
@@ -71,20 +51,42 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
   bool _isModelProfilingExpanded = false;
   List<ChatMessage> _messages = [];
 
-  // 🏆 ACHIEVEMENT SYSTEM STATE
+  // 🏆 PHASE 3.3: ENHANCED ACHIEVEMENT SYSTEM STATE
   bool _showAchievementPanel = false;
+  DateTime _sessionStartTime = DateTime.now();
+  int _orchestrationsThisSession = 0;
+  int _themeChangesThisSession = 0;
+  DateTime? _lastThemeChange;
 
   // Theme system state
   NeuralThemeType _currentThemeType = NeuralThemeType.cosmos;
   late NeuralThemeData _neuralTheme;
+
+  // 🔧 HELPER: Convert our OrchestrationStrategy to WebSocket service's type
+  WS.OrchestrationStrategy _convertToWebSocketStrategy(OrchestrationStrategy strategy) {
+    switch (strategy) {
+      case OrchestrationStrategy.parallel:
+        return WS.OrchestrationStrategy.parallel;
+      case OrchestrationStrategy.consensus:
+        return WS.OrchestrationStrategy.consensus;
+      case OrchestrationStrategy.adaptive:
+        return WS.OrchestrationStrategy.adaptive;
+      case OrchestrationStrategy.sequential:
+        return WS.OrchestrationStrategy.sequential;
+      case OrchestrationStrategy.weighted:
+        return WS.OrchestrationStrategy.weighted;
+      case OrchestrationStrategy.cascade:
+        throw UnimplementedError('Cascade strategy not yet implemented');
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     _initializeAnimations();
     _setupOrchestrationListeners();
-    // 🏆 SETUP ACHIEVEMENT TRACKING
-    _setupAchievementTracking();
+    // 🏆 PHASE 3.3: SETUP ENHANCED ACHIEVEMENT TRACKING
+    _setupEnhancedAchievementTracking();
 
     // Initialize theme system
     _neuralTheme = NeuralThemeData.cosmos();
@@ -141,7 +143,6 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
       orchestrationService.individualResponsesStream.listen((responses) {
         setState(() {
           for (final response in responses) {
-            // 🔧 FIXED: Remove requestId since it doesn't exist in AIResponse
             _messages.add(ChatMessage(
               id: '${DateTime.now().millisecondsSinceEpoch}_${response.modelName}',
               content: response.content,
@@ -155,7 +156,6 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
       orchestrationService.synthesizedResponseStream.listen((synthesis) {
         if (synthesis.isNotEmpty) {
           setState(() {
-            // 🔧 FIXED: Use ChatMessage constructor instead of synthesized
             _messages.add(ChatMessage(
               id: '${DateTime.now().millisecondsSinceEpoch}_synthesis',
               content: synthesis,
@@ -169,34 +169,106 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
     });
   }
 
-  // 🏆 SETUP ACHIEVEMENT TRACKING
-  void _setupAchievementTracking() {
+  // 🏆 PHASE 3.3: SETUP ENHANCED ACHIEVEMENT TRACKING
+  void _setupEnhancedAchievementTracking() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final tracker = ref.read(achievementTrackerProvider);
+      final tracker = ref.read(enhancedAchievementServiceProvider); // 🎯 Use enhanced service
 
       // Track first particle view when screen loads
       tracker.trackParticleInteraction();
       tracker.trackFeatureUsage('main_screen');
+
+      // 🎯 PHASE 3.3: Track session start
+      _trackSessionStart();
     });
   }
 
-  // 🔧 HELPER: Convert our OrchestrationStrategy to WebSocket service's type
-  WS.OrchestrationStrategy _convertToWebSocketStrategy(OrchestrationStrategy strategy) {
-    switch (strategy) {
-      case OrchestrationStrategy.parallel:
-        return WS.OrchestrationStrategy.parallel;
-      case OrchestrationStrategy.consensus:
-        return WS.OrchestrationStrategy.consensus;
-      case OrchestrationStrategy.adaptive:
-        return WS.OrchestrationStrategy.adaptive;
-      case OrchestrationStrategy.sequential:
-        return WS.OrchestrationStrategy.sequential;
-      case OrchestrationStrategy.weighted:
-        return WS.OrchestrationStrategy.weighted;
-    // 🔧 REMOVED: cascade doesn't exist in enum
-      case OrchestrationStrategy.cascade:
-        // TODO: Handle this case.
-        throw UnimplementedError();
+  // 🎯 PHASE 3.3: Enhanced Session Tracking Methods
+
+  /// Track session start with enhanced analytics
+  void _trackSessionStart() {
+    final tracker = ref.read(enhancedAchievementServiceProvider);
+    tracker.trackFeatureUsage('session_start');
+
+    // Reset session counters
+    _sessionStartTime = DateTime.now();
+    _orchestrationsThisSession = 0;
+    _themeChangesThisSession = 0;
+  }
+
+  /// Track orchestration completion with detailed metrics
+  void _trackOrchestrationCompletion(List<String> modelsUsed, String strategy, {
+    double? responseTime,
+    int? tokenCount,
+    double? qualityScore,
+  }) {
+    final tracker = ref.read(enhancedAchievementServiceProvider);
+
+    // Track with enhanced data
+    tracker.trackOrchestration(
+      modelsUsed,
+      strategy,
+      responseTime: responseTime,
+      tokenCount: tokenCount,
+      qualityScore: qualityScore,
+    );
+
+    // Update session stats
+    _orchestrationsThisSession++;
+
+    // Track session achievements
+    if (_orchestrationsThisSession >= 5) {
+      tracker.trackEnhancedProgress('speed_synthesizer');
+    }
+
+    if (_orchestrationsThisSession >= 10) {
+      tracker.trackEnhancedProgress('neural_marathon');
+    }
+  }
+
+  /// Track theme change with usage duration
+  void _trackThemeChange(String themeName) {
+    final tracker = ref.read(enhancedAchievementServiceProvider);
+    final now = DateTime.now();
+
+    Duration? usageDuration;
+    if (_lastThemeChange != null) {
+      usageDuration = now.difference(_lastThemeChange!);
+    }
+
+    tracker.trackThemeActivation(themeName, usageDuration: usageDuration);
+
+    // Update session stats
+    _themeChangesThisSession++;
+    _lastThemeChange = now;
+
+    // Track rapid theme switching achievement
+    if (_themeChangesThisSession >= 5) {
+      tracker.trackEnhancedProgress('visual_shapeshifter');
+    }
+  }
+
+  /// Track feature interaction with enhanced data
+  void _trackFeatureInteraction(String feature, {Map<String, dynamic>? additionalData}) {
+    final tracker = ref.read(enhancedAchievementServiceProvider);
+    tracker.trackFeatureUsage(feature);
+
+    // Track specific feature achievements
+    switch (feature) {
+      case 'model_profiling':
+        final timeSpent = additionalData?['time_spent'] as Duration?;
+        tracker.trackProfilingUsage(timeSpent: timeSpent);
+        break;
+      case 'spatial_audio':
+        final soundType = additionalData?['sound_type'] as String?;
+        final hapticEnabled = additionalData?['haptic_enabled'] as bool?;
+        tracker.trackAudioActivation(soundType: soundType, hapticEnabled: hapticEnabled);
+        break;
+      case 'particle_interaction':
+        final particleType = additionalData?['particle_type'] as String?;
+        final intensity = additionalData?['intensity'] as double?;
+        tracker.trackParticleInteraction(particleType: particleType, intensity: intensity);
+        break;
     }
   }
 
@@ -214,10 +286,12 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
   Widget build(BuildContext context) {
     final ds = context.ds;
 
-    // 🔥 NEW: Use enhanced connection state
+    // 🔥 PHASE 3.3: Use enhanced connection state and live analytics
     final connectionState = ref.watch(connectionControllerProvider);
     final orchestrationService = ref.watch(webSocketOrchestrationServiceProvider) as WS.WebSocketOrchestrationService;
     final isOrchestrationActive = ref.watch(isOrchestrationActiveProvider);
+    final sessionPerformance = ref.watch(sessionPerformanceProvider);
+    final liveAnalytics = ref.watch(liveAnalyticsProvider);
 
     final size = MediaQuery.of(context).size;
     final isMobile = size.width < 768;
@@ -234,21 +308,24 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
               children: [
                 // 🌟 REVOLUTIONARY 3D NEURAL PARTICLE SYSTEM
                 Positioned.fill(
-                  child: Neural3DParticleSystem(
-                    size: size,
-                    // 🔥 NEW: Use connection state directly
-                    isActive: connectionState.isConnected,
-                    intensity: isOrchestrationActive ? 1.5 : 1.0,
-                    primaryColor: _neuralTheme.colors.primary,
-                    secondaryColor: _neuralTheme.colors.secondary,
-                    neuralTheme: _neuralTheme,
+                  child: GestureDetector(
+                    onTap: () => _trackFeatureInteraction('particle_interaction',
+                        additionalData: {'particle_type': 'tap', 'intensity': 1.0}),
+                    child: Neural3DParticleSystem(
+                      size: size,
+                      isActive: connectionState.isConnected,
+                      intensity: isOrchestrationActive ? 1.5 : 1.0,
+                      primaryColor: _neuralTheme.colors.primary,
+                      secondaryColor: _neuralTheme.colors.secondary,
+                      neuralTheme: _neuralTheme,
+                    ),
                   ),
                 ),
 
                 // 🏆 ACHIEVEMENT NOTIFICATION OVERLAY
                 const AchievementNotificationOverlay(),
 
-                // 🏆 ACHIEVEMENT PANEL OVERLAY
+                // 🏆 ENHANCED ACHIEVEMENT PANEL OVERLAY
                 if (_showAchievementPanel)
                   Positioned.fill(
                     child: Container(
@@ -268,7 +345,10 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
                                 top: 10,
                                 right: 10,
                                 child: IconButton(
-                                  onPressed: () => setState(() => _showAchievementPanel = false),
+                                  onPressed: () {
+                                    setState(() => _showAchievementPanel = false);
+                                    _trackFeatureInteraction('achievement_panel_close');
+                                  },
                                   icon: const Icon(Icons.close, color: Colors.white),
                                 ),
                               ),
@@ -279,12 +359,12 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
                     ),
                   ),
 
-                // 🌟 Performance FPS Overlay (debug)
+                // 🌟 PHASE 3.3: Enhanced Performance Overlay with Session Analytics
                 if (MediaQuery.of(context).size.width > 1200)
                   Positioned(
                     top: 90,
                     right: 20,
-                    child: _buildPerformanceOverlay(ds),
+                    child: _buildEnhancedPerformanceOverlay(ds, sessionPerformance, liveAnalytics),
                   ),
 
                 // Main content
@@ -306,8 +386,8 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
     );
   }
 
-  // 📊 Build Performance Overlay (shows 3D system performance)
-  Widget _buildPerformanceOverlay(DesignSystemData ds) {
+  // 📊 PHASE 3.3: Build Enhanced Performance Overlay with Live Analytics
+  Widget _buildEnhancedPerformanceOverlay(DesignSystemData ds, SessionPerformance sessionPerformance, Map<String, dynamic> liveAnalytics) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
@@ -327,17 +407,18 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
+          // 🎯 Performance Header
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                Icons.speed,
+                Icons.analytics,
                 color: ds.colors.neuralAccent,
                 size: 16,
               ),
               const SizedBox(width: 6),
               Text(
-                '3D PARTICLES',
+                'LIVE ANALYTICS',
                 style: ds.typography.caption.copyWith(
                   color: ds.colors.colorScheme.onSurface,
                   fontWeight: FontWeight.w700,
@@ -346,7 +427,9 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
               ),
             ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 8),
+
+          // 📊 3D Particles Performance
           Text(
             '150 nodes • 300 connections',
             style: ds.typography.caption.copyWith(
@@ -362,13 +445,56 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
               fontWeight: FontWeight.w600,
             ),
           ),
+
+          const SizedBox(height: 6),
+          Container(height: 1, color: ds.colors.neuralPrimary.withOpacity(0.2)),
+          const SizedBox(height: 6),
+
+          // 🏆 Session Performance
+          Text(
+            'Session: ${sessionPerformance.sessionDuration.inMinutes}m',
+            style: ds.typography.caption.copyWith(
+              color: ds.colors.neuralPrimary,
+              fontSize: 9,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          Text(
+            'Achievements: ${sessionPerformance.achievementsUnlocked}',
+            style: ds.typography.caption.copyWith(
+              color: Colors.amber,
+              fontSize: 9,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          Text(
+            'Streak: ${sessionPerformance.streakDays} days',
+            style: ds.typography.caption.copyWith(
+              color: ds.colors.neuralSecondary,
+              fontSize: 9,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+
+          // 📈 Live Analytics
+          if (liveAnalytics['unlock_rate'] != null)
+            Text(
+              'Rate: ${(liveAnalytics['unlock_rate'] as double).toStringAsFixed(2)}/h',
+              style: ds.typography.caption.copyWith(
+                color: ds.colors.connectionGreen,
+                fontSize: 9,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
         ],
       ),
     );
   }
 
-  // 🧠 Build Neural App Bar - ENHANCED WITH REVOLUTIONARY CONNECTION STATUS
+  // 🧠 Build Neural App Bar - ENHANCED WITH PHASE 3.3 ANALYTICS
   Widget _buildNeuralAppBar(DesignSystemData ds, WS.WebSocketOrchestrationService orchestrationService) {
+    final sessionPerformance = ref.watch(sessionPerformanceProvider);
+
     return Container(
       height: 80,
       decoration: BoxDecoration(
@@ -413,13 +539,16 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
                       ),
                     ],
                   ),
-                  child: NeuralBrainLogo(
-                    size: 50,
-                    // 🔥 NEW: Use connection state
-                    isConnected: ref.watch(connectionControllerProvider).isConnected,
-                    showConnections: true,
-                    primaryColor: ds.colors.neuralPrimary,
-                    secondaryColor: ds.colors.neuralSecondary,
+                  child: GestureDetector(
+                    onTap: () => _trackFeatureInteraction('neural_logo',
+                        additionalData: {'session_duration': sessionPerformance.sessionDuration.inMinutes}),
+                    child: NeuralBrainLogo(
+                      size: 50,
+                      isConnected: ref.watch(connectionControllerProvider).isConnected,
+                      showConnections: true,
+                      primaryColor: ds.colors.neuralPrimary,
+                      secondaryColor: ds.colors.neuralSecondary,
+                    ),
                   ),
                 ),
 
@@ -460,7 +589,7 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
 
                 const SizedBox(width: 8),
 
-                // Enhanced subtitle with glow
+                // PHASE 3.3: Enhanced subtitle with session info
                 Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -473,7 +602,7 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
                       ),
                     ),
                     Text(
-                      'Revolutionary Connection Status',
+                      'Session: ${sessionPerformance.sessionDuration.inMinutes}m • ${sessionPerformance.achievementsUnlocked} achievements',
                       style: ds.typography.caption.copyWith(
                         color: ds.colors.neuralAccent.withOpacity(0.8),
                         fontSize: 10,
@@ -485,11 +614,14 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
 
                 const Spacer(),
 
-                // 🏆 ACHIEVEMENT QUICK STATS
+                // 🏆 ENHANCED ACHIEVEMENT QUICK STATS
                 Consumer(
                   builder: (context, ref, child) {
                     return GestureDetector(
-                      onTap: () => setState(() => _showAchievementPanel = true),
+                      onTap: () {
+                        setState(() => _showAchievementPanel = true);
+                        _trackFeatureInteraction('achievement_panel_open');
+                      },
                       child: const AchievementQuickStats(),
                     );
                   },
@@ -504,10 +636,13 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
 
                 const SizedBox(width: 16),
 
-                // 🏆 Achievement Panel Button
+                // 🏆 Achievement Panel Button with enhanced tracking
                 _buildEnhanced3DButton(
                   icon: Icons.emoji_events,
-                  onTap: () => setState(() => _showAchievementPanel = true),
+                  onTap: () {
+                    setState(() => _showAchievementPanel = true);
+                    _trackFeatureInteraction('achievement_panel_toggle');
+                  },
                   ds: ds,
                 ),
 
@@ -516,7 +651,7 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
                 // Settings button with 3D effect
                 _buildEnhanced3DButton(
                   icon: Icons.settings,
-                  onTap: () {},
+                  onTap: () => _trackFeatureInteraction('settings'),
                   ds: ds,
                 ),
               ],
@@ -575,7 +710,7 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
     );
   }
 
-  // Rest of the methods remain the same...
+  // Rest of the methods with PHASE 3.3 enhancements...
   Widget _buildMobileLayout(DesignSystemData ds) {
     return Column(
       children: [
@@ -724,8 +859,8 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
   Widget _buildRightPanelContent(DesignSystemData ds) {
     final orchestrationService = ref.watch(webSocketOrchestrationServiceProvider) as WS.WebSocketOrchestrationService;
     final isOrchestrationActive = ref.watch(isOrchestrationActiveProvider);
-    // 🔥 NEW: Watch connection state
     final connectionState = ref.watch(connectionControllerProvider);
+    final sessionPerformance = ref.watch(sessionPerformanceProvider); // 🎯 PHASE 3.3
 
     return Padding(
       padding: const EdgeInsets.all(24),
@@ -751,9 +886,9 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
 
           const SizedBox(height: 32),
 
+          // 🎯 PHASE 3.3: Enhanced Metrics with Session Data
           _buildEnhancedMetricCard(
             'Connection',
-            // 🔥 NEW: Enhanced connection status display
             connectionState.isConnected ? 'Active • ${connectionState.latencyMs}ms' : 'Inactive',
             connectionState.isConnected ? ds.colors.connectionGreen : ds.colors.connectionRed,
             Icons.wifi,
@@ -790,9 +925,20 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
             ds,
           ),
 
+          const SizedBox(height: 16),
+
+          // 🏆 PHASE 3.3: Session Performance Metrics
+          _buildEnhancedMetricCard(
+            'Session',
+            '${sessionPerformance.sessionDuration.inMinutes}m • ${sessionPerformance.achievementsUnlocked} achievements',
+            ds.colors.neuralAccent,
+            Icons.access_time,
+            ds,
+          ),
+
           const SizedBox(height: 24),
 
-          // 🧠 MODEL PROFILING DASHBOARD - WITH ACHIEVEMENT TRACKING
+          // 🧠 MODEL PROFILING DASHBOARD - WITH ENHANCED ACHIEVEMENT TRACKING
           Expanded(
             flex: 2,
             child: GestureDetector(
@@ -801,12 +947,12 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
                   _isModelProfilingExpanded = !_isModelProfilingExpanded;
                 });
 
-                // 🏆 TRACK ACHIEVEMENT
-                if (_isModelProfilingExpanded) {
-                  final tracker = ref.read(achievementTrackerProvider);
-                  tracker.trackProfilingUsage();
-                  tracker.trackFeatureUsage('model_profiling');
-                }
+                // 🏆 PHASE 3.3: Enhanced Achievement Tracking
+                final startTime = DateTime.now();
+                _trackFeatureInteraction('model_profiling', additionalData: {
+                  'expanded': _isModelProfilingExpanded,
+                  'time_spent': _isModelProfilingExpanded ? Duration.zero : Duration(seconds: 30), // Example duration
+                });
               },
               child: ModelProfilingDashboard(
                 isExpanded: _isModelProfilingExpanded,
@@ -815,33 +961,28 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
                     _isModelProfilingExpanded = !_isModelProfilingExpanded;
                   });
 
-                  // 🏆 TRACK ACHIEVEMENT
-                  if (_isModelProfilingExpanded) {
-                    final tracker = ref.read(achievementTrackerProvider);
-                    tracker.trackProfilingUsage();
-                    tracker.trackFeatureUsage('model_profiling');
-                  }
+                  _trackFeatureInteraction('model_profiling_toggle');
                 },
               ),
             ),
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(width: 16),
 
-          // 🔊 SPATIAL AUDIO CONTROLS - WITH ACHIEVEMENT TRACKING
+          // 🔊 SPATIAL AUDIO CONTROLS - WITH ENHANCED ACHIEVEMENT TRACKING
           GestureDetector(
             onTap: () {
-              // 🏆 TRACK ACHIEVEMENT
-              final tracker = ref.read(achievementTrackerProvider);
-              tracker.trackAudioActivation();
-              tracker.trackFeatureUsage('spatial_audio');
+              _trackFeatureInteraction('spatial_audio', additionalData: {
+                'sound_type': 'tap_activation',
+                'haptic_enabled': true,
+              });
             },
             child: const SpatialAudioControls(isCompact: true),
           ),
 
           const SizedBox(height: 16),
 
-          // 🎨 NEURAL THEME SELECTOR - WITH ACHIEVEMENT TRACKING
+          // 🎨 NEURAL THEME SELECTOR - WITH ENHANCED ACHIEVEMENT TRACKING
           NeuralThemeSelector(
             isCompact: true,
             onThemeChanged: (themeType) => _changeTheme(themeType),
@@ -851,7 +992,7 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
     );
   }
 
-  // 🎨 THEME CHANGE METHOD WITH ACHIEVEMENT TRACKING
+  // 🎨 PHASE 3.3: Enhanced Theme Change Method with Session Tracking
   void _changeTheme(NeuralThemeType themeType) {
     setState(() {
       _currentThemeType = themeType;
@@ -877,12 +1018,11 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
       }
     });
 
-    // 🏆 TRACK ACHIEVEMENT
-    final tracker = ref.read(achievementTrackerProvider);
-    tracker.trackThemeActivation(themeType.name);
+    // 🏆 PHASE 3.3: Enhanced Theme Tracking
+    _trackThemeChange(themeType.name);
   }
 
-  // Helper methods
+  // Helper methods (keeping existing ones but enhanced)
   Widget _buildSectionHeader(String title, IconData icon, DesignSystemData ds) {
     return Row(
       children: [
@@ -989,6 +1129,12 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
           onTap: () {
             ref.read(currentStrategyProvider.notifier).state = strategy;
             HapticFeedback.selectionClick();
+
+            // 🏆 PHASE 3.3: Enhanced Strategy Tracking
+            _trackFeatureInteraction('strategy_selection', additionalData: {
+              'strategy': strategy,
+              'previous_strategy': currentStrategy,
+            });
           },
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -1076,6 +1222,13 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
                   }
                   modelsNotifier.state = currentModels;
                   HapticFeedback.lightImpact();
+
+                  // 🏆 PHASE 3.3: Enhanced Model Tracking
+                  _trackFeatureInteraction('model_toggle', additionalData: {
+                    'model': modelId,
+                    'active': value,
+                    'total_active': currentModels.length,
+                  });
                 },
                 activeColor: color,
               ),
@@ -1102,17 +1255,21 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
   }
 
   Widget _buildEmptyState(DesignSystemData ds) {
+    final sessionPerformance = ref.watch(sessionPerformanceProvider);
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          NeuralBrainLogo(
-            size: 120,
-            // 🔥 NEW: Use connection state
-            isConnected: ref.watch(connectionControllerProvider).isConnected,
-            showConnections: true,
-            primaryColor: ds.colors.neuralPrimary,
-            secondaryColor: ds.colors.neuralSecondary,
+          GestureDetector(
+            onTap: () => _trackFeatureInteraction('neural_logo_tap'),
+            child: NeuralBrainLogo(
+              size: 120,
+              isConnected: ref.watch(connectionControllerProvider).isConnected,
+              showConnections: true,
+              primaryColor: ds.colors.neuralPrimary,
+              secondaryColor: ds.colors.neuralSecondary,
+            ),
           ),
           const SizedBox(height: 32),
           ShaderMask(
@@ -1129,7 +1286,7 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
           ),
           const SizedBox(height: 16),
           Text(
-            'AI Orchestration Platform\nTransparent multi-AI orchestration\nRevolutionary Connection Status',
+            'AI Orchestration Platform\nTransparent multi-AI orchestration\nSession: ${sessionPerformance.sessionDuration.inMinutes}m • ${sessionPerformance.achievementsUnlocked} achievements',
             style: ds.typography.body1.copyWith(
               color: ds.colors.colorScheme.onSurface.withOpacity(0.7),
               height: 1.6,
@@ -1194,7 +1351,6 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
   }
 
   Widget _buildNeuralChatInput(DesignSystemData ds) {
-    // 🔥 NEW: Use connection state
     final connectionState = ref.watch(connectionControllerProvider);
     final isConnected = connectionState.isConnected;
 
@@ -1259,10 +1415,11 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
     );
   }
 
-  // 🏆 ENHANCED _sendMessage WITH ACHIEVEMENT TRACKING
+  // 🏆 PHASE 3.3: Enhanced _sendMessage with Detailed Orchestration Tracking
   void _sendMessage(String message) {
     if (message.trim().isEmpty) return;
 
+    final startTime = DateTime.now();
     final userMessage = ChatMessage(
       id: '${DateTime.now().millisecondsSinceEpoch}_user',
       content: message.trim(),
@@ -1288,14 +1445,23 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
     final activeModels = ref.read(activeModelsProvider);
     final currentStrategy = ref.read(currentStrategyProvider);
 
-    // 🏆 TRACK ACHIEVEMENT BEFORE ORCHESTRATION
-    final tracker = ref.read(achievementTrackerProvider);
-    tracker.trackOrchestration(activeModels, currentStrategy);
+    // 🏆 PHASE 3.3: Enhanced Orchestration Tracking with Detailed Metrics
+    Future.delayed(const Duration(seconds: 1), () {
+      final responseTime = DateTime.now().difference(startTime).inMilliseconds / 1000.0;
+
+      _trackOrchestrationCompletion(
+        activeModels,
+        currentStrategy,
+        responseTime: responseTime,
+        tokenCount: message.length, // Approximate token count
+        qualityScore: 0.9, // Example quality score
+      );
+    });
 
     orchestrationService.orchestrateAIRequest(
       prompt: message.trim(),
       selectedModels: activeModels,
-      strategy: _convertToWebSocketStrategy(OrchestrationStrategy.parallel), // 🔧 FIXED: Convert our enum to websocket service enum
+      strategy: _convertToWebSocketStrategy(OrchestrationStrategy.parallel),
     );
   }
 }

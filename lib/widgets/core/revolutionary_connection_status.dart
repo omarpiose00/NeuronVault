@@ -18,10 +18,10 @@ class RevolutionaryConnectionStatus extends ConsumerStatefulWidget {
   final VoidCallback? onTap;
 
   const RevolutionaryConnectionStatus({
-    Key? key,
+    super.key,
     this.isCompact = false,
     this.onTap,
-  }) : super(key: key);
+  });
 
   @override
   ConsumerState<RevolutionaryConnectionStatus> createState() =>
@@ -46,7 +46,7 @@ class _RevolutionaryConnectionStatusState
 
   // Connection quality tracking
   Timer? _latencyTimer;
-  List<int> _latencyHistory = [];
+  final List<int> _latencyHistory = [];
   int _currentLatency = 0;
   double _connectionQuality = 1.0;
   int _retryCountdown = 0;
@@ -501,7 +501,7 @@ class _RevolutionaryConnectionStatusState
 
 /// 🔍 Connection Diagnostics Dialog - Advanced connection information
 class ConnectionDiagnosticsDialog extends ConsumerWidget {
-  const ConnectionDiagnosticsDialog({Key? key}) : super(key: key);
+  const ConnectionDiagnosticsDialog({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

@@ -22,7 +22,7 @@ class MessageBubble extends StatefulWidget {
   final VoidCallback? onShare;
 
   const MessageBubble({
-    Key? key,
+    super.key,
     required this.message,
     required this.isFromAI,
     this.aiModel,
@@ -30,7 +30,7 @@ class MessageBubble extends StatefulWidget {
     this.showTypingEffect = false,
     this.onCopy,
     this.onShare,
-  }) : super(key: key);
+  });
 
   @override
   State<MessageBubble> createState() => _MessageBubbleState();

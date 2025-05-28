@@ -8,7 +8,6 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import '../../core/providers/providers_main.dart';
-import '../../core/design_system.dart';
 import '../../core/services/spatial_audio_service.dart'; // NEW IMPORT
 import '../../core/theme/neural_theme_system.dart'; // NEW IMPORT
 
@@ -46,8 +45,8 @@ class _Neural3DParticleSystemState extends ConsumerState<Neural3DParticleSystem>
   late Animation<double> _pulseAnimation;
   late Animation<double> _rotationAnimation;
 
-  List<Neural3DParticle> _particles = [];
-  List<NeuralConnection> _connections = [];
+  final List<Neural3DParticle> _particles = [];
+  final List<NeuralConnection> _connections = [];
 
   // Performance tracking
   int _frameCount = 0;
@@ -438,7 +437,7 @@ class Neural3DParticlesPainter extends CustomPainter {
     if (currentFrame % 180 == 0) { // Every 3 seconds at 60fps
       for (int i = 0; i < activeModelCount; i++) {
         final angle = (i / activeModelCount) * 2 * math.pi;
-        final radius = 100.0;
+        const radius = 100.0;
         final position = SpatialPosition(
           x: size.width / 2 + math.cos(angle) * radius,
           y: size.height / 2 + math.sin(angle) * radius,

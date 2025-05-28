@@ -3,7 +3,6 @@
 // Compatible with both Socket.IO and native WebSocket backends
 
 import 'dart:async';
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 
@@ -85,7 +84,7 @@ class WebSocketOrchestrationService extends ChangeNotifier {
   int get currentPort => _currentPort;
 
   // AI Orchestration state
-  List<AIResponse> _individualResponses = [];
+  final List<AIResponse> _individualResponses = [];
   String? _synthesizedResponse;
   OrchestrationStrategy _currentStrategy = OrchestrationStrategy.parallel;
 

@@ -11,7 +11,7 @@ import '../state/state_models.dart';
 import '../services/config_service.dart';
 import '../services/analytics_service.dart';
 import '../services/websocket_orchestration_service.dart';
-import '../providers/providers_main.dart' hide ConnectionStatus;
+import '../providers/providers_main.dart';
 
 // 🌐 ENHANCED CONNECTION CONTROLLER (MANTIENE NOME ORIGINALE)
 class ConnectionController extends Notifier<ConnectionState> {
@@ -25,7 +25,7 @@ class ConnectionController extends Notifier<ConnectionState> {
 
   // 🔥 NEW: Latency & Quality Monitoring
   Timer? _latencyTimer;
-  List<int> _latencyHistory = [];
+  final List<int> _latencyHistory = [];
   int _currentLatency = 0;
   double _connectionQuality = 1.0;
   DateTime? _lastLatencyCheck;
@@ -281,14 +281,16 @@ class ConnectionController extends Notifier<ConnectionState> {
 
     double score = 1.0;
 
-    if (avgLatency < 50) score *= 1.0;
-    else if (avgLatency < 100) score *= 0.9;
+    if (avgLatency < 50) {
+      score *= 1.0;
+    } else if (avgLatency < 100) score *= 0.9;
     else if (avgLatency < 200) score *= 0.7;
     else if (avgLatency < 500) score *= 0.5;
     else score *= 0.3;
 
-    if (jitter > 100) score *= 0.8;
-    else if (jitter > 50) score *= 0.9;
+    if (jitter > 100) {
+      score *= 0.8;
+    } else if (jitter > 50) score *= 0.9;
 
     return math.max(score, 0.1);
   }

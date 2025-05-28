@@ -4,7 +4,6 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import '../../core/providers/providers_main.dart';
@@ -499,7 +498,7 @@ class _ModelProfilingDashboardState extends ConsumerState<ModelProfilingDashboar
                             ),
                           ),
                         );
-                      }).toList(),
+                      }),
                     ],
                   ),
 
@@ -510,7 +509,7 @@ class _ModelProfilingDashboardState extends ConsumerState<ModelProfilingDashboar
                     spec,
                     activeModels.where((id) => _modelProfiles.containsKey(id)).toList(),
                     ds,
-                  )).toList(),
+                  )),
                 ],
               ),
             );
@@ -572,7 +571,7 @@ class _ModelProfilingDashboardState extends ConsumerState<ModelProfilingDashboar
                 ),
               ),
             );
-          }).toList(),
+          }),
         ],
       ),
     );
@@ -605,7 +604,7 @@ class _ModelProfilingDashboardState extends ConsumerState<ModelProfilingDashboar
         ...activeModels.where((id) => _modelProfiles.containsKey(id)).map((modelId) {
           final profile = _modelProfiles[modelId]!;
           return _buildPerformanceBar(profile, ds);
-        }).toList(),
+        }),
       ],
     );
   }

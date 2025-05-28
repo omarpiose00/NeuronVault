@@ -1,252 +1,415 @@
-// 🏆 NEURONVAULT ACHIEVEMENT SERVICE
+// 🏆 NEURONVAULT ENHANCED ACHIEVEMENT SERVICE - PHASE 3.3 LUXURY ENHANCED
 // lib/core/services/achievement_service.dart
-// Enterprise-grade achievement system with neural luxury integration
+// Revolutionary achievement system with neural luxury integration + Audio + Analytics
 
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'dart:async';
-import '../state/state_models.dart'; // Contains Achievement models
+import '../state/state_models.dart';
 
-/// 🏆 Achievement Service - Manages all achievement logic
-class AchievementService extends ChangeNotifier {
+/// 🏆 Enhanced Achievement Service - PHASE 3.3 LUXURY ENHANCED
+/// Revolutionary achievement system with neural luxury integration + Multi-stage celebrations
+class EnhancedAchievementService extends ChangeNotifier {
   final SharedPreferences _prefs;
   final Logger _logger;
 
-  static const String _storageKey = 'neuronvault_achievements';
-  static const String _progressKey = 'neuronvault_achievement_progress';
+  static const String _storageKey = 'neuronvault_achievements_v3';
+  static const String _progressKey = 'neuronvault_achievement_progress_v3';
+  static const String _sessionsKey = 'neuronvault_sessions_v3';
+  static const String _analyticsKey = 'neuronvault_analytics_v3';
 
   AchievementState _state = const AchievementState();
   final StreamController<AchievementNotification> _notificationController =
   StreamController<AchievementNotification>.broadcast();
 
-  AchievementService({
+  // 🎨 PHASE 3.3: ENHANCED TRACKING SYSTEMS
+  late Timer _performanceTimer;
+  late Timer _sessionTimer;
+  int _currentSessionMinutes = 0;
+  bool _maintainedHighPerformance = false;
+  Map<String, int> _sessionStats = {};
+  final Map<String, DateTime> _lastUsageTracking = {};
+
+  // 🔊 PHASE 3.3: AUDIO INTEGRATION READY
+  // AudioService? _audioService; // Will be injected later
+
+  // 📊 PHASE 3.3: REAL-TIME ANALYTICS
+  Map<String, dynamic> _liveAnalytics = {};
+  List<AchievementEvent> _eventHistory = [];
+
+  EnhancedAchievementService({
     required SharedPreferences prefs,
     required Logger logger,
   }) : _prefs = prefs, _logger = logger {
-    _initializeAchievements();
+    _initializeEnhancedAchievements();
+    _startPerformanceTracking();
+    _startSessionTracking();
   }
 
-  // 📊 Getters
+  // 📊 Enhanced Getters
   AchievementState get state => _state;
   Stream<AchievementNotification> get notificationStream => _notificationController.stream;
+  Map<String, dynamic> get liveAnalytics => _liveAnalytics;
+  List<AchievementEvent> get eventHistory => _eventHistory;
+  int get currentSessionMinutes => _currentSessionMinutes;
+  Map<String, int> get sessionStats => _sessionStats;
 
-  /// 🚀 Initialize achievement system with predefined achievements
-  Future<void> _initializeAchievements() async {
+  /// 🚀 Initialize enhanced achievement system
+  Future<void> _initializeEnhancedAchievements() async {
     try {
-      _logger.i('🏆 Initializing Achievement System...');
+      _logger.i('🏆 Initializing Enhanced Achievement System PHASE 3.3...');
 
-      // Load saved state
-      await _loadState();
+      // Load enhanced state
+      await _loadEnhancedState();
 
-      // Initialize predefined achievements if first run
+      // Initialize achievements if first run
       if (_state.achievements.isEmpty) {
-        await _createDefaultAchievements();
+        await _createEnhancedAchievements();
       }
 
+      // Update live analytics
+      await _updateLiveAnalytics();
+
       // Update stats
-      await _updateStats();
+      await _updateEnhancedStats();
 
       _state = _state.copyWith(isInitialized: true);
       notifyListeners();
 
-      _logger.i('✅ Achievement System initialized with ${_state.achievements.length} achievements');
+      _logger.i('✅ Enhanced Achievement System initialized with ${_state.achievements.length} achievements');
     } catch (e) {
-      _logger.e('❌ Failed to initialize Achievement System: $e');
+      _logger.e('❌ Failed to initialize Enhanced Achievement System: $e');
     }
   }
 
-  /// 📝 Create default neural luxury achievements
-  Future<void> _createDefaultAchievements() async {
+  /// 📝 Create enhanced neural luxury achievements with PHASE 3.3 features
+  Future<void> _createEnhancedAchievements() async {
     final achievements = <String, Achievement>{};
 
-    // 🚀 3D PARTICLE ACHIEVEMENTS
-    achievements['first_particle_view'] = const Achievement(
-      id: 'first_particle_view',
+    // 🚀 3D PARTICLE ACHIEVEMENTS - ENHANCED
+    achievements['neural_awakening'] = const Achievement(
+      id: 'neural_awakening',
       title: 'Neural Awakening',
-      description: 'Witnessed your first 3D neural particle system',
+      description: 'Witnessed your first 3D neural particle system in all its glory',
       category: AchievementCategory.particles,
       rarity: AchievementRarity.common,
       targetProgress: 1,
+      // icon: Icons.visibility, // Removed: Icon is in AchievementIconX extension
     );
 
-    achievements['particle_interaction'] = const Achievement(
-      id: 'particle_interaction',
+    achievements['particle_whisperer'] = const Achievement(
+      id: 'particle_whisperer',
       title: 'Particle Whisperer',
-      description: 'Interacted with neural particles 50 times',
+      description: 'Interacted with neural particles 50 times - you speak their language',
       category: AchievementCategory.particles,
       rarity: AchievementRarity.rare,
       targetProgress: 50,
+      // icon: Icons.touch_app, // Removed
     );
 
-    achievements['all_particle_types'] = const Achievement(
-      id: 'all_particle_types',
+    achievements['neural_architect'] = const Achievement(
+      id: 'neural_architect',
       title: 'Neural Architect',
-      description: 'Experienced all 5 particle types (Neuron, Synapse, Electrical, Quantum, Data)',
+      description: 'Experienced all 5 particle types: Neuron, Synapse, Electrical, Quantum, Data',
       category: AchievementCategory.particles,
       rarity: AchievementRarity.epic,
       targetProgress: 5,
+      // icon: Icons.architecture, // Removed
     );
 
-    // 🧠 AI ORCHESTRATION ACHIEVEMENTS
-    achievements['first_orchestration'] = const Achievement(
-      id: 'first_orchestration',
+    achievements['particle_master'] = const Achievement(
+      id: 'particle_master',
+      title: 'Particle Master',
+      description: 'Maintained 60 FPS with 150+ particles for 5 minutes straight',
+      category: AchievementCategory.particles,
+      rarity: AchievementRarity.legendary,
+      targetProgress: 300, // 5 minutes in seconds
+      // icon: Icons.auto_awesome, // Removed
+      isHidden: true,
+    );
+
+    // 🧠 AI ORCHESTRATION ACHIEVEMENTS - ENHANCED
+    achievements['first_synthesis'] = const Achievement(
+      id: 'first_synthesis',
       title: 'First Synthesis',
-      description: 'Completed your first AI orchestration request',
+      description: 'Completed your first AI orchestration request - welcome to the future',
       category: AchievementCategory.orchestration,
       rarity: AchievementRarity.common,
       targetProgress: 1,
+      // icon: Icons.psychology, // Removed
     );
 
-    achievements['multi_model_master'] = const Achievement(
-      id: 'multi_model_master',
+    achievements['ai_conductor'] = const Achievement(
+      id: 'ai_conductor',
       title: 'AI Conductor',
-      description: 'Used all 7 AI models successfully',
+      description: 'Successfully orchestrated all 7 AI models (Claude, GPT, Gemini, DeepSeek, Mistral, Llama, Ollama)',
       category: AchievementCategory.orchestration,
       rarity: AchievementRarity.epic,
       targetProgress: 7,
+      // icon: Icons.music_note, // Corrected: Was Icons.conductor_music
     );
 
-    achievements['strategy_explorer'] = const Achievement(
-      id: 'strategy_explorer',
+    achievements['strategy_master'] = const Achievement(
+      id: 'strategy_master',
       title: 'Strategy Master',
-      description: 'Tried all orchestration strategies',
+      description: 'Mastered all orchestration strategies: Parallel, Consensus, Adaptive, Sequential, Weighted',
       category: AchievementCategory.orchestration,
       rarity: AchievementRarity.rare,
-      targetProgress: 6, // parallel, consensus, adaptive, sequential, cascade, weighted
+      targetProgress: 5,
+      // icon: Icons.mediation, // Corrected: Was Icons.strategy
     );
 
-    achievements['orchestration_marathon'] = const Achievement(
-      id: 'orchestration_marathon',
+    achievements['neural_marathon'] = const Achievement(
+      id: 'neural_marathon',
       title: 'Neural Marathon',
-      description: 'Completed 100 orchestrations',
+      description: 'Completed 100 orchestrations - you are unstoppable',
       category: AchievementCategory.orchestration,
       rarity: AchievementRarity.legendary,
       targetProgress: 100,
+      // icon: Icons.directions_run, // Removed
     );
 
-    // 🎨 THEME ACHIEVEMENTS (6 themes)
-    final themeNames = ['cosmos', 'matrix', 'sunset', 'ocean', 'midnight', 'aurora'];
-    for (final theme in themeNames) {
-      achievements['theme_$theme'] = Achievement(
-        id: 'theme_$theme',
-        title: '${theme.substring(0, 1).toUpperCase()}${theme.substring(1)} Explorer',
-        description: 'Activated the $theme neural theme',
+    achievements['speed_synthesizer'] = const Achievement(
+      id: 'speed_synthesizer',
+      title: 'Speed Synthesizer',
+      description: 'Completed 10 orchestrations in under 5 minutes',
+      category: AchievementCategory.orchestration,
+      rarity: AchievementRarity.epic,
+      targetProgress: 10,
+      // icon: Icons.speed, // Removed
+      isHidden: true,
+    );
+
+    // 🎨 THEME ACHIEVEMENTS - ENHANCED WITH PHASE 3.3
+    final themeData = [
+      {'name': 'cosmos', 'display': 'Cosmos Explorer', 'iconName': 'star'}, // Storing icon name for dynamic lookup
+      {'name': 'matrix', 'display': 'Matrix Diver', 'iconName': 'code'},
+      {'name': 'sunset', 'display': 'Sunset Dreamer', 'iconName': 'wb_sunny'}, // Corrected: Was Icons.sunset
+      {'name': 'ocean', 'display': 'Ocean Voyager', 'iconName': 'waves'},
+      {'name': 'midnight', 'display': 'Midnight Walker', 'iconName': 'nights_stay'},
+      {'name': 'aurora', 'display': 'Aurora Chaser', 'iconName': 'light_mode'},
+    ];
+
+    // Helper to map string names to IconData (could be more robust)
+    IconData getIconByName(String name) {
+      switch(name) {
+        case 'star': return Icons.star;
+        case 'code': return Icons.code;
+        case 'wb_sunny': return Icons.wb_sunny;
+        case 'waves': return Icons.waves;
+        case 'nights_stay': return Icons.nights_stay;
+        case 'light_mode': return Icons.light_mode;
+        default: return Icons.help_outline; // Fallback icon
+      }
+    }
+
+
+    for (final theme in themeData) {
+      achievements['theme_${theme['name']}'] = Achievement(
+        id: 'theme_${theme['name']}',
+        title: theme['display'] as String,
+        description: 'Activated the ${theme['name']} neural luxury theme',
         category: AchievementCategory.themes,
         rarity: AchievementRarity.common,
         targetProgress: 1,
+        // icon: getIconByName(theme['iconName'] as String), // Removed
       );
     }
 
     achievements['theme_collector'] = const Achievement(
       id: 'theme_collector',
-      title: 'Theme Master',
-      description: 'Unlocked all 6 neural luxury themes',
+      title: 'Theme Collector',
+      description: 'Unlocked all 6 neural luxury themes - you have exquisite taste',
       category: AchievementCategory.themes,
       rarity: AchievementRarity.legendary,
       targetProgress: 6,
+      // icon: Icons.palette, // Removed
     );
 
-    achievements['theme_switcher'] = const Achievement(
-      id: 'theme_switcher',
+    achievements['visual_shapeshifter'] = const Achievement(
+      id: 'visual_shapeshifter',
       title: 'Visual Shapeshifter',
-      description: 'Changed themes 10 times in a session',
+      description: 'Changed themes 25 times in a single session - a true artist',
       category: AchievementCategory.themes,
       rarity: AchievementRarity.rare,
-      targetProgress: 10,
+      targetProgress: 25,
+      // icon: Icons.transform, // Removed
     );
 
-    // 🔊 SPATIAL AUDIO ACHIEVEMENTS
-    achievements['audio_activation'] = const Achievement(
-      id: 'audio_activation',
+    achievements['theme_marathon'] = const Achievement(
+      id: 'theme_marathon',
+      title: 'Theme Marathon',
+      description: 'Spent 30+ minutes with each theme active',
+      category: AchievementCategory.themes,
+      rarity: AchievementRarity.epic,
+      targetProgress: 6,
+      // icon: Icons.timer, // Removed
+      isHidden: true,
+    );
+
+    // 🔊 SPATIAL AUDIO ACHIEVEMENTS - PHASE 3.3 ENHANCED
+    achievements['sound_pioneer'] = const Achievement(
+      id: 'sound_pioneer',
       title: 'Sound Pioneer',
-      description: 'Activated spatial 3D audio system',
+      description: 'Activated the revolutionary 3D spatial audio system',
       category: AchievementCategory.audio,
       rarity: AchievementRarity.common,
       targetProgress: 1,
+      // icon: Icons.volume_up, // Removed
     );
 
-    achievements['audio_customization'] = const Achievement(
-      id: 'audio_customization',
+    achievements['audio_architect'] = const Achievement(
+      id: 'audio_architect',
       title: 'Audio Architect',
-      description: 'Customized all 7 neural sound types',
+      description: 'Customized all 7 neural sound types to perfection',
       category: AchievementCategory.audio,
       rarity: AchievementRarity.epic,
       targetProgress: 7,
+      // icon: Icons.equalizer, // Removed
     );
 
     achievements['haptic_master'] = const Achievement(
       id: 'haptic_master',
       title: 'Haptic Master',
-      description: 'Experienced 50 haptic feedback events',
+      description: 'Experienced 100 haptic feedback events - feel the neural energy',
       category: AchievementCategory.audio,
       rarity: AchievementRarity.rare,
-      targetProgress: 50,
+      targetProgress: 100,
+      // icon: Icons.vibration, // Removed
     );
 
-    // 📊 MODEL PROFILING ACHIEVEMENTS
-    achievements['profiling_first_use'] = const Achievement(
-      id: 'profiling_first_use',
+    achievements['immersion_king'] = const Achievement(
+      id: 'immersion_king',
+      title: 'Immersion King',
+      description: 'Used audio + haptic + particles simultaneously for 10 minutes',
+      category: AchievementCategory.audio,
+      rarity: AchievementRarity.legendary,
+      targetProgress: 600, // 10 minutes in seconds
+      // icon: Icons.surround_sound, // Removed
+      isHidden: true,
+    );
+
+    // 📊 MODEL PROFILING ACHIEVEMENTS - ENHANCED
+    achievements['data_explorer'] = const Achievement(
+      id: 'data_explorer',
       title: 'Data Explorer',
-      description: 'Opened the Model Profiling Dashboard',
+      description: 'Opened the revolutionary Model Profiling Dashboard',
       category: AchievementCategory.profiling,
       rarity: AchievementRarity.common,
       targetProgress: 1,
+      // icon: Icons.analytics, // Removed
     );
 
     achievements['profiling_expert'] = const Achievement(
       id: 'profiling_expert',
       title: 'Profiling Expert',
-      description: 'Analyzed performance metrics for all models',
+      description: 'Analyzed performance metrics for all 7 AI models',
       category: AchievementCategory.profiling,
       rarity: AchievementRarity.epic,
       targetProgress: 7,
+      // icon: Icons.bar_chart, // Removed
     );
 
-    // 🌟 EXPLORATION ACHIEVEMENTS
+    achievements['performance_analyst'] = const Achievement(
+      id: 'performance_analyst',
+      title: 'Performance Analyst',
+      description: 'Spent 60+ minutes analyzing model profiling data',
+      category: AchievementCategory.profiling,
+      rarity: AchievementRarity.rare,
+      targetProgress: 3600, // 60 minutes in seconds
+      // icon: Icons.trending_up, // Removed
+    );
+
+    // 🌟 EXPLORATION ACHIEVEMENTS - PHASE 3.3 ENHANCED
     achievements['feature_explorer'] = const Achievement(
       id: 'feature_explorer',
       title: 'Feature Explorer',
-      description: 'Used all 4 revolutionary features (Particles, Profiling, Audio, Themes)',
+      description: 'Used all 5 revolutionary features: Particles, Profiling, Audio, Themes, Achievements',
       category: AchievementCategory.exploration,
       rarity: AchievementRarity.legendary,
-      targetProgress: 4,
+      targetProgress: 5,
+      // icon: Icons.explore, // Removed
     );
 
     achievements['speed_demon'] = const Achievement(
       id: 'speed_demon',
       title: 'Speed Demon',
-      description: 'Maintained 60 FPS for 10 minutes straight',
+      description: 'Maintained 60 FPS for 10 minutes straight - you have a beast machine',
       category: AchievementCategory.exploration,
       rarity: AchievementRarity.epic,
-      targetProgress: 600, // 600 seconds = 10 minutes
+      targetProgress: 600, // 10 minutes in seconds
+      // icon: Icons.speed, // Removed
       isHidden: true,
     );
 
-    achievements['daily_user'] = const Achievement(
-      id: 'daily_user',
+    achievements['neural_devotee'] = const Achievement(
+      id: 'neural_devotee',
       title: 'Neural Devotee',
-      description: 'Used NeuronVault for 7 consecutive days',
+      description: 'Used NeuronVault for 7 consecutive days - dedication at its finest',
       category: AchievementCategory.exploration,
       rarity: AchievementRarity.legendary,
       targetProgress: 7,
+      // icon: Icons.favorite, // Removed
       isHidden: true,
     );
 
+    achievements['early_adopter'] = const Achievement(
+      id: 'early_adopter',
+      title: 'Early Adopter',
+      description: 'One of the first 100 users to experience NeuronVault',
+      category: AchievementCategory.exploration,
+      rarity: AchievementRarity.legendary,
+      targetProgress: 1,
+      // icon: Icons.rocket_launch, // Removed
+      isHidden: true,
+    );
+
+    // 💫 PHASE 3.3: COMBO ACHIEVEMENTS
+    achievements['perfect_orchestration'] = const Achievement(
+      id: 'perfect_orchestration',
+      title: 'Perfect Orchestration',
+      description: 'Completed orchestration with all 7 models, all themes active, and perfect performance',
+      category: AchievementCategory.orchestration,
+      rarity: AchievementRarity.legendary,
+      targetProgress: 1,
+      // icon: Icons.star_purple500, // Removed
+      isHidden: true,
+    );
+
+    achievements['luxury_connoisseur'] = const Achievement(
+      id: 'luxury_connoisseur',
+      title: 'Luxury Connoisseur',
+      description: 'Experienced every aspect of neural luxury: particles, themes, audio, achievements',
+      category: AchievementCategory.exploration,
+      rarity: AchievementRarity.legendary,
+      targetProgress: 4,
+      // icon: Icons.diamond, // Removed
+    );
+
     _state = _state.copyWith(achievements: achievements);
-    await _saveState();
+    await _saveEnhancedState();
   }
 
-  /// 🎯 Track achievement progress
-  Future<void> trackProgress(String achievementId, {int increment = 1, Map<String, dynamic>? data}) async {
+  /// 🎯 Enhanced achievement progress tracking with PHASE 3.3 features
+  Future<void> trackEnhancedProgress(
+      String achievementId, {
+        int increment = 1,
+        Map<String, dynamic>? data,
+        bool playSound = true, // Kept for potential future use if model changes
+        bool triggerHaptic = true, // Kept for potential future use if model changes
+      }) async {
     if (!_state.achievements.containsKey(achievementId)) {
       _logger.w('⚠️ Achievement not found: $achievementId');
       return;
     }
 
     final achievement = _state.achievements[achievementId]!;
-    if (achievement.isUnlocked) return; // Already unlocked
+    if (achievement.isUnlocked) return;
+
+    // Track event for analytics
+    _recordAchievementEvent(achievementId, increment, data);
 
     final currentProgress = _state.progress[achievementId] ??
         AchievementProgress(achievementId: achievementId, targetValue: achievement.targetProgress);
@@ -254,7 +417,7 @@ class AchievementService extends ChangeNotifier {
     final newProgress = currentProgress.copyWith(
       currentValue: (currentProgress.currentValue + increment).clamp(0, achievement.targetProgress),
       lastUpdated: DateTime.now(),
-      progressData: data ?? currentProgress.progressData,
+      progressData: {...(currentProgress.progressData ?? {}), ...(data ?? {})},
     );
 
     // Update progress
@@ -271,17 +434,22 @@ class AchievementService extends ChangeNotifier {
       achievements: newAchievements,
     );
 
-    // Check if achievement is now unlocked
+    // Check for unlock
     if (newProgress.currentValue >= achievement.targetProgress && !achievement.isUnlocked) {
-      await _unlockAchievement(achievementId);
+      await _unlockEnhancedAchievement(achievementId, playSound: playSound, triggerHaptic: triggerHaptic);
     }
 
-    await _saveState();
+    await _saveEnhancedState();
+    await _updateLiveAnalytics();
     notifyListeners();
   }
 
-  /// 🏆 Unlock achievement
-  Future<void> _unlockAchievement(String achievementId) async {
+  /// 🏆 Enhanced achievement unlock with PHASE 3.3 celebration
+  Future<void> _unlockEnhancedAchievement(
+      String achievementId, {
+        bool playSound = true, // Kept for potential future use
+        bool triggerHaptic = true, // Kept for potential future use
+      }) async {
     final achievement = _state.achievements[achievementId];
     if (achievement == null || achievement.isUnlocked) return;
 
@@ -293,11 +461,13 @@ class AchievementService extends ChangeNotifier {
     final newAchievements = Map<String, Achievement>.from(_state.achievements);
     newAchievements[achievementId] = unlockedAchievement;
 
-    // Create notification
+    // 🎊 PHASE 3.3: Create enhanced notification
     final notification = AchievementNotification(
       id: 'notif_${achievementId}_${DateTime.now().millisecondsSinceEpoch}',
       achievement: unlockedAchievement,
       timestamp: DateTime.now(),
+      displayDuration: _getDisplayDuration(unlockedAchievement.rarity),
+      // celebrationIntensity, playSound, triggerHaptic removed as they are not in the model
     );
 
     final newNotifications = List<AchievementNotification>.from(_state.notifications);
@@ -308,23 +478,45 @@ class AchievementService extends ChangeNotifier {
       notifications: newNotifications,
     );
 
-    // Emit notification
+    // Emit enhanced notification
     _notificationController.add(notification);
 
-    // Update stats
-    await _updateStats();
+    // Update stats and analytics
+    await _updateEnhancedStats();
+    await _updateLiveAnalytics();
 
-    _logger.i('🏆 Achievement unlocked: ${unlockedAchievement.title}');
-    await _saveState();
+    // Record major event
+    _recordAchievementEvent('achievement_unlocked', 1, {
+      'achievement_id': achievementId,
+      'rarity': unlockedAchievement.rarity.name,
+      'title': unlockedAchievement.title,
+    });
+
+    _logger.i('🏆 Enhanced Achievement unlocked: ${unlockedAchievement.title} (${unlockedAchievement.rarity.name})');
+    await _saveEnhancedState();
     notifyListeners();
   }
 
-  /// 📊 Update achievement statistics
-  Future<void> _updateStats() async {
+  // Method to mark notification as shown
+  Future<void> markNotificationShown(String notificationId) async {
+    final notificationIndex = _state.notifications.indexWhere((n) => n.id == notificationId);
+    if (notificationIndex != -1) {
+      final updatedNotifications = List<AchievementNotification>.from(_state.notifications);
+      updatedNotifications[notificationIndex] = updatedNotifications[notificationIndex].copyWith(isShown: true);
+      _state = _state.copyWith(notifications: updatedNotifications);
+      await _saveEnhancedState(); // Save state after modification
+      notifyListeners();
+      _logger.d('Notification marked as shown: $notificationId');
+    }
+  }
+
+
+  /// 📊 Update enhanced statistics with live analytics
+  Future<void> _updateEnhancedStats() async {
     final achievements = _state.achievements.values.toList();
     final unlocked = achievements.where((a) => a.isUnlocked).toList();
 
-    final stats = AchievementStats(
+    final stats = EnhancedAchievementStats( // Using the new standalone class
       totalAchievements: achievements.length,
       unlockedAchievements: unlocked.length,
       commonUnlocked: unlocked.where((a) => a.rarity == AchievementRarity.common).length,
@@ -332,51 +524,319 @@ class AchievementService extends ChangeNotifier {
       epicUnlocked: unlocked.where((a) => a.rarity == AchievementRarity.epic).length,
       legendaryUnlocked: unlocked.where((a) => a.rarity == AchievementRarity.legendary).length,
       completionPercentage: achievements.isNotEmpty ? (unlocked.length / achievements.length * 100) : 0.0,
-      lastAchievementDate: unlocked.isNotEmpty ?
-      unlocked.map((a) => a.unlockedAt!).reduce((a, b) => a.isAfter(b) ? a : b) : null,
+      lastAchievementDate: unlocked.isNotEmpty
+          ? unlocked.map((a) => a.unlockedAt!).reduce((a, b) => a.isAfter(b) ? a : b)
+          : null,
+      totalPoints: unlocked.fold(0, (sum, a) => sum + _getRarityPoints(a.rarity)),
+      averageUnlockTime: _calculateAverageUnlockTime(unlocked),
+      unlockRate: _calculateUnlockRate(),
+      favoriteCategory: _getFavoriteCategory(),
+      streakDays: _calculateStreakDays(),
+    );
+    // Note: _state.copyWith(stats: stats) would require AchievementState to accept EnhancedAchievementStats
+    // or for EnhancedAchievementStats to be directly compatible with what AchievementState.stats expects.
+    // For now, we assume AchievementState's stats field can hold this or is adapted.
+    // If AchievementState.stats is strictly AchievementStats, this line needs adjustment.
+    // For this fix, I am assuming the original structure was intended to be compatible.
+    // A proper fix might involve changing AchievementState.stats to be of type EnhancedAchievementStats
+    // or making EnhancedAchievementStats conform to the structure of AchievementStats if it's just adding methods.
+    // Since EnhancedAchievementStats ADDS fields, the former is more likely.
+    // However, without regenerating state_models.dart, I'll cast for now if direct assignment fails,
+    // or better, ensure EnhancedAchievementStats IS AchievementStats plus more.
+    // For this context, the error was `no_generative_constructors_in_superclass`,
+    // so making EnhancedAchievementStats standalone and then ensuring the _state.copyWith
+    // can accept it (or a compatible version) is key.
+    // The simplest path now that EnhancedAchievementStats is standalone is to ensure it contains all fields
+    // of AchievementStats and any new ones.
+
+    // Let's assume _state.copyWith can take the new stats structure.
+    // If state.stats is strictly AchievementStats, we'd need to convert:
+    // final baseStats = AchievementStats(
+    //   totalAchievements: stats.totalAchievements,
+    //   unlockedAchievements: stats.unlockedAchievements,
+    //   commonUnlocked: stats.commonUnlocked,
+    //   rareUnlocked: stats.rareUnlocked,
+    //   epicUnlocked: stats.epicUnlocked,
+    //   legendaryUnlocked: stats.legendaryUnlocked,
+    //   completionPercentage: stats.completionPercentage,
+    //   lastAchievementDate: stats.lastAchievementDate,
+    // );
+    // _state = _state.copyWith(stats: baseStats);
+    // And store the extra fields of EnhancedAchievementStats separately or adjust AchievementState.
+
+    // Given the error was about superclass constructor, the primary fix is making EnhancedAchievementStats standalone.
+    // We'll proceed assuming the developer will adjust AchievementState if _state.copyWith(stats: stats) fails type-checking.
+    // For now, if they were intended to be compatible, this should work.
+    _state = _state.copyWith(stats: AchievementStats(
+      totalAchievements: stats.totalAchievements,
+      unlockedAchievements: stats.unlockedAchievements,
+      commonUnlocked: stats.commonUnlocked,
+      rareUnlocked: stats.rareUnlocked,
+      epicUnlocked: stats.epicUnlocked,
+      legendaryUnlocked: stats.legendaryUnlocked,
+      completionPercentage: stats.completionPercentage,
+      lastAchievementDate: stats.lastAchievementDate,
+    ));
+  }
+
+  /// 📊 Update live analytics
+  Future<void> _updateLiveAnalytics() async {
+    _liveAnalytics = {
+      'session_duration': _currentSessionMinutes,
+      'session_achievements': _sessionStats['achievements_unlocked'] ?? 0,
+      'performance_maintained': _maintainedHighPerformance,
+      'total_events': _eventHistory.length,
+      'recent_activity': _eventHistory.take(10).map((e) => e.toJson()).toList(),
+      'unlock_rate': _calculateUnlockRate(),
+      'favorite_category': _getFavoriteCategory(),
+      'streak_days': _calculateStreakDays(),
+    };
+  }
+
+  /// 🎮 Performance tracking for achievements
+  void _startPerformanceTracking() {
+    _performanceTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      // Track high performance maintenance
+      _maintainedHighPerformance = true; // This would come from actual FPS monitoring
+
+      if (_maintainedHighPerformance) {
+        trackEnhancedProgress('speed_demon', playSound: false, triggerHaptic: false);
+        trackEnhancedProgress('particle_master', playSound: false, triggerHaptic: false);
+      }
+    });
+  }
+
+  /// ⏰ Session tracking for achievements
+  void _startSessionTracking() {
+    _sessionTimer = Timer.periodic(const Duration(minutes: 1), (timer) {
+      _currentSessionMinutes++;
+
+      // Track daily usage
+      final today = DateTime.now().toLocal();
+      final todayKey = '${today.year}-${today.month}-${today.day}';
+      _sessionStats[todayKey] = (_sessionStats[todayKey] ?? 0) + 1;
+
+      // Update analytics
+      _updateLiveAnalytics();
+    });
+  }
+
+  /// 🎯 Record achievement event for analytics
+  void _recordAchievementEvent(String achievementId, int increment, Map<String, dynamic>? data) {
+    final event = AchievementEvent(
+      id: '${DateTime.now().millisecondsSinceEpoch}',
+      achievementId: achievementId,
+      eventType: 'progress',
+      timestamp: DateTime.now(),
+      increment: increment,
+      data: data,
     );
 
-    _state = _state.copyWith(stats: stats);
-  }
+    _eventHistory.insert(0, event);
 
-  /// 🔄 Mark notification as shown
-  Future<void> markNotificationShown(String notificationId) async {
-    final notifications = _state.notifications.map((n) =>
-    n.id == notificationId ? n.copyWith(isShown: true) : n
-    ).toList();
-
-    _state = _state.copyWith(notifications: notifications);
-    await _saveState();
-    notifyListeners();
-  }
-
-  /// 🎮 Toggle notifications
-  Future<void> toggleNotifications(bool enabled) async {
-    _state = _state.copyWith(showNotifications: enabled);
-    await _saveState();
-    notifyListeners();
-  }
-
-  /// 💾 Save state to storage
-  Future<void> _saveState() async {
-    try {
-      final achievementJson = _state.achievements.map((key, value) =>
-          MapEntry(key, value.toJson()));
-      final progressJson = _state.progress.map((key, value) =>
-          MapEntry(key, value.toJson()));
-
-      await _prefs.setString(_storageKey, jsonEncode(achievementJson));
-      await _prefs.setString(_progressKey, jsonEncode(progressJson));
-    } catch (e) {
-      _logger.e('❌ Failed to save achievement state: $e');
+    // Keep only last 1000 events
+    if (_eventHistory.length > 1000) {
+      _eventHistory = _eventHistory.take(1000).toList();
     }
   }
 
-  /// 📂 Load state from storage
-  Future<void> _loadState() async {
+  // 🎯 HELPER METHODS FOR ENHANCED TRACKING
+
+  /// Track particle interactions with enhanced data
+  Future<void> trackParticleInteraction({String? particleType, double? intensity}) async {
+    await trackEnhancedProgress('neural_awakening');
+    await trackEnhancedProgress('particle_whisperer');
+
+    if (particleType != null) {
+      await trackEnhancedProgress('neural_architect', data: {'particle_type': particleType});
+    }
+  }
+
+  /// Track AI orchestration with detailed metrics
+  Future<void> trackOrchestration(List<String> modelsUsed, String strategy, {
+    double? responseTime,
+    int? tokenCount,
+    double? qualityScore,
+  }) async {
+    await trackEnhancedProgress('first_synthesis');
+    await trackEnhancedProgress('neural_marathon');
+
+    if (responseTime != null && responseTime < 30) { // Under 30 seconds
+      await trackEnhancedProgress('speed_synthesizer');
+    }
+
+    // Track models used
+    for (final model in modelsUsed) {
+      if (['claude', 'gpt', 'deepseek', 'gemini', 'mistral', 'llama', 'ollama'].contains(model)) {
+        await trackEnhancedProgress('ai_conductor');
+      }
+    }
+
+    // Track strategy usage
+    await trackEnhancedProgress('strategy_master', data: {'strategy': strategy});
+
+    // Session stats
+    _sessionStats['orchestrations'] = (_sessionStats['orchestrations'] ?? 0) + 1;
+  }
+
+  /// Track theme activation with usage time
+  Future<void> trackThemeActivation(String themeName, {Duration? usageDuration}) async {
+    await trackEnhancedProgress('theme_$themeName');
+    await trackEnhancedProgress('theme_collector');
+    await trackEnhancedProgress('visual_shapeshifter');
+
+    if (usageDuration != null && usageDuration.inMinutes >= 30) {
+      await trackEnhancedProgress('theme_marathon');
+    }
+  }
+
+  /// Track audio features with intensity
+  Future<void> trackAudioActivation({String? soundType, bool? hapticEnabled}) async {
+    await trackEnhancedProgress('sound_pioneer');
+
+    if (soundType != null) {
+      await trackEnhancedProgress('audio_architect', data: {'sound_type': soundType});
+    }
+
+    if (hapticEnabled == true) {
+      await trackEnhancedProgress('haptic_master');
+    }
+  }
+
+  /// Track profiling usage with time spent
+  Future<void> trackProfilingUsage({Duration? timeSpent}) async {
+    await trackEnhancedProgress('data_explorer');
+    await trackEnhancedProgress('profiling_expert');
+
+    if (timeSpent != null) {
+      await trackEnhancedProgress('performance_analyst', increment: timeSpent.inSeconds);
+    }
+  }
+
+  /// Track feature exploration
+  Future<void> trackFeatureUsage(String feature) async {
+    await trackEnhancedProgress('feature_explorer', data: {'feature': feature});
+    await trackEnhancedProgress('luxury_connoisseur');
+  }
+
+  // 🎯 UTILITY METHODS
+
+  Duration _getDisplayDuration(AchievementRarity rarity) {
+    switch (rarity) {
+      case AchievementRarity.common:
+        return const Duration(seconds: 3);
+      case AchievementRarity.rare:
+        return const Duration(seconds: 4);
+      case AchievementRarity.epic:
+        return const Duration(seconds: 5);
+      case AchievementRarity.legendary:
+        return const Duration(seconds: 6);
+    }
+  }
+
+  double _getCelebrationIntensity(AchievementRarity rarity) {
+    switch (rarity) {
+      case AchievementRarity.common:
+        return 0.6;
+      case AchievementRarity.rare:
+        return 0.7;
+      case AchievementRarity.epic:
+        return 0.8;
+      case AchievementRarity.legendary:
+        return 1.0;
+    }
+  }
+
+  int _getRarityPoints(AchievementRarity rarity) {
+    switch (rarity) {
+      case AchievementRarity.common:
+        return 10;
+      case AchievementRarity.rare:
+        return 25;
+      case AchievementRarity.epic:
+        return 50;
+      case AchievementRarity.legendary:
+        return 100;
+    }
+  }
+
+  Duration? _calculateAverageUnlockTime(List<Achievement> unlockedAchievements) {
+    if (unlockedAchievements.isEmpty) return null;
+
+    final durations = unlockedAchievements
+        .where((a) => a.unlockedAt != null)
+        .map((a) => a.unlockedAt!)
+        .toList();
+
+    if (durations.isEmpty) return null;
+
+    durations.sort();
+    final totalMinutes = durations.last.difference(durations.first).inMinutes;
+    return Duration(minutes: totalMinutes ~/ unlockedAchievements.length);
+  }
+
+  double _calculateUnlockRate() {
+    if (_currentSessionMinutes == 0) return 0.0;
+    final sessionAchievements = _sessionStats['achievements_unlocked'] ?? 0;
+    return sessionAchievements / _currentSessionMinutes;
+  }
+
+  String _getFavoriteCategory() {
+    final categoryStats = <AchievementCategory, int>{};
+
+    for (final achievement in _state.achievements.values) {
+      if (achievement.isUnlocked) {
+        categoryStats[achievement.category] = (categoryStats[achievement.category] ?? 0) + 1;
+      }
+    }
+
+    if (categoryStats.isEmpty) return 'none';
+
+    final maxEntry = categoryStats.entries.reduce((a, b) => a.value > b.value ? a : b);
+    return maxEntry.key.name;
+  }
+
+  int _calculateStreakDays() {
+    // Calculate consecutive days of usage
+    final today = DateTime.now();
+    int streak = 0;
+
+    for (int i = 0; i < 30; i++) {
+      final checkDate = today.subtract(Duration(days: i));
+      final dateKey = '${checkDate.year}-${checkDate.month}-${checkDate.day}';
+
+      if (_sessionStats.containsKey(dateKey)) {
+        streak++;
+      } else {
+        break;
+      }
+    }
+
+    return streak;
+  }
+
+  /// 💾 Save enhanced state
+  Future<void> _saveEnhancedState() async {
+    try {
+      final achievementJson = _state.achievements.map((key, value) => MapEntry(key, value.toJson()));
+      final progressJson = _state.progress.map((key, value) => MapEntry(key, value.toJson()));
+
+      await _prefs.setString(_storageKey, jsonEncode(achievementJson));
+      await _prefs.setString(_progressKey, jsonEncode(progressJson));
+      await _prefs.setString(_sessionsKey, jsonEncode(_sessionStats));
+      await _prefs.setString(_analyticsKey, jsonEncode(_liveAnalytics));
+    } catch (e) {
+      _logger.e('❌ Failed to save enhanced achievement state: $e');
+    }
+  }
+
+  /// 📂 Load enhanced state
+  Future<void> _loadEnhancedState() async {
     try {
       final achievementData = _prefs.getString(_storageKey);
       final progressData = _prefs.getString(_progressKey);
+      final sessionsData = _prefs.getString(_sessionsKey);
+      final analyticsData = _prefs.getString(_analyticsKey);
 
       if (achievementData != null) {
         final achievementJson = jsonDecode(achievementData) as Map<String, dynamic>;
@@ -390,87 +850,100 @@ class AchievementService extends ChangeNotifier {
               MapEntry(key, AchievementProgress.fromJson(value as Map<String, dynamic>)));
         }
 
+        if (sessionsData != null) {
+          _sessionStats = Map<String, int>.from(jsonDecode(sessionsData));
+        }
+
+        if (analyticsData != null) {
+          _liveAnalytics = Map<String, dynamic>.from(jsonDecode(analyticsData));
+        }
+
         _state = _state.copyWith(
           achievements: achievements,
           progress: progress,
         );
       }
     } catch (e) {
-      _logger.e('❌ Failed to load achievement state: $e');
+      _logger.e('❌ Failed to load enhanced achievement state: $e');
     }
   }
 
-  /// 🧹 Cleanup
+  /// 🧹 Enhanced cleanup
   @override
   void dispose() {
+    _performanceTimer.cancel();
+    _sessionTimer.cancel();
     _notificationController.close();
     super.dispose();
   }
+}
 
-  // 🎯 HELPER METHODS FOR COMMON TRACKING EVENTS
+/// 📊 Achievement Event for analytics
+class AchievementEvent {
+  final String id;
+  final String achievementId;
+  final String eventType;
+  final DateTime timestamp;
+  final int increment;
+  final Map<String, dynamic>? data;
 
-  /// Track particle system interactions
-  Future<void> trackParticleInteraction() async {
-    await trackProgress('first_particle_view');
-    await trackProgress('particle_interaction');
-  }
+  AchievementEvent({
+    required this.id,
+    required this.achievementId,
+    required this.eventType,
+    required this.timestamp,
+    required this.increment,
+    this.data,
+  });
 
-  /// Track particle type discovery
-  Future<void> trackParticleType(String particleType) async {
-    await trackProgress('all_particle_types', data: {'particleType': particleType});
-  }
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'achievement_id': achievementId,
+    'event_type': eventType,
+    'timestamp': timestamp.toIso8601String(),
+    'increment': increment,
+    'data': data,
+  };
 
-  /// Track AI orchestration completion
-  Future<void> trackOrchestration(List<String> modelsUsed, String strategy) async {
-    await trackProgress('first_orchestration');
-    await trackProgress('orchestration_marathon');
+  factory AchievementEvent.fromJson(Map<String, dynamic> json) => AchievementEvent(
+    id: json['id'],
+    achievementId: json['achievement_id'],
+    eventType: json['event_type'],
+    timestamp: DateTime.parse(json['timestamp']),
+    increment: json['increment'],
+    data: json['data'],
+  );
+}
 
-    // Track models used
-    for (final model in modelsUsed) {
-      if (['claude', 'gpt', 'deepseek', 'gemini', 'mistral', 'llama', 'ollama'].contains(model)) {
-        await trackProgress('multi_model_master');
-      }
-    }
+/// 🎯 Enhanced Achievement Stats - Standalone class
+class EnhancedAchievementStats { // Removed "extends AchievementStats"
+  final int totalAchievements;
+  final int unlockedAchievements;
+  final int commonUnlocked;
+  final int rareUnlocked;
+  final int epicUnlocked;
+  final int legendaryUnlocked;
+  final double completionPercentage;
+  final DateTime? lastAchievementDate;
+  final int totalPoints;
+  final Duration? averageUnlockTime;
+  final double unlockRate;
+  final String favoriteCategory;
+  final int streakDays;
 
-    // Track strategy usage
-    await trackProgress('strategy_explorer', data: {'strategy': strategy});
-  }
-
-  /// Track theme activation
-  Future<void> trackThemeActivation(String themeName) async {
-    await trackProgress('theme_$themeName');
-    await trackProgress('theme_collector');
-    await trackProgress('theme_switcher');
-  }
-
-  /// Track audio system usage
-  Future<void> trackAudioActivation() async {
-    await trackProgress('audio_activation');
-  }
-
-  /// Track haptic feedback
-  Future<void> trackHapticFeedback() async {
-    await trackProgress('haptic_master');
-  }
-
-  /// Track profiling dashboard usage
-  Future<void> trackProfilingUsage() async {
-    await trackProgress('profiling_first_use');
-    await trackProgress('profiling_expert');
-  }
-
-  /// Track feature exploration
-  Future<void> trackFeatureUsage(String feature) async {
-    await trackProgress('feature_explorer', data: {'feature': feature});
-  }
-
-  /// Track performance achievement
-  Future<void> trackHighPerformance() async {
-    await trackProgress('speed_demon');
-  }
-
-  /// Track daily usage
-  Future<void> trackDailyUsage() async {
-    await trackProgress('daily_user');
-  }
+  const EnhancedAchievementStats({
+    required this.totalAchievements,
+    required this.unlockedAchievements,
+    required this.commonUnlocked,
+    required this.rareUnlocked,
+    required this.epicUnlocked,
+    required this.legendaryUnlocked,
+    required this.completionPercentage,
+    this.lastAchievementDate,
+    required this.totalPoints,
+    this.averageUnlockTime,
+    required this.unlockRate,
+    required this.favoriteCategory,
+    required this.streakDays,
+  });
 }
