@@ -1,685 +1,639 @@
-// lib/core/services/mini_llm_analyzer_service.dart
-// 🧠 NEURONVAULT - MINI-LLM ANALYZER SERVICE - PHASE 3.4 REVOLUTIONARY
-// AI Autonomy Intelligence Engine - Fast prompt analysis with Claude Haiku
-// Part of ATHENA INTELLIGENCE SYSTEM - World's first AI that selects AI
+// 🧠 NEURONVAULT - MINI-LLM ANALYZER SERVICE - PHASE 3.4
+// World's first AI Meta-Analysis Engine for intelligent model selection
+// Claude Haiku integration for <200ms prompt analysis and AI orchestration intelligence
 
 import 'dart:async';
 import 'dart:convert';
-import 'package:dio/dio.dart';
 import 'package:logger/logger.dart';
 import 'package:flutter/foundation.dart';
 
 import '../state/state_models.dart';
 import 'config_service.dart';
+import 'ai_service.dart';
 import 'storage_service.dart';
 
-/// 🧠 PROMPT ANALYSIS RESULT
-class PromptAnalysisResult {
-  final String promptType;
-  final double complexity;
-  final List<String> recommendedModels;
-  final Map<String, double> modelConfidenceScores;
-  final String reasoningExplanation;
-  final Duration analysisTime;
-  final Map<String, dynamic> metadata;
+/// 🎯 Prompt analysis categories for intelligent model selection
+enum PromptCategory {
+  creative,           // Creative writing, storytelling, art
+  analytical,         // Data analysis, research, technical review
+  conversational,     // General chat, Q&A, casual interaction
+  coding,            // Programming, debugging, technical implementation
+  reasoning,         // Logic puzzles, complex problem solving
+  factual,           // Information lookup, definitions, explanations
+  synthesis,         // Combining multiple sources, summarization
+  specialized,       // Domain-specific expertise (legal, medical, etc.)
+}
 
-  const PromptAnalysisResult({
-    required this.promptType,
+/// 🧠 Prompt complexity levels for strategy selection
+enum PromptComplexity {
+  simple,    // Single concept, direct question
+  moderate,  // Multiple concepts, some context needed
+  complex,   // Multi-step reasoning, extensive context
+  expert,    // Specialized knowledge, advanced reasoning
+}
+
+/// 📊 Prompt analysis result with AI recommendations
+@immutable
+class PromptAnalysis {
+  final String promptText;
+  final PromptCategory primaryCategory;
+  final List<PromptCategory> secondaryCategories;
+  final PromptComplexity complexity;
+  final double confidenceScore;
+  final Map<String, double> modelRecommendations;
+  final String recommendedStrategy;
+  final List<String> reasoningSteps;
+  final Duration analysisTime;
+  final DateTime timestamp;
+
+  const PromptAnalysis({
+    required this.promptText,
+    required this.primaryCategory,
+    required this.secondaryCategories,
     required this.complexity,
-    required this.recommendedModels,
-    required this.modelConfidenceScores,
-    required this.reasoningExplanation,
+    required this.confidenceScore,
+    required this.modelRecommendations,
+    required this.recommendedStrategy,
+    required this.reasoningSteps,
     required this.analysisTime,
-    required this.metadata,
+    required this.timestamp,
   });
 
-  Map<String, dynamic> toJson() => {
-    'prompt_type': promptType,
-    'complexity': complexity,
-    'recommended_models': recommendedModels,
-    'model_confidence_scores': modelConfidenceScores,
-    'reasoning_explanation': reasoningExplanation,
-    'analysis_time_ms': analysisTime.inMilliseconds,
-    'metadata': metadata,
-  };
-
-  factory PromptAnalysisResult.fromJson(Map<String, dynamic> json) {
-    return PromptAnalysisResult(
-      promptType: json['prompt_type'] as String,
-      complexity: (json['complexity'] as num).toDouble(),
-      recommendedModels: List<String>.from(json['recommended_models'] as List),
-      modelConfidenceScores: Map<String, double>.from(
-          (json['model_confidence_scores'] as Map<String, dynamic>)
-              .map((k, v) => MapEntry(k, (v as num).toDouble()))
+  factory PromptAnalysis.fromJson(Map<String, dynamic> json) {
+    return PromptAnalysis(
+      promptText: json['prompt_text'] as String,
+      primaryCategory: PromptCategory.values.firstWhere(
+            (e) => e.name == json['primary_category'],
+        orElse: () => PromptCategory.conversational,
       ),
-      reasoningExplanation: json['reasoning_explanation'] as String,
-      analysisTime: Duration(milliseconds: json['analysis_time_ms'] as int),
-      metadata: Map<String, dynamic>.from(json['metadata'] as Map),
+      secondaryCategories: (json['secondary_categories'] as List<dynamic>?)
+          ?.map((e) => PromptCategory.values.firstWhere(
+            (cat) => cat.name == e,
+        orElse: () => PromptCategory.conversational,
+      ))
+          .toList() ?? [],
+      complexity: PromptComplexity.values.firstWhere(
+            (e) => e.name == json['complexity'],
+        orElse: () => PromptComplexity.moderate,
+      ),
+      confidenceScore: (json['confidence_score'] as num?)?.toDouble() ?? 0.8,
+      modelRecommendations: (json['model_recommendations'] as Map<String, dynamic>?)
+          ?.map((k, v) => MapEntry(k, (v as num).toDouble())) ?? {},
+      recommendedStrategy: json['recommended_strategy'] as String? ?? 'parallel',
+      reasoningSteps: (json['reasoning_steps'] as List<dynamic>?)
+          ?.map((e) => e.toString())
+          .toList() ?? [],
+      analysisTime: Duration(milliseconds: json['analysis_time_ms'] as int? ?? 200),
+      timestamp: DateTime.tryParse(json['timestamp'] as String? ?? '') ?? DateTime.now(),
     );
   }
-}
 
-/// 🎯 PROMPT CLASSIFICATION TYPES
-enum PromptType {
-  creative,           // Creative writing, storytelling, artistic
-  analytical,         // Data analysis, reasoning, logic
-  technical,          // Programming, technical documentation
-  conversational,     // Chat, Q&A, general discussion
-  mathematical,       // Math problems, calculations
-  research,           // Information gathering, summarization
-  instructional,      // How-to, explanations, tutorials
-  complex,            // Multi-faceted, requires multiple AI perspectives
-}
-
-/// 🔧 MODEL SPECIALIZATION PROFILES
-class ModelSpecialization {
-  static const Map<String, Map<PromptType, double>> profiles = {
-    'claude': {
-      PromptType.analytical: 0.95,
-      PromptType.technical: 0.90,
-      PromptType.research: 0.90,
-      PromptType.instructional: 0.85,
-      PromptType.conversational: 0.80,
-      PromptType.creative: 0.75,
-      PromptType.mathematical: 0.70,
-      PromptType.complex: 0.90,
-    },
-    'gpt': {
-      PromptType.conversational: 0.95,
-      PromptType.creative: 0.90,
-      PromptType.instructional: 0.85,
-      PromptType.technical: 0.80,
-      PromptType.analytical: 0.80,
-      PromptType.research: 0.75,
-      PromptType.mathematical: 0.75,
-      PromptType.complex: 0.85,
-    },
-    'deepseek': {
-      PromptType.technical: 0.95,
-      PromptType.mathematical: 0.90,
-      PromptType.analytical: 0.85,
-      PromptType.research: 0.80,
-      PromptType.instructional: 0.75,
-      PromptType.conversational: 0.70,
-      PromptType.creative: 0.65,
-      PromptType.complex: 0.80,
-    },
-    'gemini': {
-      PromptType.creative: 0.85,
-      PromptType.conversational: 0.85,
-      PromptType.research: 0.80,
-      PromptType.analytical: 0.80,
-      PromptType.instructional: 0.75,
-      PromptType.technical: 0.75,
-      PromptType.mathematical: 0.70,
-      PromptType.complex: 0.80,
-    },
-    'mistral': {
-      PromptType.analytical: 0.80,
-      PromptType.technical: 0.75,
-      PromptType.research: 0.75,
-      PromptType.conversational: 0.75,
-      PromptType.instructional: 0.70,
-      PromptType.creative: 0.70,
-      PromptType.mathematical: 0.65,
-      PromptType.complex: 0.75,
-    },
-    'llama': {
-      PromptType.conversational: 0.80,
-      PromptType.creative: 0.75,
-      PromptType.analytical: 0.70,
-      PromptType.technical: 0.70,
-      PromptType.research: 0.70,
-      PromptType.instructional: 0.65,
-      PromptType.mathematical: 0.60,
-      PromptType.complex: 0.70,
-    },
-    'ollama': {
-      PromptType.conversational: 0.75,
-      PromptType.creative: 0.70,
-      PromptType.analytical: 0.65,
-      PromptType.technical: 0.65,
-      PromptType.research: 0.65,
-      PromptType.instructional: 0.60,
-      PromptType.mathematical: 0.55,
-      PromptType.complex: 0.65,
-    },
-  };
-
-  static double getConfidence(String modelName, PromptType promptType) {
-    return profiles[modelName.toLowerCase()]?[promptType] ?? 0.5;
+  Map<String, dynamic> toJson() {
+    return {
+      'prompt_text': promptText,
+      'primary_category': primaryCategory.name,
+      'secondary_categories': secondaryCategories.map((e) => e.name).toList(),
+      'complexity': complexity.name,
+      'confidence_score': confidenceScore,
+      'model_recommendations': modelRecommendations,
+      'recommended_strategy': recommendedStrategy,
+      'reasoning_steps': reasoningSteps,
+      'analysis_time_ms': analysisTime.inMilliseconds,
+      'timestamp': timestamp.toIso8601String(),
+    };
   }
+}
+
+/// 🎯 Model specialization profiles for intelligent selection
+class ModelSpecializationProfile {
+  final String modelName;
+  final Map<PromptCategory, double> categoryStrengths;
+  final Map<PromptComplexity, double> complexityHandling;
+  final double averageResponseTime;
+  final double reliabilityScore;
+  final double costEfficiency;
+
+  const ModelSpecializationProfile({
+    required this.modelName,
+    required this.categoryStrengths,
+    required this.complexityHandling,
+    required this.averageResponseTime,
+    required this.reliabilityScore,
+    required this.costEfficiency,
+  });
 }
 
 /// 🧠 MINI-LLM ANALYZER SERVICE - AI AUTONOMY FOUNDATION
 class MiniLLMAnalyzerService {
+  final AIService _aiService;
   final ConfigService _configService;
   final StorageService _storageService;
   final Logger _logger;
 
-  late final Dio _dio;
+  // 📊 Performance tracking
+  final Map<PromptCategory, List<int>> _analysisPerformance = {};
   final Map<String, int> _analysisCount = {};
-  final Map<String, List<Duration>> _responseTimes = {};
-  final Map<String, int> _cacheHits = {};
+  final List<PromptAnalysis> _recentAnalyses = [];
 
-  // 🧠 Claude Haiku specific configuration
-  static const String _claudeHaikuModel = 'claude-3-haiku-20240307';
-  static const String _claudeApiVersion = '2023-06-01';
-  static const int _maxAnalysisTokens = 150; // Keep analysis concise and fast
-  static const Duration _analysisTimeout = Duration(milliseconds: 2000); // 2s max
-
-  // 📈 Performance tracking
-  final List<Duration> _recentAnalysisTimes = [];
-  int _totalAnalyses = 0;
-  int _cacheHitCount = 0;
-  int _failureCount = 0;
+  // 🎯 Model specialization database
+  static const Map<String, ModelSpecializationProfile> _modelProfiles = {
+    'claude': ModelSpecializationProfile(
+      modelName: 'claude',
+      categoryStrengths: {
+        PromptCategory.analytical: 0.95,
+        PromptCategory.reasoning: 0.92,
+        PromptCategory.coding: 0.88,
+        PromptCategory.synthesis: 0.90,
+        PromptCategory.conversational: 0.85,
+        PromptCategory.creative: 0.80,
+        PromptCategory.factual: 0.88,
+        PromptCategory.specialized: 0.87,
+      },
+      complexityHandling: {
+        PromptComplexity.simple: 0.85,
+        PromptComplexity.moderate: 0.92,
+        PromptComplexity.complex: 0.95,
+        PromptComplexity.expert: 0.90,
+      },
+      averageResponseTime: 1500.0,
+      reliabilityScore: 0.94,
+      costEfficiency: 0.80,
+    ),
+    'gpt': ModelSpecializationProfile(
+      modelName: 'gpt',
+      categoryStrengths: {
+        PromptCategory.conversational: 0.95,
+        PromptCategory.creative: 0.92,
+        PromptCategory.factual: 0.90,
+        PromptCategory.coding: 0.85,
+        PromptCategory.analytical: 0.82,
+        PromptCategory.reasoning: 0.85,
+        PromptCategory.synthesis: 0.88,
+        PromptCategory.specialized: 0.80,
+      },
+      complexityHandling: {
+        PromptComplexity.simple: 0.95,
+        PromptComplexity.moderate: 0.90,
+        PromptComplexity.complex: 0.85,
+        PromptComplexity.expert: 0.82,
+      },
+      averageResponseTime: 1200.0,
+      reliabilityScore: 0.92,
+      costEfficiency: 0.85,
+    ),
+    'deepseek': ModelSpecializationProfile(
+      modelName: 'deepseek',
+      categoryStrengths: {
+        PromptCategory.coding: 0.95,
+        PromptCategory.reasoning: 0.90,
+        PromptCategory.analytical: 0.88,
+        PromptCategory.specialized: 0.85,
+        PromptCategory.factual: 0.82,
+        PromptCategory.synthesis: 0.80,
+        PromptCategory.conversational: 0.75,
+        PromptCategory.creative: 0.70,
+      },
+      complexityHandling: {
+        PromptComplexity.simple: 0.80,
+        PromptComplexity.moderate: 0.88,
+        PromptComplexity.complex: 0.92,
+        PromptComplexity.expert: 0.95,
+      },
+      averageResponseTime: 1800.0,
+      reliabilityScore: 0.89,
+      costEfficiency: 0.90,
+    ),
+    'gemini': ModelSpecializationProfile(
+      modelName: 'gemini',
+      categoryStrengths: {
+        PromptCategory.creative: 0.90,
+        PromptCategory.conversational: 0.88,
+        PromptCategory.factual: 0.92,
+        PromptCategory.synthesis: 0.85,
+        PromptCategory.analytical: 0.80,
+        PromptCategory.reasoning: 0.82,
+        PromptCategory.coding: 0.75,
+        PromptCategory.specialized: 0.78,
+      },
+      complexityHandling: {
+        PromptComplexity.simple: 0.90,
+        PromptComplexity.moderate: 0.85,
+        PromptComplexity.complex: 0.80,
+        PromptComplexity.expert: 0.78,
+      },
+      averageResponseTime: 1400.0,
+      reliabilityScore: 0.87,
+      costEfficiency: 0.95,
+    ),
+  };
 
   MiniLLMAnalyzerService({
+    required AIService aiService,
     required ConfigService configService,
     required StorageService storageService,
     required Logger logger,
-  })  : _configService = configService,
+  }) : _aiService = aiService,
+        _configService = configService,
         _storageService = storageService,
         _logger = logger {
-    _initializeHttpClient();
-    _logger.i('🧠 MiniLLMAnalyzerService initialized - Athena Intelligence Engine ready');
+    _logger.i('🧠 Mini-LLM Analyzer Service initialized - AI Autonomy Foundation ready');
   }
 
-  /// 🔧 HTTP CLIENT INITIALIZATION
-  void _initializeHttpClient() {
-    _dio = Dio(BaseOptions(
-      connectTimeout: const Duration(seconds: 5),
-      receiveTimeout: _analysisTimeout,
-      sendTimeout: const Duration(seconds: 5),
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'NeuronVault-Athena/3.4.0',
-      },
-    ));
-
-    _dio.interceptors.add(
-      LogInterceptor(
-        requestBody: false,
-        responseBody: false,
-        logPrint: (obj) => _logger.d('🔗 Mini-LLM HTTP: $obj'),
-      ),
-    );
-
-    _dio.interceptors.add(
-      InterceptorsWrapper(
-        onError: (error, handler) {
-          _logger.e('❌ Mini-LLM HTTP Error: ${error.message}');
-          _failureCount++;
-          handler.next(error);
-        },
-      ),
-    );
-
-    _logger.d('🔧 Mini-LLM HTTP client initialized with Claude Haiku integration');
-  }
-
-  /// 🧠 MAIN ANALYSIS METHOD - FAST PROMPT ANALYSIS
-  Future<PromptAnalysisResult> analyzePrompt(
-      String prompt, {
-        List<String>? availableModels,
-        bool useCache = true,
-        Map<String, dynamic>? context,
-      }) async {
+  /// 🔍 MAIN METHOD: Analyze prompt with Claude Haiku for <200ms intelligence
+  Future<PromptAnalysis> analyzePrompt(String prompt) async {
     final stopwatch = Stopwatch()..start();
 
     try {
-      _logger.d('🧠 Starting prompt analysis: "${prompt.length > 50 ? '${prompt.substring(0, 50)}...' : prompt}"');
-      _totalAnalyses++;
+      _logger.d('🔍 Starting rapid prompt analysis: "${prompt.substring(0, prompt.length.clamp(0, 50))}..."');
 
-      // 📊 Cache check for performance
-      if (useCache) {
-        final cachedResult = await _getCachedAnalysis(prompt);
-        if (cachedResult != null) {
-          _cacheHitCount++;
-          _logger.d('💨 Cache hit for prompt analysis (${stopwatch.elapsedMilliseconds}ms)');
-          return cachedResult;
-        }
-      }
+      // 1. Quick heuristic analysis (always runs)
+      final heuristicAnalysis = _performHeuristicAnalysis(prompt);
+      _logger.d('⚡ Heuristic analysis completed in ${stopwatch.elapsedMilliseconds}ms');
 
-      // 🎯 Fast heuristic analysis (local, instant)
-      final heuristicResult = _performHeuristicAnalysis(prompt, availableModels ?? []);
-
-      // 🧠 Enhanced analysis with Claude Haiku (if available and configured)
-      PromptAnalysisResult finalResult;
-      if (_isClaudeHaikuConfigured()) {
-        try {
-          final claudeEnhancedResult = await _performClaudeHaikuAnalysis(
-            prompt,
-            heuristicResult,
-            availableModels ?? [],
-            context,
-          );
-          finalResult = claudeEnhancedResult;
-          _logger.d('✨ Claude Haiku enhanced analysis completed');
-        } catch (e) {
-          _logger.w('⚠️ Claude Haiku analysis failed, using heuristic: $e');
-          finalResult = heuristicResult;
-        }
-      } else {
-        finalResult = heuristicResult;
-        _logger.d('💡 Using heuristic analysis (Claude Haiku not configured)');
+      // 2. Try Claude Haiku enhancement (fallback to heuristic if fails)
+      PromptAnalysis finalAnalysis;
+      try {
+        final claudeEnhancement = await _performClaudeHaikuAnalysis(prompt, heuristicAnalysis);
+        finalAnalysis = claudeEnhancement;
+        _logger.d('🤖 Claude Haiku enhancement completed in ${stopwatch.elapsedMilliseconds}ms');
+      } catch (e) {
+        _logger.w('⚠️ Claude Haiku unavailable, using heuristic analysis: $e');
+        finalAnalysis = heuristicAnalysis;
       }
 
       stopwatch.stop();
-      final analysisTime = stopwatch.elapsed;
+      final analysisTime = Duration(milliseconds: stopwatch.elapsedMilliseconds);
 
-      // 📊 Performance tracking
-      _recentAnalysisTimes.add(analysisTime);
-      if (_recentAnalysisTimes.length > 100) {
-        _recentAnalysisTimes.removeAt(0);
-      }
-
-      // 💾 Cache result for future use
-      if (useCache) {
-        await _cacheAnalysisResult(prompt, finalResult);
-      }
-
-      _logger.i('🎯 Prompt analysis completed in ${analysisTime.inMilliseconds}ms');
-      _logger.d('📊 Recommended models: ${finalResult.recommendedModels.join(', ')}');
-
-      return PromptAnalysisResult(
-        promptType: finalResult.promptType,
-        complexity: finalResult.complexity,
-        recommendedModels: finalResult.recommendedModels,
-        modelConfidenceScores: finalResult.modelConfidenceScores,
-        reasoningExplanation: finalResult.reasoningExplanation,
+      // 3. Create final analysis with performance data
+      final result = PromptAnalysis(
+        promptText: prompt,
+        primaryCategory: finalAnalysis.primaryCategory,
+        secondaryCategories: finalAnalysis.secondaryCategories,
+        complexity: finalAnalysis.complexity,
+        confidenceScore: finalAnalysis.confidenceScore,
+        modelRecommendations: _generateModelRecommendations(finalAnalysis),
+        recommendedStrategy: _selectOptimalStrategy(finalAnalysis),
+        reasoningSteps: finalAnalysis.reasoningSteps,
         analysisTime: analysisTime,
-        metadata: {
-          ...finalResult.metadata,
-          'analysis_method': _isClaudeHaikuConfigured() ? 'claude_haiku_enhanced' : 'heuristic_only',
-          'cache_used': false,
-          'total_analyses': _totalAnalyses,
-          'cache_hit_rate': _cacheHitCount / _totalAnalyses,
-        },
+        timestamp: DateTime.now(),
       );
+
+      // 4. Track performance and store for learning
+      _trackAnalysisPerformance(result);
+      _storeRecentAnalysis(result);
+
+      _logger.i('✅ Prompt analysis completed in ${analysisTime.inMilliseconds}ms - Category: ${result.primaryCategory.name}, Complexity: ${result.complexity.name}');
+
+      return result;
 
     } catch (e, stackTrace) {
       stopwatch.stop();
-      _failureCount++;
-      _logger.e('❌ Prompt analysis failed after ${stopwatch.elapsedMilliseconds}ms',
-          error: e, stackTrace: stackTrace);
+      _logger.e('❌ Prompt analysis failed after ${stopwatch.elapsedMilliseconds}ms', error: e, stackTrace: stackTrace);
 
-      // Return fallback analysis
-      return _getFallbackAnalysis(prompt, availableModels ?? [], stopwatch.elapsed);
+      // Return fallback analysis to prevent system failure
+      return _createFallbackAnalysis(prompt, Duration(milliseconds: stopwatch.elapsedMilliseconds));
     }
   }
 
-  /// 🎯 FAST HEURISTIC ANALYSIS (Local, <50ms)
-  PromptAnalysisResult _performHeuristicAnalysis(String prompt, List<String> availableModels) {
-    final promptLower = prompt.toLowerCase();
-    final words = prompt.split(RegExp(r'\s+'));
+  /// ⚡ Rapid heuristic analysis (always <50ms)
+  PromptAnalysis _performHeuristicAnalysis(String prompt) {
+    final lowerPrompt = prompt.toLowerCase();
+    final words = lowerPrompt.split(RegExp(r'\W+'));
 
-    // 🔍 Keyword-based classification
-    PromptType detectedType = PromptType.conversational; // Default
-    double complexity = 0.5; // Default complexity
+    // Category detection through keyword matching
+    PromptCategory primaryCategory = PromptCategory.conversational; // default
+    final categoryScores = <PromptCategory, double>{};
 
-    // 🎨 Creative indicators
-    if (_containsKeywords(promptLower, ['write', 'create', 'story', 'poem', 'creative', 'imagine', 'fiction'])) {
-      detectedType = PromptType.creative;
-      complexity = 0.6;
-    }
-    // 🔧 Technical indicators
-    else if (_containsKeywords(promptLower, ['code', 'program', 'debug', 'api', 'function', 'algorithm', 'technical', 'implement'])) {
-      detectedType = PromptType.technical;
-      complexity = 0.8;
-    }
-    // 📊 Analytical indicators
-    else if (_containsKeywords(promptLower, ['analyze', 'compare', 'evaluate', 'assess', 'reasoning', 'logic', 'data'])) {
-      detectedType = PromptType.analytical;
-      complexity = 0.7;
-    }
-    // 🔢 Mathematical indicators
-    else if (_containsKeywords(promptLower, ['calculate', 'solve', 'equation', 'math', 'formula', 'number'])) {
-      detectedType = PromptType.mathematical;
-      complexity = 0.7;
-    }
-    // 📚 Research indicators
-    else if (_containsKeywords(promptLower, ['research', 'find', 'information', 'summarize', 'explain', 'what is'])) {
-      detectedType = PromptType.research;
-      complexity = 0.6;
-    }
-    // 📖 Instructional indicators
-    else if (_containsKeywords(promptLower, ['how to', 'step by step', 'guide', 'tutorial', 'instructions', 'teach'])) {
-      detectedType = PromptType.instructional;
-      complexity = 0.5;
+    // Creative indicators
+    final creativeKeywords = ['write', 'story', 'creative', 'poem', 'imagine', 'design', 'art', 'novel', 'character'];
+    categoryScores[PromptCategory.creative] = _calculateKeywordScore(words, creativeKeywords);
+
+    // Analytical indicators
+    final analyticalKeywords = ['analyze', 'compare', 'evaluate', 'research', 'study', 'data', 'statistics', 'trends'];
+    categoryScores[PromptCategory.analytical] = _calculateKeywordScore(words, analyticalKeywords);
+
+    // Coding indicators
+    final codingKeywords = ['code', 'program', 'function', 'debug', 'api', 'javascript', 'python', 'algorithm', 'software'];
+    categoryScores[PromptCategory.coding] = _calculateKeywordScore(words, codingKeywords);
+
+    // Reasoning indicators
+    final reasoningKeywords = ['why', 'how', 'explain', 'reason', 'logic', 'solve', 'problem', 'think', 'because'];
+    categoryScores[PromptCategory.reasoning] = _calculateKeywordScore(words, reasoningKeywords);
+
+    // Factual indicators
+    final factualKeywords = ['what', 'who', 'when', 'where', 'define', 'definition', 'fact', 'information', 'tell'];
+    categoryScores[PromptCategory.factual] = _calculateKeywordScore(words, factualKeywords);
+
+    // Find primary category
+    final maxScore = categoryScores.values.fold(0.0, (max, score) => score > max ? score : max);
+    if (maxScore > 0.1) {
+      primaryCategory = categoryScores.entries
+          .where((entry) => entry.value == maxScore)
+          .first
+          .key;
     }
 
-    // 📈 Complexity adjustment based on prompt characteristics
-    if (words.length > 100) complexity += 0.2;
-    if (prompt.contains('?') && prompt.split('?').length > 3) complexity += 0.1;
-    if (_containsKeywords(promptLower, ['complex', 'detailed', 'comprehensive', 'thorough', 'advanced'])) {
-      complexity += 0.2;
-      if (complexity > 0.8) detectedType = PromptType.complex;
+    // Complexity detection
+    PromptComplexity complexity = PromptComplexity.moderate; // default
+    final wordCount = words.length;
+    final sentenceCount = prompt.split(RegExp(r'[.!?]+')).length;
+    final questionCount = prompt.split('?').length - 1;
+
+    if (wordCount < 10 && sentenceCount <= 1) {
+      complexity = PromptComplexity.simple;
+    } else if (wordCount > 50 || sentenceCount > 3 || questionCount > 2) {
+      complexity = PromptComplexity.complex;
     }
 
-    complexity = complexity.clamp(0.0, 1.0);
-
-    // 🎯 Generate model recommendations based on specializations
-    final modelScores = <String, double>{};
-    final availableModelSet = Set<String>.from(availableModels.map((m) => m.toLowerCase()));
-
-    for (final modelName in availableModelSet) {
-      if (ModelSpecialization.profiles.containsKey(modelName)) {
-        modelScores[modelName] = ModelSpecialization.getConfidence(modelName, detectedType);
+    // Specialized domain detection
+    final specializedKeywords = ['legal', 'medical', 'financial', 'scientific', 'academic', 'technical', 'professional'];
+    if (_calculateKeywordScore(words, specializedKeywords) > 0.2) {
+      if (primaryCategory == PromptCategory.conversational) {
+        primaryCategory = PromptCategory.specialized;
+      }
+      if (complexity == PromptComplexity.moderate) {
+        complexity = PromptComplexity.expert;
       }
     }
 
-    // 📊 Sort models by confidence score
-    final sortedModels = modelScores.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-
-    final recommendedModels = sortedModels
-        .where((entry) => entry.value >= 0.7) // Only recommend high-confidence models
-        .map((entry) => entry.key)
-        .take(3) // Top 3 recommendations
-        .toList();
-
-    // 📝 Generate reasoning explanation
-    final reasoning = _generateHeuristicReasoning(detectedType, complexity, recommendedModels, modelScores);
-
-    return PromptAnalysisResult(
-      promptType: detectedType.name,
-      complexity: complexity,
-      recommendedModels: recommendedModels,
-      modelConfidenceScores: modelScores,
-      reasoningExplanation: reasoning,
-      analysisTime: const Duration(milliseconds: 25), // Heuristic is very fast
-      metadata: {
-        'word_count': words.length,
-        'analysis_method': 'heuristic',
-        'detected_keywords': _getDetectedKeywords(promptLower),
-      },
-    );
-  }
-
-  /// 🧠 CLAUDE HAIKU ENHANCED ANALYSIS
-  Future<PromptAnalysisResult> _performClaudeHaikuAnalysis(
-      String prompt,
-      PromptAnalysisResult heuristicResult,
-      List<String> availableModels,
-      Map<String, dynamic>? context,
-      ) async {
-    final claudeConfig = _configService.getModelConfig(AIModel.claude);
-
-    if (claudeConfig == null || claudeConfig.apiKey.isEmpty) {
-      throw Exception('Claude configuration not available');
-    }
-
-    final analysisPrompt = _buildClaudeAnalysisPrompt(prompt, heuristicResult, availableModels, context);
-
-    final response = await _dio.post(
-      '${claudeConfig.baseUrl}/v1/messages',
-      options: Options(
-        headers: {
-          'x-api-key': claudeConfig.apiKey,
-          'anthropic-version': _claudeApiVersion,
-        },
-      ),
-      data: {
-        'model': _claudeHaikuModel,
-        'max_tokens': _maxAnalysisTokens,
-        'temperature': 0.1, // Low temperature for consistent analysis
-        'messages': [
-          {
-            'role': 'user',
-            'content': analysisPrompt,
-          }
-        ],
-      },
-    );
-
-    final claudeAnalysis = response.data['content'][0]['text'] as String;
-    return _parseClaudeAnalysis(claudeAnalysis, heuristicResult, availableModels);
-  }
-
-  /// 📝 BUILD CLAUDE ANALYSIS PROMPT
-  String _buildClaudeAnalysisPrompt(
-      String prompt,
-      PromptAnalysisResult heuristicResult,
-      List<String> availableModels,
-      Map<String, dynamic>? context,
-      ) {
-    return '''Analyze this prompt for AI model selection. Respond in JSON format only.
-
-PROMPT TO ANALYZE: "$prompt"
-
-AVAILABLE MODELS: ${availableModels.join(', ')}
-
-HEURISTIC ANALYSIS: 
-- Type: ${heuristicResult.promptType}
-- Complexity: ${heuristicResult.complexity}
-- Recommendations: ${heuristicResult.recommendedModels.join(', ')}
-
-Provide JSON with:
-{
-  "prompt_type": "creative|analytical|technical|conversational|mathematical|research|instructional|complex",
-  "complexity": 0.0-1.0,
-  "recommended_models": ["model1", "model2", "model3"],
-  "confidence_scores": {"model1": 0.95, "model2": 0.85},
-  "reasoning": "Brief explanation of recommendations"
-}
-
-Focus on accuracy over verbosity. Consider model specializations:
-- Claude: analytical, technical, research
-- GPT: conversational, creative, general
-- DeepSeek: technical, mathematical  
-- Gemini: creative, research
-- Others: balanced capabilities''';
-  }
-
-  /// 🔍 PARSE CLAUDE ANALYSIS RESPONSE
-  PromptAnalysisResult _parseClaudeAnalysis(
-      String claudeResponse,
-      PromptAnalysisResult heuristicFallback,
-      List<String> availableModels,
-      ) {
-    try {
-      // Extract JSON from Claude's response
-      final jsonMatch = RegExp(r'\{.*\}', dotAll: true).firstMatch(claudeResponse);
-      if (jsonMatch == null) {
-        throw Exception('No JSON found in Claude response');
-      }
-
-      final jsonData = jsonDecode(jsonMatch.group(0)!) as Map<String, dynamic>;
-
-      final promptType = jsonData['prompt_type'] as String? ?? heuristicFallback.promptType;
-      final complexity = (jsonData['complexity'] as num?)?.toDouble() ?? heuristicFallback.complexity;
-      final recommendedModels = List<String>.from(jsonData['recommended_models'] as List? ?? heuristicFallback.recommendedModels);
-      final confidenceScores = Map<String, double>.from(
-          (jsonData['confidence_scores'] as Map<String, dynamic>? ?? heuristicFallback.modelConfidenceScores)
-              .map((k, v) => MapEntry(k, (v as num).toDouble()))
-      );
-      final reasoning = jsonData['reasoning'] as String? ?? heuristicFallback.reasoningExplanation;
-
-      return PromptAnalysisResult(
-        promptType: promptType,
-        complexity: complexity.clamp(0.0, 1.0),
-        recommendedModels: recommendedModels.take(3).toList(),
-        modelConfidenceScores: confidenceScores,
-        reasoningExplanation: reasoning,
-        analysisTime: const Duration(milliseconds: 1500), // Claude Haiku typical response time
-        metadata: {
-          'analysis_method': 'claude_haiku_enhanced',
-          'claude_response_length': claudeResponse.length,
-          'heuristic_agreement': _calculateAgreement(heuristicFallback, promptType, recommendedModels),
-        },
-      );
-
-    } catch (e) {
-      _logger.w('⚠️ Failed to parse Claude analysis, using heuristic fallback: $e');
-      return heuristicFallback;
-    }
-  }
-
-  /// 📊 UTILITY METHODS
-
-  bool _containsKeywords(String text, List<String> keywords) {
-    return keywords.any((keyword) => text.contains(keyword));
-  }
-
-  List<String> _getDetectedKeywords(String text) {
-    final allKeywords = [
-      'write', 'create', 'story', 'poem', 'creative', 'imagine', 'fiction',
-      'code', 'program', 'debug', 'api', 'function', 'algorithm', 'technical',
-      'analyze', 'compare', 'evaluate', 'assess', 'reasoning', 'logic', 'data',
-      'calculate', 'solve', 'equation', 'math', 'formula', 'number',
-      'research', 'find', 'information', 'summarize', 'explain',
-      'how to', 'step by step', 'guide', 'tutorial', 'instructions',
+    final reasoningSteps = [
+      'Analyzed ${words.length} words and $sentenceCount sentences',
+      'Primary category: ${primaryCategory.name} (confidence: ${(maxScore * 100).toStringAsFixed(1)}%)',
+      'Complexity level: ${complexity.name} based on length and structure',
+      'Heuristic analysis completed in <50ms',
     ];
 
-    return allKeywords.where((keyword) => text.contains(keyword)).toList();
-  }
-
-  String _generateHeuristicReasoning(
-      PromptType type,
-      double complexity,
-      List<String> recommendedModels,
-      Map<String, double> scores,
-      ) {
-    final complexityDesc = complexity > 0.8 ? 'high' : complexity > 0.6 ? 'medium' : 'low';
-
-    return 'Detected ${type.name} prompt with $complexityDesc complexity. '
-        'Recommended ${recommendedModels.length} models based on specialization scores: '
-        '${recommendedModels.map((m) => '$m (${(scores[m] ?? 0).toStringAsFixed(2)})').join(', ')}.';
-  }
-
-  double _calculateAgreement(
-      PromptAnalysisResult heuristic,
-      String claudeType,
-      List<String> claudeModels,
-      ) {
-    double agreement = 0.0;
-
-    // Type agreement
-    if (heuristic.promptType == claudeType) agreement += 0.5;
-
-    // Model agreement
-    final heuristicSet = Set<String>.from(heuristic.recommendedModels);
-    final claudeSet = Set<String>.from(claudeModels);
-    final intersection = heuristicSet.intersection(claudeSet);
-    agreement += (intersection.length / heuristicSet.union(claudeSet).length) * 0.5;
-
-    return agreement.clamp(0.0, 1.0);
-  }
-
-  bool _isClaudeHaikuConfigured() {
-    final config = _configService.getModelConfig(AIModel.claude);
-    return config != null && config.apiKey.isNotEmpty;
-  }
-
-  /// 💾 CACHING METHODS
-
-  Future<PromptAnalysisResult?> _getCachedAnalysis(String prompt) async {
-    try {
-      final cacheKey = 'prompt_analysis_${prompt.hashCode}';
-      final cachedJson = await _storageService.getString(cacheKey);
-
-      if (cachedJson != null) {
-        final result = PromptAnalysisResult.fromJson(jsonDecode(cachedJson));
-        // Cache valid for 1 hour
-        if (DateTime.now().difference(DateTime.fromMillisecondsSinceEpoch(
-          result.metadata['cached_at'] as int? ?? 0,
-        )).inHours < 1) {
-          return result;
-        }
-      }
-    } catch (e) {
-      _logger.w('⚠️ Cache retrieval failed: $e');
-    }
-    return null;
-  }
-
-  Future<void> _cacheAnalysisResult(String prompt, PromptAnalysisResult result) async {
-    try {
-      final cacheKey = 'prompt_analysis_${prompt.hashCode}';
-      final resultWithTimestamp = PromptAnalysisResult(
-        promptType: result.promptType,
-        complexity: result.complexity,
-        recommendedModels: result.recommendedModels,
-        modelConfidenceScores: result.modelConfidenceScores,
-        reasoningExplanation: result.reasoningExplanation,
-        analysisTime: result.analysisTime,
-        metadata: {
-          ...result.metadata,
-          'cached_at': DateTime.now().millisecondsSinceEpoch,
-        },
-      );
-
-      await _storageService.setString(cacheKey, jsonEncode(resultWithTimestamp.toJson()));
-    } catch (e) {
-      _logger.w('⚠️ Cache storage failed: $e');
-    }
-  }
-
-  /// 🛡️ FALLBACK ANALYSIS
-  PromptAnalysisResult _getFallbackAnalysis(String prompt, List<String> availableModels, Duration elapsed) {
-    return PromptAnalysisResult(
-      promptType: 'conversational',
-      complexity: 0.5,
-      recommendedModels: availableModels.take(2).toList(),
-      modelConfidenceScores: {
-        for (final model in availableModels.take(3)) model: 0.6
-      },
-      reasoningExplanation: 'Fallback analysis due to service error. Using conservative recommendations.',
-      analysisTime: elapsed,
-      metadata: {
-        'analysis_method': 'fallback',
-        'error_recovery': true,
-        'failure_count': _failureCount,
-      },
+    return PromptAnalysis(
+      promptText: prompt,
+      primaryCategory: primaryCategory,
+      secondaryCategories: categoryScores.entries
+          .where((entry) => entry.value > 0.1 && entry.key != primaryCategory)
+          .map((entry) => entry.key)
+          .take(2)
+          .toList(),
+      complexity: complexity,
+      confidenceScore: 0.75, // Heuristic confidence
+      modelRecommendations: {}, // Will be filled later
+      recommendedStrategy: 'parallel', // Default
+      reasoningSteps: reasoningSteps,
+      analysisTime: const Duration(milliseconds: 50),
+      timestamp: DateTime.now(),
     );
   }
 
-  /// 📊 ANALYTICS & PERFORMANCE
+  /// 🤖 Claude Haiku enhanced analysis (target <200ms)
+  Future<PromptAnalysis> _performClaudeHaikuAnalysis(
+      String prompt,
+      PromptAnalysis heuristicBase,
+      ) async {
+    try {
+      // Get Claude Haiku configuration
+      final modelsConfig = await _configService.getModelsConfig();
+      final claudeConfig = modelsConfig?.availableModels[AIModel.claude];
 
-  Map<String, dynamic> getAnalyticsData() {
-    final avgResponseTime = _recentAnalysisTimes.isNotEmpty
-        ? _recentAnalysisTimes.fold<int>(0, (sum, time) => sum + time.inMilliseconds) / _recentAnalysisTimes.length
-        : 0.0;
+      if (claudeConfig == null || claudeConfig.apiKey.isEmpty) {
+        throw Exception('Claude Haiku not configured');
+      }
+
+      // Construct analysis prompt for Claude Haiku
+      final analysisPrompt = '''Analyze this prompt for AI model selection. Be concise and precise:
+
+PROMPT: "$prompt"
+
+Respond with JSON only:
+{
+  "primary_category": "creative|analytical|conversational|coding|reasoning|factual|synthesis|specialized",
+  "complexity": "simple|moderate|complex|expert", 
+  "confidence": 0.0-1.0,
+  "reasoning": ["step1", "step2", "step3"]
+}''';
+
+      // Send to Claude Haiku (fastest Claude model)
+      final response = await _aiService.singleRequest(
+        analysisPrompt,
+        AIModel.claude,
+        claudeConfig.copyWith(
+          maxTokens: 150, // Keep response small for speed
+          temperature: 0.1, // Low temperature for consistency
+        ),
+      );
+
+      // Parse Claude's response
+      final analysisJson = _extractJsonFromResponse(response);
+
+      if (analysisJson != null) {
+        final claudeCategory = _parseCategory(analysisJson['primary_category']);
+        final claudeComplexity = _parseComplexity(analysisJson['complexity']);
+        final claudeConfidence = (analysisJson['confidence'] as num?)?.toDouble() ?? 0.8;
+        final claudeReasoning = (analysisJson['reasoning'] as List?)
+            ?.map((e) => e.toString())
+            .toList() ?? [];
+
+        // Combine heuristic and Claude analysis
+        return PromptAnalysis(
+          promptText: prompt,
+          primaryCategory: claudeCategory ?? heuristicBase.primaryCategory,
+          secondaryCategories: heuristicBase.secondaryCategories,
+          complexity: claudeComplexity ?? heuristicBase.complexity,
+          confidenceScore: (claudeConfidence + heuristicBase.confidenceScore) / 2,
+          modelRecommendations: {}, // Will be filled later
+          recommendedStrategy: 'parallel', // Will be determined later
+          reasoningSteps: [
+            'Heuristic analysis: ${heuristicBase.primaryCategory.name}',
+            'Claude Haiku enhancement: ${claudeCategory?.name ?? "unavailable"}',
+            ...claudeReasoning,
+            'Combined confidence: ${((claudeConfidence + heuristicBase.confidenceScore) / 2 * 100).toStringAsFixed(1)}%',
+          ],
+          analysisTime: const Duration(milliseconds: 200),
+          timestamp: DateTime.now(),
+        );
+      } else {
+        throw Exception('Invalid Claude response format');
+      }
+
+    } catch (e) {
+      _logger.w('⚠️ Claude Haiku analysis failed, using heuristic: $e');
+      rethrow;
+    }
+  }
+
+  /// 🎯 Generate intelligent model recommendations based on analysis
+  Map<String, double> _generateModelRecommendations(PromptAnalysis analysis) {
+    final recommendations = <String, double>{};
+
+    for (final profile in _modelProfiles.values) {
+      double score = 0.0;
+
+      // Category strength (60% weight)
+      final categoryStrength = profile.categoryStrengths[analysis.primaryCategory] ?? 0.5;
+      score += categoryStrength * 0.6;
+
+      // Complexity handling (25% weight)
+      final complexityHandling = profile.complexityHandling[analysis.complexity] ?? 0.5;
+      score += complexityHandling * 0.25;
+
+      // Reliability and cost (15% weight)
+      score += (profile.reliabilityScore * 0.1);
+      score += (profile.costEfficiency * 0.05);
+
+      recommendations[profile.modelName] = score.clamp(0.0, 1.0);
+    }
+
+    return recommendations;
+  }
+
+  /// 🎛️ Select optimal orchestration strategy based on analysis
+  String _selectOptimalStrategy(PromptAnalysis analysis) {
+    switch (analysis.complexity) {
+      case PromptComplexity.simple:
+        return 'consensus'; // Quick consensus for simple queries
+      case PromptComplexity.moderate:
+        return 'parallel'; // Standard parallel processing
+      case PromptComplexity.complex:
+        return 'weighted'; // Weighted based on specialization
+      case PromptComplexity.expert:
+        return 'adaptive'; // Adaptive strategy for expert queries
+    }
+  }
+
+  /// 📊 Performance tracking for continuous improvement
+  void _trackAnalysisPerformance(PromptAnalysis analysis) {
+    // Track analysis time by category
+    _analysisPerformance
+        .putIfAbsent(analysis.primaryCategory, () => [])
+        .add(analysis.analysisTime.inMilliseconds);
+
+    // Keep only last 100 entries per category
+    if (_analysisPerformance[analysis.primaryCategory]!.length > 100) {
+      _analysisPerformance[analysis.primaryCategory]!.removeAt(0);
+    }
+
+    // Track total analysis count
+    final categoryName = analysis.primaryCategory.name;
+    _analysisCount[categoryName] = (_analysisCount[categoryName] ?? 0) + 1;
+  }
+
+  /// 💾 Store recent analyses for learning and debugging
+  void _storeRecentAnalysis(PromptAnalysis analysis) {
+    _recentAnalyses.add(analysis);
+
+    // Keep only last 50 analyses
+    if (_recentAnalyses.length > 50) {
+      _recentAnalyses.removeAt(0);
+    }
+  }
+
+  /// 🆘 Fallback analysis when all else fails
+  PromptAnalysis _createFallbackAnalysis(String prompt, Duration analysisTime) {
+    return PromptAnalysis(
+      promptText: prompt,
+      primaryCategory: PromptCategory.conversational,
+      secondaryCategories: [],
+      complexity: PromptComplexity.moderate,
+      confidenceScore: 0.5,
+      modelRecommendations: {
+        'claude': 0.8,
+        'gpt': 0.8,
+        'deepseek': 0.7,
+        'gemini': 0.7,
+      },
+      recommendedStrategy: 'parallel',
+      reasoningSteps: ['Fallback analysis - all systems failed'],
+      analysisTime: analysisTime,
+      timestamp: DateTime.now(),
+    );
+  }
+
+  // 🔧 UTILITY METHODS
+
+  double _calculateKeywordScore(List<String> words, List<String> keywords) {
+    int matches = 0;
+    for (final word in words) {
+      if (keywords.contains(word)) {
+        matches++;
+      }
+    }
+    return matches / words.length;
+  }
+
+  Map<String, dynamic>? _extractJsonFromResponse(String response) {
+    try {
+      // Try to find JSON in the response
+      final jsonMatch = RegExp(r'\{.*\}', dotAll: true).firstMatch(response);
+      if (jsonMatch != null) {
+        return jsonDecode(jsonMatch.group(0)!) as Map<String, dynamic>;
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  PromptCategory? _parseCategory(dynamic categoryStr) {
+    if (categoryStr is! String) return null;
+    try {
+      return PromptCategory.values.firstWhere(
+            (e) => e.name == categoryStr,
+        orElse: () => PromptCategory.conversational,
+      );
+    } catch (e) {
+      return null;
+    }
+  }
+
+  PromptComplexity? _parseComplexity(dynamic complexityStr) {
+    if (complexityStr is! String) return null;
+    try {
+      return PromptComplexity.values.firstWhere(
+            (e) => e.name == complexityStr,
+        orElse: () => PromptComplexity.moderate,
+      );
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // 📊 PUBLIC ANALYTICS METHODS
+
+  /// Get analysis statistics for debugging and optimization
+  Map<String, dynamic> getAnalysisStatistics() {
+    final stats = <String, dynamic>{};
+
+    for (final category in PromptCategory.values) {
+      final performances = _analysisPerformance[category] ?? [];
+      if (performances.isNotEmpty) {
+        stats[category.name] = {
+          'count': _analysisCount[category.name] ?? 0,
+          'avg_time_ms': performances.reduce((a, b) => a + b) / performances.length,
+          'min_time_ms': performances.reduce((a, b) => a < b ? a : b),
+          'max_time_ms': performances.reduce((a, b) => a > b ? a : b),
+        };
+      }
+    }
 
     return {
-      'total_analyses': _totalAnalyses,
-      'cache_hit_rate': _totalAnalyses > 0 ? _cacheHitCount / _totalAnalyses : 0.0,
-      'failure_rate': _totalAnalyses > 0 ? _failureCount / _totalAnalyses : 0.0,
-      'average_response_time_ms': avgResponseTime,
-      'min_response_time_ms': _recentAnalysisTimes.isNotEmpty
-          ? _recentAnalysisTimes.map((t) => t.inMilliseconds).reduce((a, b) => a < b ? a : b)
-          : 0,
-      'max_response_time_ms': _recentAnalysisTimes.isNotEmpty
-          ? _recentAnalysisTimes.map((t) => t.inMilliseconds).reduce((a, b) => a > b ? a : b)
-          : 0,
-      'claude_haiku_configured': _isClaudeHaikuConfigured(),
-      'recent_analyses_count': _recentAnalysisTimes.length,
+      'total_analyses': _recentAnalyses.length,
+      'categories': stats,
+      'recent_analyses': _recentAnalyses.take(10).map((a) => {
+        'category': a.primaryCategory.name,
+        'complexity': a.complexity.name,
+        'confidence': a.confidenceScore,
+        'time_ms': a.analysisTime.inMilliseconds,
+      }).toList(),
     };
   }
 
-  void resetAnalytics() {
-    _recentAnalysisTimes.clear();
-    _totalAnalyses = 0;
-    _cacheHitCount = 0;
-    _failureCount = 0;
-    _logger.i('📊 MiniLLMAnalyzerService analytics reset');
+  /// Get model recommendation history for learning
+  List<PromptAnalysis> getRecentAnalyses({int? limit}) {
+    final analyses = _recentAnalyses.reversed.toList();
+    return limit != null ? analyses.take(limit).toList() : analyses;
   }
 
-  /// 🧹 CLEANUP
-  Future<void> dispose() async {
-    _logger.d('🧹 Disposing MiniLLMAnalyzerService...');
-
-    try {
-      _dio.close();
-      _recentAnalysisTimes.clear();
-      _analysisCount.clear();
-      _responseTimes.clear();
-      _cacheHits.clear();
-
-      _logger.i('✅ MiniLLMAnalyzerService disposed successfully');
-    } catch (e) {
-      _logger.e('❌ Error disposing MiniLLMAnalyzerService: $e');
-    }
+  /// Clear analysis history and reset statistics
+  void clearAnalysisHistory() {
+    _recentAnalyses.clear();
+    _analysisPerformance.clear();
+    _analysisCount.clear();
+    _logger.i('🧹 Analysis history cleared');
   }
 }

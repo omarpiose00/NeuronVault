@@ -96,7 +96,6 @@ class EnhancedAchievementService extends ChangeNotifier {
       category: AchievementCategory.particles,
       rarity: AchievementRarity.common,
       targetProgress: 1,
-      // icon: Icons.visibility, // Removed: Icon is in AchievementIconX extension
     );
 
     achievements['particle_whisperer'] = const Achievement(
@@ -106,7 +105,6 @@ class EnhancedAchievementService extends ChangeNotifier {
       category: AchievementCategory.particles,
       rarity: AchievementRarity.rare,
       targetProgress: 50,
-      // icon: Icons.touch_app, // Removed
     );
 
     achievements['neural_architect'] = const Achievement(
@@ -116,7 +114,6 @@ class EnhancedAchievementService extends ChangeNotifier {
       category: AchievementCategory.particles,
       rarity: AchievementRarity.epic,
       targetProgress: 5,
-      // icon: Icons.architecture, // Removed
     );
 
     achievements['particle_master'] = const Achievement(
@@ -126,7 +123,6 @@ class EnhancedAchievementService extends ChangeNotifier {
       category: AchievementCategory.particles,
       rarity: AchievementRarity.legendary,
       targetProgress: 300, // 5 minutes in seconds
-      // icon: Icons.auto_awesome, // Removed
       isHidden: true,
     );
 
@@ -138,7 +134,6 @@ class EnhancedAchievementService extends ChangeNotifier {
       category: AchievementCategory.orchestration,
       rarity: AchievementRarity.common,
       targetProgress: 1,
-      // icon: Icons.psychology, // Removed
     );
 
     achievements['ai_conductor'] = const Achievement(
@@ -148,7 +143,6 @@ class EnhancedAchievementService extends ChangeNotifier {
       category: AchievementCategory.orchestration,
       rarity: AchievementRarity.epic,
       targetProgress: 7,
-      // icon: Icons.music_note, // Corrected: Was Icons.conductor_music
     );
 
     achievements['strategy_master'] = const Achievement(
@@ -158,7 +152,6 @@ class EnhancedAchievementService extends ChangeNotifier {
       category: AchievementCategory.orchestration,
       rarity: AchievementRarity.rare,
       targetProgress: 5,
-      // icon: Icons.mediation, // Corrected: Was Icons.strategy
     );
 
     achievements['neural_marathon'] = const Achievement(
@@ -168,7 +161,6 @@ class EnhancedAchievementService extends ChangeNotifier {
       category: AchievementCategory.orchestration,
       rarity: AchievementRarity.legendary,
       targetProgress: 100,
-      // icon: Icons.directions_run, // Removed
     );
 
     achievements['speed_synthesizer'] = const Achievement(
@@ -178,33 +170,18 @@ class EnhancedAchievementService extends ChangeNotifier {
       category: AchievementCategory.orchestration,
       rarity: AchievementRarity.epic,
       targetProgress: 10,
-      // icon: Icons.speed, // Removed
       isHidden: true,
     );
 
     // 🎨 THEME ACHIEVEMENTS - ENHANCED WITH PHASE 3.3
     final themeData = [
-      {'name': 'cosmos', 'display': 'Cosmos Explorer', 'iconName': 'star'}, // Storing icon name for dynamic lookup
-      {'name': 'matrix', 'display': 'Matrix Diver', 'iconName': 'code'},
-      {'name': 'sunset', 'display': 'Sunset Dreamer', 'iconName': 'wb_sunny'}, // Corrected: Was Icons.sunset
-      {'name': 'ocean', 'display': 'Ocean Voyager', 'iconName': 'waves'},
-      {'name': 'midnight', 'display': 'Midnight Walker', 'iconName': 'nights_stay'},
-      {'name': 'aurora', 'display': 'Aurora Chaser', 'iconName': 'light_mode'},
+      {'name': 'cosmos', 'display': 'Cosmos Explorer'},
+      {'name': 'matrix', 'display': 'Matrix Diver'},
+      {'name': 'sunset', 'display': 'Sunset Dreamer'},
+      {'name': 'ocean', 'display': 'Ocean Voyager'},
+      {'name': 'midnight', 'display': 'Midnight Walker'},
+      {'name': 'aurora', 'display': 'Aurora Chaser'},
     ];
-
-    // Helper to map string names to IconData (could be more robust)
-    IconData getIconByName(String name) {
-      switch(name) {
-        case 'star': return Icons.star;
-        case 'code': return Icons.code;
-        case 'wb_sunny': return Icons.wb_sunny;
-        case 'waves': return Icons.waves;
-        case 'nights_stay': return Icons.nights_stay;
-        case 'light_mode': return Icons.light_mode;
-        default: return Icons.help_outline; // Fallback icon
-      }
-    }
-
 
     for (final theme in themeData) {
       achievements['theme_${theme['name']}'] = Achievement(
@@ -214,7 +191,6 @@ class EnhancedAchievementService extends ChangeNotifier {
         category: AchievementCategory.themes,
         rarity: AchievementRarity.common,
         targetProgress: 1,
-        // icon: getIconByName(theme['iconName'] as String), // Removed
       );
     }
 
@@ -225,7 +201,6 @@ class EnhancedAchievementService extends ChangeNotifier {
       category: AchievementCategory.themes,
       rarity: AchievementRarity.legendary,
       targetProgress: 6,
-      // icon: Icons.palette, // Removed
     );
 
     achievements['visual_shapeshifter'] = const Achievement(
@@ -235,7 +210,6 @@ class EnhancedAchievementService extends ChangeNotifier {
       category: AchievementCategory.themes,
       rarity: AchievementRarity.rare,
       targetProgress: 25,
-      // icon: Icons.transform, // Removed
     );
 
     achievements['theme_marathon'] = const Achievement(
@@ -245,7 +219,6 @@ class EnhancedAchievementService extends ChangeNotifier {
       category: AchievementCategory.themes,
       rarity: AchievementRarity.epic,
       targetProgress: 6,
-      // icon: Icons.timer, // Removed
       isHidden: true,
     );
 
@@ -257,7 +230,6 @@ class EnhancedAchievementService extends ChangeNotifier {
       category: AchievementCategory.audio,
       rarity: AchievementRarity.common,
       targetProgress: 1,
-      // icon: Icons.volume_up, // Removed
     );
 
     achievements['audio_architect'] = const Achievement(
@@ -267,7 +239,6 @@ class EnhancedAchievementService extends ChangeNotifier {
       category: AchievementCategory.audio,
       rarity: AchievementRarity.epic,
       targetProgress: 7,
-      // icon: Icons.equalizer, // Removed
     );
 
     achievements['haptic_master'] = const Achievement(
@@ -277,7 +248,6 @@ class EnhancedAchievementService extends ChangeNotifier {
       category: AchievementCategory.audio,
       rarity: AchievementRarity.rare,
       targetProgress: 100,
-      // icon: Icons.vibration, // Removed
     );
 
     achievements['immersion_king'] = const Achievement(
@@ -287,7 +257,6 @@ class EnhancedAchievementService extends ChangeNotifier {
       category: AchievementCategory.audio,
       rarity: AchievementRarity.legendary,
       targetProgress: 600, // 10 minutes in seconds
-      // icon: Icons.surround_sound, // Removed
       isHidden: true,
     );
 
@@ -299,7 +268,6 @@ class EnhancedAchievementService extends ChangeNotifier {
       category: AchievementCategory.profiling,
       rarity: AchievementRarity.common,
       targetProgress: 1,
-      // icon: Icons.analytics, // Removed
     );
 
     achievements['profiling_expert'] = const Achievement(
@@ -309,7 +277,6 @@ class EnhancedAchievementService extends ChangeNotifier {
       category: AchievementCategory.profiling,
       rarity: AchievementRarity.epic,
       targetProgress: 7,
-      // icon: Icons.bar_chart, // Removed
     );
 
     achievements['performance_analyst'] = const Achievement(
@@ -319,7 +286,6 @@ class EnhancedAchievementService extends ChangeNotifier {
       category: AchievementCategory.profiling,
       rarity: AchievementRarity.rare,
       targetProgress: 3600, // 60 minutes in seconds
-      // icon: Icons.trending_up, // Removed
     );
 
     // 🌟 EXPLORATION ACHIEVEMENTS - PHASE 3.3 ENHANCED
@@ -330,7 +296,6 @@ class EnhancedAchievementService extends ChangeNotifier {
       category: AchievementCategory.exploration,
       rarity: AchievementRarity.legendary,
       targetProgress: 5,
-      // icon: Icons.explore, // Removed
     );
 
     achievements['speed_demon'] = const Achievement(
@@ -340,7 +305,6 @@ class EnhancedAchievementService extends ChangeNotifier {
       category: AchievementCategory.exploration,
       rarity: AchievementRarity.epic,
       targetProgress: 600, // 10 minutes in seconds
-      // icon: Icons.speed, // Removed
       isHidden: true,
     );
 
@@ -351,7 +315,6 @@ class EnhancedAchievementService extends ChangeNotifier {
       category: AchievementCategory.exploration,
       rarity: AchievementRarity.legendary,
       targetProgress: 7,
-      // icon: Icons.favorite, // Removed
       isHidden: true,
     );
 
@@ -362,7 +325,6 @@ class EnhancedAchievementService extends ChangeNotifier {
       category: AchievementCategory.exploration,
       rarity: AchievementRarity.legendary,
       targetProgress: 1,
-      // icon: Icons.rocket_launch, // Removed
       isHidden: true,
     );
 
@@ -374,7 +336,6 @@ class EnhancedAchievementService extends ChangeNotifier {
       category: AchievementCategory.orchestration,
       rarity: AchievementRarity.legendary,
       targetProgress: 1,
-      // icon: Icons.star_purple500, // Removed
       isHidden: true,
     );
 
@@ -385,7 +346,6 @@ class EnhancedAchievementService extends ChangeNotifier {
       category: AchievementCategory.exploration,
       rarity: AchievementRarity.legendary,
       targetProgress: 4,
-      // icon: Icons.diamond, // Removed
     );
 
     _state = _state.copyWith(achievements: achievements);
@@ -397,8 +357,8 @@ class EnhancedAchievementService extends ChangeNotifier {
       String achievementId, {
         int increment = 1,
         Map<String, dynamic>? data,
-        bool playSound = true, // Kept for potential future use if model changes
-        bool triggerHaptic = true, // Kept for potential future use if model changes
+        bool playSound = true,
+        bool triggerHaptic = true,
       }) async {
     if (!_state.achievements.containsKey(achievementId)) {
       _logger.w('⚠️ Achievement not found: $achievementId');
@@ -447,8 +407,8 @@ class EnhancedAchievementService extends ChangeNotifier {
   /// 🏆 Enhanced achievement unlock with PHASE 3.3 celebration
   Future<void> _unlockEnhancedAchievement(
       String achievementId, {
-        bool playSound = true, // Kept for potential future use
-        bool triggerHaptic = true, // Kept for potential future use
+        bool playSound = true,
+        bool triggerHaptic = true,
       }) async {
     final achievement = _state.achievements[achievementId];
     if (achievement == null || achievement.isUnlocked) return;
@@ -461,13 +421,12 @@ class EnhancedAchievementService extends ChangeNotifier {
     final newAchievements = Map<String, Achievement>.from(_state.achievements);
     newAchievements[achievementId] = unlockedAchievement;
 
-    // 🎊 PHASE 3.3: Create enhanced notification
+    // 🎊 PHASE 3.3: Create enhanced notification with celebration data
     final notification = AchievementNotification(
       id: 'notif_${achievementId}_${DateTime.now().millisecondsSinceEpoch}',
       achievement: unlockedAchievement,
       timestamp: DateTime.now(),
       displayDuration: _getDisplayDuration(unlockedAchievement.rarity),
-      // celebrationIntensity, playSound, triggerHaptic removed as they are not in the model
     );
 
     final newNotifications = List<AchievementNotification>.from(_state.notifications);
@@ -497,26 +456,12 @@ class EnhancedAchievementService extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Method to mark notification as shown
-  Future<void> markNotificationShown(String notificationId) async {
-    final notificationIndex = _state.notifications.indexWhere((n) => n.id == notificationId);
-    if (notificationIndex != -1) {
-      final updatedNotifications = List<AchievementNotification>.from(_state.notifications);
-      updatedNotifications[notificationIndex] = updatedNotifications[notificationIndex].copyWith(isShown: true);
-      _state = _state.copyWith(notifications: updatedNotifications);
-      await _saveEnhancedState(); // Save state after modification
-      notifyListeners();
-      _logger.d('Notification marked as shown: $notificationId');
-    }
-  }
-
-
   /// 📊 Update enhanced statistics with live analytics
   Future<void> _updateEnhancedStats() async {
     final achievements = _state.achievements.values.toList();
     final unlocked = achievements.where((a) => a.isUnlocked).toList();
 
-    final stats = EnhancedAchievementStats( // Using the new standalone class
+    final stats = AchievementStats(
       totalAchievements: achievements.length,
       unlockedAchievements: unlocked.length,
       commonUnlocked: unlocked.where((a) => a.rarity == AchievementRarity.common).length,
@@ -533,50 +478,8 @@ class EnhancedAchievementService extends ChangeNotifier {
       favoriteCategory: _getFavoriteCategory(),
       streakDays: _calculateStreakDays(),
     );
-    // Note: _state.copyWith(stats: stats) would require AchievementState to accept EnhancedAchievementStats
-    // or for EnhancedAchievementStats to be directly compatible with what AchievementState.stats expects.
-    // For now, we assume AchievementState's stats field can hold this or is adapted.
-    // If AchievementState.stats is strictly AchievementStats, this line needs adjustment.
-    // For this fix, I am assuming the original structure was intended to be compatible.
-    // A proper fix might involve changing AchievementState.stats to be of type EnhancedAchievementStats
-    // or making EnhancedAchievementStats conform to the structure of AchievementStats if it's just adding methods.
-    // Since EnhancedAchievementStats ADDS fields, the former is more likely.
-    // However, without regenerating state_models.dart, I'll cast for now if direct assignment fails,
-    // or better, ensure EnhancedAchievementStats IS AchievementStats plus more.
-    // For this context, the error was `no_generative_constructors_in_superclass`,
-    // so making EnhancedAchievementStats standalone and then ensuring the _state.copyWith
-    // can accept it (or a compatible version) is key.
-    // The simplest path now that EnhancedAchievementStats is standalone is to ensure it contains all fields
-    // of AchievementStats and any new ones.
 
-    // Let's assume _state.copyWith can take the new stats structure.
-    // If state.stats is strictly AchievementStats, we'd need to convert:
-    // final baseStats = AchievementStats(
-    //   totalAchievements: stats.totalAchievements,
-    //   unlockedAchievements: stats.unlockedAchievements,
-    //   commonUnlocked: stats.commonUnlocked,
-    //   rareUnlocked: stats.rareUnlocked,
-    //   epicUnlocked: stats.epicUnlocked,
-    //   legendaryUnlocked: stats.legendaryUnlocked,
-    //   completionPercentage: stats.completionPercentage,
-    //   lastAchievementDate: stats.lastAchievementDate,
-    // );
-    // _state = _state.copyWith(stats: baseStats);
-    // And store the extra fields of EnhancedAchievementStats separately or adjust AchievementState.
-
-    // Given the error was about superclass constructor, the primary fix is making EnhancedAchievementStats standalone.
-    // We'll proceed assuming the developer will adjust AchievementState if _state.copyWith(stats: stats) fails type-checking.
-    // For now, if they were intended to be compatible, this should work.
-    _state = _state.copyWith(stats: AchievementStats(
-      totalAchievements: stats.totalAchievements,
-      unlockedAchievements: stats.unlockedAchievements,
-      commonUnlocked: stats.commonUnlocked,
-      rareUnlocked: stats.rareUnlocked,
-      epicUnlocked: stats.epicUnlocked,
-      legendaryUnlocked: stats.legendaryUnlocked,
-      completionPercentage: stats.completionPercentage,
-      lastAchievementDate: stats.lastAchievementDate,
-    ));
+    _state = _state.copyWith(stats: stats);
   }
 
   /// 📊 Update live analytics
@@ -734,19 +637,6 @@ class EnhancedAchievementService extends ChangeNotifier {
     }
   }
 
-  double _getCelebrationIntensity(AchievementRarity rarity) {
-    switch (rarity) {
-      case AchievementRarity.common:
-        return 0.6;
-      case AchievementRarity.rare:
-        return 0.7;
-      case AchievementRarity.epic:
-        return 0.8;
-      case AchievementRarity.legendary:
-        return 1.0;
-    }
-  }
-
   int _getRarityPoints(AchievementRarity rarity) {
     switch (rarity) {
       case AchievementRarity.common:
@@ -868,6 +758,22 @@ class EnhancedAchievementService extends ChangeNotifier {
     }
   }
 
+  /// 🧹 Mark notification as shown
+  Future<void> markNotificationShown(String notificationId) async {
+    final index = _state.notifications.indexWhere((n) => n.id == notificationId);
+    if (index != -1) {
+      final notification = _state.notifications[index];
+      final updatedNotification = notification.copyWith(isShown: true);
+
+      final newNotifications = List<AchievementNotification>.from(_state.notifications);
+      newNotifications[index] = updatedNotification;
+
+      _state = _state.copyWith(notifications: newNotifications);
+      await _saveEnhancedState();
+      notifyListeners();
+    }
+  }
+
   /// 🧹 Enhanced cleanup
   @override
   void dispose() {
@@ -913,37 +819,4 @@ class AchievementEvent {
     increment: json['increment'],
     data: json['data'],
   );
-}
-
-/// 🎯 Enhanced Achievement Stats - Standalone class
-class EnhancedAchievementStats { // Removed "extends AchievementStats"
-  final int totalAchievements;
-  final int unlockedAchievements;
-  final int commonUnlocked;
-  final int rareUnlocked;
-  final int epicUnlocked;
-  final int legendaryUnlocked;
-  final double completionPercentage;
-  final DateTime? lastAchievementDate;
-  final int totalPoints;
-  final Duration? averageUnlockTime;
-  final double unlockRate;
-  final String favoriteCategory;
-  final int streakDays;
-
-  const EnhancedAchievementStats({
-    required this.totalAchievements,
-    required this.unlockedAchievements,
-    required this.commonUnlocked,
-    required this.rareUnlocked,
-    required this.epicUnlocked,
-    required this.legendaryUnlocked,
-    required this.completionPercentage,
-    this.lastAchievementDate,
-    required this.totalPoints,
-    this.averageUnlockTime,
-    required this.unlockRate,
-    required this.favoriteCategory,
-    required this.streakDays,
-  });
 }

@@ -1,506 +1,481 @@
-// lib/core/controllers/athena_controller.dart
-// 🧠 NEURONVAULT - ATHENA CONTROLLER - PHASE 3.4 REVOLUTIONARY
-// AI Autonomy State Management - Riverpod 2.x Controller Pattern
-// Manages Athena Intelligence System state and interactions
+// 🎮 NEURONVAULT - ATHENA CONTROLLER - PHASE 3.4
+// AI Autonomy State Management Layer with Riverpod integration
+// Neural luxury reactive state management for world's first AI autonomy
 
 import 'dart:async';
-import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logger/logger.dart';
 
 import '../services/athena_intelligence_service.dart';
-import '../services/mini_llm_analyzer_service.dart';
-import '../state/state_models.dart';
 
-/// 🧠 ATHENA SYSTEM STATE
-enum AthenaSystemState {
-  initializing,
-  ready,
-  analyzing,
-  recommending,
-  learning,
-  error,
-  disabled,
+/// 🎯 Athena UI State for reactive interface
+enum AthenaUIState {
+  disabled,      // Athena is turned off
+  idle,         // Enabled but not active
+  analyzing,    // Currently analyzing prompt
+  recommending, // Generating recommendations
+  ready,        // Recommendations ready for review/apply
+  applying,     // Applying recommendations
+  error,        // Error state
 }
 
-/// 🎯 ATHENA RECOMMENDATION STATE
-class AthenaRecommendationState {
-  final bool isActive;
-  final AthenaSystemState systemState;
-  final AIRecommendationResult? currentRecommendation;
-  final PromptAnalysisResult? currentAnalysis;
-  final bool isAutoModeEnabled;
-  final double systemConfidence;
-  final List<DecisionTreeNode> decisionTree;
+/// 🎛️ Athena Controller State combining service state with UI state
+class AthenaControllerState {
+  final AthenaUIState uiState;
+  final AthenaState serviceState;
   final String? errorMessage;
-  final DateTime? lastRecommendationTime;
-  final Map<String, dynamic> systemMetrics;
+  final bool autoApplyEnabled;
+  final double autoApplyThreshold;
+  final List<String> recentPromptCategories;
+  final Map<String, int> categoryUsageStats;
 
-  const AthenaRecommendationState({
-    this.isActive = false,
-    this.systemState = AthenaSystemState.initializing,
-    this.currentRecommendation,
-    this.currentAnalysis,
-    this.isAutoModeEnabled = false,
-    this.systemConfidence = 0.0,
-    this.decisionTree = const [],
+  const AthenaControllerState({
+    required this.uiState,
+    required this.serviceState,
     this.errorMessage,
-    this.lastRecommendationTime,
-    this.systemMetrics = const {},
+    required this.autoApplyEnabled,
+    required this.autoApplyThreshold,
+    required this.recentPromptCategories,
+    required this.categoryUsageStats,
   });
 
-  AthenaRecommendationState copyWith({
-    bool? isActive,
-    AthenaSystemState? systemState,
-    AIRecommendationResult? currentRecommendation,
-    PromptAnalysisResult? currentAnalysis,
-    bool? isAutoModeEnabled,
-    double? systemConfidence,
-    List<DecisionTreeNode>? decisionTree,
+  AthenaControllerState.initial()
+      : uiState = AthenaUIState.disabled,
+        serviceState = AthenaState.initial(), // Removed const
+        errorMessage = null,
+        autoApplyEnabled = false,
+        autoApplyThreshold = 0.8,
+        recentPromptCategories = const [],
+        categoryUsageStats = const {};
+  AthenaControllerState copyWith({
+    AthenaUIState? uiState,
+    AthenaState? serviceState,
     String? errorMessage,
-    DateTime? lastRecommendationTime,
-    Map<String, dynamic>? systemMetrics,
+    bool? autoApplyEnabled,
+    double? autoApplyThreshold,
+    List<String>? recentPromptCategories,
+    Map<String, int>? categoryUsageStats,
   }) {
-    return AthenaRecommendationState(
-      isActive: isActive ?? this.isActive,
-      systemState: systemState ?? this.systemState,
-      currentRecommendation: currentRecommendation ?? this.currentRecommendation,
-      currentAnalysis: currentAnalysis ?? this.currentAnalysis,
-      isAutoModeEnabled: isAutoModeEnabled ?? this.isAutoModeEnabled,
-      systemConfidence: systemConfidence ?? this.systemConfidence,
-      decisionTree: decisionTree ?? this.decisionTree,
-      errorMessage: errorMessage ?? this.errorMessage,
-      lastRecommendationTime: lastRecommendationTime ?? this.lastRecommendationTime,
-      systemMetrics: systemMetrics ?? this.systemMetrics,
+    return AthenaControllerState(
+      uiState: uiState ?? this.uiState,
+      serviceState: serviceState ?? this.serviceState,
+      errorMessage: errorMessage,
+      autoApplyEnabled: autoApplyEnabled ?? this.autoApplyEnabled,
+      autoApplyThreshold: autoApplyThreshold ?? this.autoApplyThreshold,
+      recentPromptCategories: recentPromptCategories ?? this.recentPromptCategories,
+      categoryUsageStats: categoryUsageStats ?? this.categoryUsageStats,
     );
   }
 
-  Map<String, dynamic> toJson() => {
-    'is_active': isActive,
-    'system_state': systemState.name,
-    'current_recommendation': currentRecommendation?.toJson(),
-    'current_analysis': currentAnalysis?.toJson(),
-    'is_auto_mode_enabled': isAutoModeEnabled,
-    'system_confidence': systemConfidence,
-    'decision_tree': decisionTree.map((node) => node.toJson()).toList(),
-    'error_message': errorMessage,
-    'last_recommendation_time': lastRecommendationTime?.toIso8601String(),
-    'system_metrics': systemMetrics,
-  };
+  // Computed properties for UI
+  bool get isEnabled => serviceState.isEnabled;
+  bool get isAnalyzing => uiState == AthenaUIState.analyzing || uiState == AthenaUIState.recommending;
+  bool get hasRecommendation => serviceState.currentRecommendation != null;
+  bool get hasError => uiState == AthenaUIState.error;
+  bool get canApplyRecommendation => hasRecommendation && uiState == AthenaUIState.ready;
+
+  AthenaRecommendation? get currentRecommendation => serviceState.currentRecommendation;
+  List<AthenaDecision> get recentDecisions => serviceState.decisionHistory.take(10).toList();
+
+  double get averageConfidence {
+    if (serviceState.decisionHistory.isEmpty) return 0.0;
+    final confidences = serviceState.decisionHistory.map((d) => d.confidenceScore);
+    return confidences.reduce((a, b) => a + b) / confidences.length;
+  }
 }
 
-/// 🧠 ATHENA CONTROLLER - AI AUTONOMY STATE MANAGER
-class AthenaController extends ChangeNotifier {
+/// 🧠 ATHENA CONTROLLER - AI AUTONOMY STATE MANAGEMENT
+class AthenaController extends StateNotifier<AthenaControllerState> {
   final AthenaIntelligenceService _athenaService;
-  final MiniLLMAnalyzerService _miniLLMService;
   final Logger _logger;
 
-  // State
-  AthenaRecommendationState _state = const AthenaRecommendationState();
+  // 📡 Stream subscriptions for reactive updates
+  StreamSubscription<AthenaState>? _stateSubscription;
+  StreamSubscription<AthenaRecommendation>? _recommendationSubscription;
+  StreamSubscription<AthenaDecision>? _decisionSubscription;
 
-  // Subscriptions
-  StreamSubscription<AIRecommendationResult>? _recommendationSubscription;
-  Timer? _metricsUpdateTimer;
+  // 📊 Local tracking for UI enhancements
+  final Map<String, int> _categoryUsage = {};
+  final List<String> _recentCategories = [];
 
-  // Configuration
-  static const Duration _metricsUpdateInterval = Duration(seconds: 30);
-  static const Duration _recommendationTimeout = Duration(seconds: 10);
-
-  // Getters
-  AthenaRecommendationState get state => _state;
-  bool get isActive => _state.isActive;
-  bool get isAutoModeEnabled => _state.isAutoModeEnabled;
-  AIRecommendationResult? get currentRecommendation => _state.currentRecommendation;
-  List<DecisionTreeNode> get decisionTree => _state.decisionTree;
-  double get systemConfidence => _state.systemConfidence;
-
-  AthenaController({
-    required AthenaIntelligenceService athenaService,
-    required MiniLLMAnalyzerService miniLLMService,
-    required Logger logger,
-  })  : _athenaService = athenaService,
-        _miniLLMService = miniLLMService,
-        _logger = logger {
+  AthenaController(
+      this._athenaService,
+      this._logger,
+      ) : super(AthenaControllerState.initial()) {
     _initializeController();
-    _logger.i('🧠 AthenaController initialized - AI Autonomy state management ready');
   }
 
-  /// 🚀 INITIALIZATION
-  Future<void> _initializeController() async {
-    try {
-      _updateState(_state.copyWith(systemState: AthenaSystemState.initializing));
+  /// 🚀 Initialize controller and set up reactive streams
+  void _initializeController() {
+    _logger.i('🎮 Initializing Athena Controller...');
 
-      // Listen to Athena service changes
-      _athenaService.addListener(_onAthenaServiceUpdate);
+    // Subscribe to service state changes
+    _stateSubscription = _athenaService.stateStream.listen(
+      _handleServiceStateChange,
+      onError: _handleStreamError,
+    );
 
-      // Start metrics update timer
-      _startMetricsTimer();
+    // Subscribe to recommendation updates
+    _recommendationSubscription = _athenaService.recommendationStream.listen(
+      _handleRecommendationUpdate,
+      onError: _handleStreamError,
+    );
 
-      // System ready
-      _updateState(_state.copyWith(
-        systemState: AthenaSystemState.ready,
-        isAutoModeEnabled: _athenaService.isAutoModeEnabled,
-      ));
+    // Subscribe to decision updates
+    _decisionSubscription = _athenaService.decisionStream.listen(
+      _handleDecisionUpdate,
+      onError: _handleStreamError,
+    );
 
-      _logger.i('✅ AthenaController initialization completed');
+    // Initialize with current service state
+    _updateStateFromService(_athenaService.state);
 
-    } catch (e) {
-      _logger.e('❌ AthenaController initialization failed: $e');
-      _updateState(_state.copyWith(
-        systemState: AthenaSystemState.error,
-        errorMessage: 'Initialization failed: $e',
-      ));
+    _logger.i('✅ Athena Controller initialized successfully');
+  }
+
+  /// 🔄 Handle service state changes
+  void _handleServiceStateChange(AthenaState serviceState) {
+    _logger.d('🔄 Service state changed: enabled=${serviceState.isEnabled}, analyzing=${serviceState.isAnalyzing}');
+    _updateStateFromService(serviceState);
+  }
+
+  /// 📥 Handle new recommendations
+  void _handleRecommendationUpdate(AthenaRecommendation recommendation) {
+    _logger.d('📥 New recommendation received for ${recommendation.analysis.primaryCategory.name} prompt');
+
+    // Track category usage
+    final category = recommendation.analysis.primaryCategory.name;
+    _categoryUsage[category] = (_categoryUsage[category] ?? 0) + 1;
+
+    // Update recent categories
+    _recentCategories.add(category);
+    if (_recentCategories.length > 20) {
+      _recentCategories.removeAt(0);
+    }
+
+    // Update UI state
+    AthenaUIState newUIState;
+    if (recommendation.autoApplyRecommended && state.autoApplyEnabled) {
+      newUIState = AthenaUIState.applying;
+      // Auto-apply will be handled separately
+    } else {
+      newUIState = AthenaUIState.ready;
+    }
+
+    state = state.copyWith(
+      uiState: newUIState,
+      serviceState: _athenaService.state,
+      errorMessage: null,
+      recentPromptCategories: List.from(_recentCategories),
+      categoryUsageStats: Map.from(_categoryUsage),
+    );
+
+    // Auto-apply if enabled and confident
+    if (recommendation.autoApplyRecommended && state.autoApplyEnabled) {
+      _autoApplyRecommendation(recommendation);
     }
   }
 
-  /// 🎯 CORE RECOMMENDATION METHOD
-  Future<AIRecommendationResult?> requestRecommendation(
+  /// 📊 Handle decision updates
+  void _handleDecisionUpdate(AthenaDecision decision) {
+    _logger.d('📊 New decision: ${decision.type.name} (confidence: ${decision.confidenceScore.toStringAsFixed(2)})');
+
+    // Update state with latest service state
+    state = state.copyWith(
+      serviceState: _athenaService.state,
+    );
+  }
+
+  /// ❌ Handle stream errors
+  void _handleStreamError(dynamic error) {
+    _logger.e('❌ Athena stream error: $error');
+
+    state = state.copyWith(
+      uiState: AthenaUIState.error,
+      errorMessage: error.toString(),
+    );
+  }
+
+  /// 🔄 Update state from service state
+  void _updateStateFromService(AthenaState serviceState) {
+    AthenaUIState newUIState;
+
+    if (!serviceState.isEnabled) {
+      newUIState = AthenaUIState.disabled;
+    } else if (serviceState.isAnalyzing) {
+      newUIState = AthenaUIState.analyzing;
+    } else if (serviceState.currentRecommendation != null) {
+      newUIState = AthenaUIState.ready;
+    } else {
+      newUIState = AthenaUIState.idle;
+    }
+
+    state = state.copyWith(
+      uiState: newUIState,
+      serviceState: serviceState,
+      errorMessage: null, // Clear error on successful update
+    );
+  }
+
+  // 🎯 PUBLIC CONTROLLER METHODS
+
+  /// 🔄 Enable/disable Athena Intelligence
+  Future<void> toggleAthenaEnabled() async {
+    try {
+      final newEnabled = !state.isEnabled;
+      _logger.i('🎛️ ${newEnabled ? "Enabling" : "Disabling"} Athena Intelligence...');
+
+      await _athenaService.setEnabled(newEnabled);
+
+      // Update UI state immediately for responsiveness
+      state = state.copyWith(
+        uiState: newEnabled ? AthenaUIState.idle : AthenaUIState.disabled,
+      );
+
+      _logger.i('✅ Athena Intelligence ${newEnabled ? "enabled" : "disabled"}');
+
+    } catch (e, stackTrace) {
+      _logger.e('❌ Failed to toggle Athena enabled state', error: e, stackTrace: stackTrace);
+
+      state = state.copyWith(
+        uiState: AthenaUIState.error,
+        errorMessage: 'Failed to toggle Athena: $e',
+      );
+    }
+  }
+
+  /// 🧠 Request AI recommendations for prompt
+  Future<void> analyzePrompt(
       String prompt, {
-        required List<String> availableModels,
-        List<String>? currentActiveModels,
+        List<String>? currentModels,
         String? currentStrategy,
         Map<String, double>? currentWeights,
-        Map<String, dynamic>? context,
       }) async {
-    if (_state.systemState == AthenaSystemState.analyzing ||
-        _state.systemState == AthenaSystemState.recommending) {
-      _logger.w('⚠️ Recommendation already in progress, ignoring new request');
-      return null;
+    if (!state.isEnabled) {
+      _logger.w('⚠️ Cannot analyze prompt: Athena is disabled');
+      return;
     }
 
     try {
-      _logger.d('🧠 Requesting AI recommendation for prompt: "${_truncatePrompt(prompt)}"');
+      _logger.i('🧠 Starting prompt analysis...');
 
-      // Update state to analyzing
-      _updateState(_state.copyWith(
-        systemState: AthenaSystemState.analyzing,
+      // Update UI to analyzing state
+      state = state.copyWith(
+        uiState: AthenaUIState.analyzing,
         errorMessage: null,
-      ));
-
-      // Generate recommendation with timeout
-      final recommendation = await _athenaService.generateAIRecommendation(
-        prompt,
-        availableModels: availableModels,
-        currentActiveModels: currentActiveModels,
-        currentStrategy: currentStrategy,
-        currentWeights: currentWeights,
-        context: context,
-      ).timeout(_recommendationTimeout);
-
-      // Update state with recommendation
-      _updateState(_state.copyWith(
-        systemState: AthenaSystemState.ready,
-        currentRecommendation: recommendation,
-        systemConfidence: recommendation.overallConfidence,
-        decisionTree: recommendation.decisionTree,
-        lastRecommendationTime: DateTime.now(),
-      ));
-
-      _logger.i('🎯 AI recommendation completed with ${(recommendation.overallConfidence * 100).round()}% confidence');
-
-      // Check if should auto-apply
-      if (_athenaService.shouldAutoApply(recommendation)) {
-        _logger.i('🤖 Auto-applying recommendation (confidence: ${(recommendation.overallConfidence * 100).round()}%)');
-        await _recordAutoApplication(recommendation);
-      }
-
-      return recommendation;
-
-    } catch (e) {
-      _logger.e('❌ AI recommendation failed: $e');
-      _updateState(_state.copyWith(
-        systemState: AthenaSystemState.error,
-        errorMessage: 'Recommendation failed: $e',
-      ));
-      return null;
-    }
-  }
-
-  /// 🔍 PROMPT ANALYSIS METHOD
-  Future<PromptAnalysisResult?> analyzePrompt(
-      String prompt, {
-        List<String>? availableModels,
-        Map<String, dynamic>? context,
-      }) async {
-    try {
-      _logger.d('🔍 Analyzing prompt: "${_truncatePrompt(prompt)}"');
-
-      _updateState(_state.copyWith(systemState: AthenaSystemState.analyzing));
-
-      final analysis = await _miniLLMService.analyzePrompt(
-        prompt,
-        availableModels: availableModels,
-        context: context,
       );
 
-      _updateState(_state.copyWith(
-        systemState: AthenaSystemState.ready,
-        currentAnalysis: analysis,
-      ));
+      // Request recommendations from service
 
-      _logger.d('✅ Prompt analysis completed: ${analysis.promptType} (${(analysis.complexity * 100).round()}% complexity)');
+      // State will be updated by recommendation stream
+      _logger.i('✅ Prompt analysis completed');
 
-      return analysis;
+    } catch (e, stackTrace) {
+      _logger.e('❌ Prompt analysis failed', error: e, stackTrace: stackTrace);
 
-    } catch (e) {
-      _logger.e('❌ Prompt analysis failed: $e');
-      _updateState(_state.copyWith(
-        systemState: AthenaSystemState.error,
+      state = state.copyWith(
+        uiState: AthenaUIState.error,
         errorMessage: 'Analysis failed: $e',
-      ));
-      return null;
+      );
     }
   }
 
-  /// 🎛️ AUTO MODE CONTROL
-  Future<void> toggleAutoMode() async {
-    try {
-      final newAutoMode = !_state.isAutoModeEnabled;
-      await _athenaService.setAutoMode(newAutoMode);
-
-      _updateState(_state.copyWith(isAutoModeEnabled: newAutoMode));
-
-      _logger.i('🎛️ Auto mode ${newAutoMode ? 'enabled' : 'disabled'}');
-
-    } catch (e) {
-      _logger.e('❌ Failed to toggle auto mode: $e');
+  /// 🎯 Apply current recommendation
+  Future<void> applyRecommendation() async {
+    final recommendation = state.currentRecommendation;
+    if (recommendation == null) {
+      _logger.w('⚠️ No recommendation to apply');
+      return;
     }
-  }
 
-  /// 👤 USER INTERACTION METHODS
-
-  Future<void> recordUserOverride(
-      AIRecommendationResult originalRecommendation,
-      List<String> userSelectedModels,
-      String userSelectedStrategy,
-      ) async {
     try {
-      _athenaService.recordUserOverride();
+      _logger.i('🎯 Applying Athena recommendation...');
 
-      _logger.d('👤 User override recorded: ${userSelectedModels.join(', ')} with $userSelectedStrategy');
-
-      // This is a learning opportunity - record the user preference
-      // Note: We might want to implement user preference learning in the future
-
-    } catch (e) {
-      _logger.e('❌ Failed to record user override: $e');
-    }
-  }
-
-  Future<void> recordOrchestrationOutcome({
-    required String prompt,
-    required List<String> usedModels,
-    required String usedStrategy,
-    required double qualityScore,
-    Map<String, dynamic>? context,
-  }) async {
-    try {
-      _updateState(_state.copyWith(systemState: AthenaSystemState.learning));
-
-      await _athenaService.recordOrchestrationOutcome(
-        prompt: prompt,
-        usedModels: usedModels,
-        usedStrategy: usedStrategy,
-        qualityScore: qualityScore,
-        context: context,
+      // Update UI to applying state
+      state = state.copyWith(
+        uiState: AthenaUIState.applying,
+        errorMessage: null,
       );
 
-      _updateState(_state.copyWith(systemState: AthenaSystemState.ready));
+      // Apply recommendation through service
+      await _athenaService.applyRecommendation(recommendation);
 
-      _logger.d('📚 Orchestration outcome recorded for learning');
+      // Update UI to idle after successful application
+      state = state.copyWith(
+        uiState: AthenaUIState.idle,
+        serviceState: _athenaService.state,
+      );
 
-    } catch (e) {
-      _logger.e('❌ Failed to record orchestration outcome: $e');
-      _updateState(_state.copyWith(systemState: AthenaSystemState.ready));
+      _logger.i('✅ Recommendation applied successfully');
+
+    } catch (e, stackTrace) {
+      _logger.e('❌ Failed to apply recommendation', error: e, stackTrace: stackTrace);
+
+      state = state.copyWith(
+        uiState: AthenaUIState.error,
+        errorMessage: 'Failed to apply: $e',
+      );
     }
   }
 
-  /// 🤖 AUTO-APPLICATION TRACKING
-  Future<void> _recordAutoApplication(AIRecommendationResult recommendation) async {
+  /// 🤖 Auto-apply recommendation if confidence is high enough
+  Future<void> _autoApplyRecommendation(AthenaRecommendation recommendation) async {
+    if (recommendation.overallConfidence < state.autoApplyThreshold) {
+      _logger.d('📊 Auto-apply skipped: confidence ${recommendation.overallConfidence.toStringAsFixed(2)} < threshold ${state.autoApplyThreshold}');
+      return;
+    }
+
     try {
-      _athenaService.recordAutoApplication();
+      _logger.i('🤖 Auto-applying high-confidence recommendation...');
 
-      // You might want to emit an event or callback here for the UI to apply the recommendation
-      // For now, we just log it
-      _logger.i('🤖 Auto-application recorded for models: ${recommendation.recommendedModels.join(', ')}');
+      await _athenaService.applyRecommendation(recommendation);
 
-    } catch (e) {
-      _logger.e('❌ Failed to record auto-application: $e');
+      // Update state to idle after auto-apply
+      state = state.copyWith(
+        uiState: AthenaUIState.idle,
+        serviceState: _athenaService.state,
+      );
+
+      _logger.i('✅ Auto-apply completed successfully');
+
+    } catch (e, stackTrace) {
+      _logger.e('❌ Auto-apply failed', error: e, stackTrace: stackTrace);
+
+      // Don't set error state for auto-apply failures - just log
+      state = state.copyWith(
+        uiState: AthenaUIState.ready, // Fall back to manual apply
+      );
     }
   }
 
-  /// 📊 METRICS AND ANALYTICS
+  /// ⚙️ Configure auto-apply settings
+  void configureAutoApply({
+    bool? enabled,
+    double? threshold,
+  }) {
+    _logger.d('⚙️ Configuring auto-apply: enabled=$enabled, threshold=$threshold');
 
-  void _startMetricsTimer() {
-    _metricsUpdateTimer?.cancel();
-    _metricsUpdateTimer = Timer.periodic(_metricsUpdateInterval, (_) => _updateSystemMetrics());
+    state = state.copyWith(
+      autoApplyEnabled: enabled ?? state.autoApplyEnabled,
+      autoApplyThreshold: threshold ?? state.autoApplyThreshold,
+    );
   }
 
-  void _updateSystemMetrics() {
-    try {
-      final athenaAnalytics = _athenaService.getAthenaAnalytics();
-      final miniLLMAnalytics = _miniLLMService.getAnalyticsData();
+  /// 🗑️ Clear recommendation and reset to idle
+  void clearRecommendation() {
+    _logger.d('🗑️ Clearing current recommendation');
 
-      final combinedMetrics = {
-        'athena': athenaAnalytics,
-        'mini_llm': miniLLMAnalytics,
-        'controller': {
-          'state': _state.systemState.name,
-          'last_update': DateTime.now().toIso8601String(),
-          'uptime_seconds': DateTime.now().difference(_initTime).inSeconds,
-        },
+    state = state.copyWith(
+      uiState: state.isEnabled ? AthenaUIState.idle : AthenaUIState.disabled,
+    );
+  }
+
+  /// 🔄 Retry after error
+  void retryFromError() {
+    _logger.d('🔄 Retrying from error state');
+
+    state = state.copyWith(
+      uiState: state.isEnabled ? AthenaUIState.idle : AthenaUIState.disabled,
+      errorMessage: null,
+    );
+  }
+
+  /// 🧹 Clear decision history
+  Future<void> clearHistory() async {
+    try {
+      _logger.i('🧹 Clearing Athena history...');
+
+      _athenaService.clearHistory();
+
+      // Clear local tracking
+      _categoryUsage.clear();
+      _recentCategories.clear();
+
+      state = state.copyWith(
+        serviceState: _athenaService.state,
+        recentPromptCategories: [],
+        categoryUsageStats: {},
+      );
+
+      _logger.i('✅ Athena history cleared');
+
+    } catch (e, stackTrace) {
+      _logger.e('❌ Failed to clear history', error: e, stackTrace: stackTrace);
+    }
+  }
+
+  // 📊 ANALYTICS & INSIGHTS METHODS
+
+  /// Get comprehensive Athena statistics
+  Map<String, dynamic> getAthenaAnalytics() {
+    final serviceStats = _athenaService.getAthenaStatistics();
+
+    return {
+      ...serviceStats,
+      'ui_state': state.uiState.name,
+      'auto_apply_enabled': state.autoApplyEnabled,
+      'auto_apply_threshold': state.autoApplyThreshold,
+      'category_usage': Map<String, int>.from(state.categoryUsageStats),
+      'recent_categories': List<String>.from(state.recentPromptCategories),
+      'average_confidence': state.averageConfidence,
+      'has_current_recommendation': state.hasRecommendation,
+      'error_message': state.errorMessage,
+    };
+  }
+
+  /// Get usage insights for UI display
+  Map<String, dynamic> getUsageInsights() {
+    final totalUsage = state.categoryUsageStats.values.fold(0, (a, b) => a + b);
+
+    if (totalUsage == 0) {
+      return {
+        'total_prompts': 0,
+        'most_used_category': 'none',
+        'category_distribution': <String, double>{},
+        'efficiency_score': 0.0,
       };
-
-      _updateState(_state.copyWith(systemMetrics: combinedMetrics));
-
-    } catch (e) {
-      _logger.w('⚠️ Failed to update system metrics: $e');
     }
-  }
 
-  late final DateTime _initTime = DateTime.now();
+    // Find most used category
+    final mostUsedEntry = state.categoryUsageStats.entries
+        .reduce((a, b) => a.value > b.value ? a : b);
 
-  Map<String, dynamic> getSystemStatus() {
+    // Calculate category distribution
+    final distribution = state.categoryUsageStats.map(
+          (category, count) => MapEntry(category, count / totalUsage),
+    );
+
+    // Calculate efficiency score based on average confidence
+    final efficiencyScore = (state.averageConfidence * 100).clamp(0.0, 100.0);
+
     return {
-      'system_state': _state.systemState.name,
-      'is_active': _state.isActive,
-      'auto_mode_enabled': _state.isAutoModeEnabled,
-      'system_confidence': _state.systemConfidence,
-      'has_current_recommendation': _state.currentRecommendation != null,
-      'has_current_analysis': _state.currentAnalysis != null,
-      'decision_tree_nodes': _state.decisionTree.length,
-      'error_message': _state.errorMessage,
-      'last_recommendation_time': _state.lastRecommendationTime?.toIso8601String(),
-      'uptime_seconds': DateTime.now().difference(_initTime).inSeconds,
+      'total_prompts': totalUsage,
+      'most_used_category': mostUsedEntry.key,
+      'category_distribution': distribution,
+      'efficiency_score': efficiencyScore,
+      'recent_trend': _getRecentTrend(),
     };
   }
 
-  /// 🎯 SYSTEM CONTROL METHODS
+  /// Get recent usage trend
+  String _getRecentTrend() {
+    if (state.recentPromptCategories.length < 5) return 'insufficient_data';
 
-  Future<void> activateSystem() async {
-    try {
-      _updateState(_state.copyWith(
-        isActive: true,
-        systemState: AthenaSystemState.ready,
-        errorMessage: null,
-      ));
+    final recent = state.recentPromptCategories.skip(state.recentPromptCategories.length - 5).toList();
+    final categories = recent.toSet();
 
-      _logger.i('🚀 Athena Intelligence System activated');
-
-    } catch (e) {
-      _logger.e('❌ Failed to activate Athena system: $e');
-    }
+    if (categories.length == 1) return 'focused';
+    if (categories.length >= 4) return 'diverse';
+    return 'balanced';
   }
-
-  Future<void> deactivateSystem() async {
-    try {
-      _updateState(_state.copyWith(
-        isActive: false,
-        systemState: AthenaSystemState.disabled,
-      ));
-
-      _logger.i('⏸️ Athena Intelligence System deactivated');
-
-    } catch (e) {
-      _logger.e('❌ Failed to deactivate Athena system: $e');
-    }
-  }
-
-  Future<void> resetSystem() async {
-    try {
-      _updateState(const AthenaRecommendationState(
-        systemState: AthenaSystemState.ready,
-        isActive: true,
-      ));
-
-      _logger.i('🔄 Athena Intelligence System reset');
-
-    } catch (e) {
-      _logger.e('❌ Failed to reset Athena system: $e');
-    }
-  }
-
-  /// 🔧 UTILITY METHODS
-
-  void _updateState(AthenaRecommendationState newState) {
-    if (_state != newState) {
-      _state = newState;
-      notifyListeners();
-    }
-  }
-
-  void _onAthenaServiceUpdate() {
-    // Handle updates from the Athena service
-    try {
-      _updateState(_state.copyWith(
-        isAutoModeEnabled: _athenaService.isAutoModeEnabled,
-        currentRecommendation: _athenaService.lastRecommendation,
-      ));
-    } catch (e) {
-      _logger.w('⚠️ Error handling Athena service update: $e');
-    }
-  }
-
-  String _truncatePrompt(String prompt, {int maxLength = 50}) {
-    return prompt.length > maxLength ? '${prompt.substring(0, maxLength)}...' : prompt;
-  }
-
-  /// 🧠 ADVANCED FEATURES
-
-  /// Get decision explanation for transparency
-  String getDecisionExplanation() {
-    if (_state.currentRecommendation == null) {
-      return 'No current recommendation available.';
-    }
-
-    final recommendation = _state.currentRecommendation!;
-    final explanation = StringBuffer();
-
-    explanation.writeln('🧠 AI Decision Analysis:');
-    explanation.writeln('');
-    explanation.writeln('📊 Confidence: ${(recommendation.overallConfidence * 100).round()}%');
-    explanation.writeln('⏱️ Decision Time: ${recommendation.decisionTime.inMilliseconds}ms');
-    explanation.writeln('');
-    explanation.writeln('🎯 Recommendations:');
-    explanation.writeln('• Models: ${recommendation.recommendedModels.join(', ')}');
-    explanation.writeln('• Strategy: ${recommendation.recommendedStrategy}');
-    explanation.writeln('');
-    explanation.writeln('🧬 Reasoning:');
-    explanation.writeln(recommendation.decisionReasoning);
-
-    if (_state.decisionTree.isNotEmpty) {
-      explanation.writeln('');
-      explanation.writeln('🌳 Decision Tree:');
-      for (final node in _state.decisionTree) {
-        explanation.writeln('• ${node.question} → ${node.answer} (${(node.confidence * 100).round()}%)');
-      }
-    }
-
-    return explanation.toString();
-  }
-
-  /// Export system state for debugging
-  Map<String, dynamic> exportSystemState() {
-    return {
-      'timestamp': DateTime.now().toIso8601String(),
-      'state': _state.toJson(),
-      'system_status': getSystemStatus(),
-      'system_metrics': _state.systemMetrics,
-    };
-  }
-
-  /// 🧹 CLEANUP
 
   @override
-  Future<void> dispose() async {
-    try {
-      _metricsUpdateTimer?.cancel();
-      _recommendationSubscription?.cancel();
-      _athenaService.removeListener(_onAthenaServiceUpdate);
+  void dispose() {
+    _logger.d('🧹 Disposing Athena Controller...');
 
-      _logger.i('✅ AthenaController disposed successfully');
-    } catch (e) {
-      _logger.e('❌ Error disposing AthenaController: $e');
-    }
+    _stateSubscription?.cancel();
+    _recommendationSubscription?.cancel();
+    _decisionSubscription?.cancel();
 
     super.dispose();
   }

@@ -403,6 +403,11 @@ class AchievementStats with _$AchievementStats {
     @Default(0) int legendaryUnlocked,
     @Default(0.0) double completionPercentage,
     @Default(null) DateTime? lastAchievementDate,
+    @Default(0) int totalPoints,
+    @Default(0.0) double unlockRate,
+    @Default('') String favoriteCategory,
+    @Default(0) int streakDays,
+    @Default(null) Duration? averageUnlockTime,
   }) = _AchievementStats;
 
   factory AchievementStats.fromJson(Map<String, dynamic> json) =>
