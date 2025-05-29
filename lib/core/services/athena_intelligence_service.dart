@@ -1,593 +1,837 @@
-// 🧠 NEURONVAULT - ATHENA INTELLIGENCE SERVICE
-// PHASE 3.4: Core AI Autonomy Engine - Revolutionary Meta-Orchestration
-// The first AI system that intelligently orchestrates other AI systems
+// lib/core/services/athena_intelligence_service.dart
+// 🧠 NEURONVAULT - ATHENA INTELLIGENCE SERVICE - PHASE 3.4 REVOLUTIONARY
+// Core AI Autonomy Engine - AI that selects AI (Meta-orchestration)
+// World's first transparent AI decision-making system
 
 import 'dart:async';
+import 'dart:convert';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logger/logger.dart';
 
 import '../state/state_models.dart';
-import '../providers/providers_main.dart';
-import 'mini_llm_analyzer_service.dart';
-import 'ai_service.dart';
 import 'config_service.dart';
 import 'storage_service.dart';
-import 'analytics_service.dart';
+import 'mini_llm_analyzer_service.dart';
 
-/// 🎯 ATHENA RECOMMENDATION
-class AthenaRecommendation {
+/// 🎯 AI RECOMMENDATION RESULT
+class AIRecommendationResult {
   final List<String> recommendedModels;
   final String recommendedStrategy;
-  final Map<String, double> modelWeights;
-  final Map<String, double> modelConfidences;
-  final String reasoning;
+  final Map<String, double> modelConfidenceScores;
+  final Map<String, double> recommendedWeights;
   final double overallConfidence;
-  final Duration estimatedTime;
+  final String decisionReasoning;
+  final List<DecisionTreeNode> decisionTree;
+  final Duration decisionTime;
   final Map<String, dynamic> metadata;
-  final DateTime timestamp;
 
-  const AthenaRecommendation({
+  const AIRecommendationResult({
     required this.recommendedModels,
     required this.recommendedStrategy,
-    required this.modelWeights,
-    required this.modelConfidences,
-    required this.reasoning,
+    required this.modelConfidenceScores,
+    required this.recommendedWeights,
     required this.overallConfidence,
-    required this.estimatedTime,
+    required this.decisionReasoning,
+    required this.decisionTree,
+    required this.decisionTime,
     required this.metadata,
-    required this.timestamp,
   });
 
-  factory AthenaRecommendation.fromAnalysis(PromptAnalysis analysis) {
-    return AthenaRecommendation(
-      recommendedModels: analysis.recommendedModels,
-      recommendedStrategy: analysis.recommendedStrategy,
-      modelWeights: analysis.modelScores,
-      modelConfidences: analysis.modelScores,
-      reasoning: _generateReasoning(analysis),
-      overallConfidence: analysis.confidence,
-      estimatedTime: analysis.estimatedTime,
-      metadata: {
-        'prompt_type': analysis.promptType,
-        'complexity': analysis.complexity,
-        'creativity_required': analysis.creativityRequired,
-        'technical_depth': analysis.technicalDepth,
-        'reasoning_complexity': analysis.reasoningComplexity,
-        'key_topics': analysis.keyTopics,
-      },
-      timestamp: DateTime.now(),
-    );
-  }
-
-  static String _generateReasoning(PromptAnalysis analysis) {
-    final buffer = StringBuffer();
-
-    buffer.write('Athena Analysis: ');
-    buffer.write('This ${analysis.complexity} ${analysis.promptType} prompt ');
-
-    if (analysis.creativityRequired > 0.7) {
-      buffer.write('requires high creativity, ');
-    }
-    if (analysis.technicalDepth > 0.7) {
-      buffer.write('demands technical expertise, ');
-    }
-    if (analysis.reasoningComplexity > 0.7) {
-      buffer.write('needs complex reasoning. ');
-    }
-
-    buffer.write('Selected ${analysis.recommendedModels.length} optimal models ');
-    buffer.write('using ${analysis.recommendedStrategy} strategy ');
-    buffer.write('with ${(analysis.confidence * 100).round()}% confidence.');
-
-    return buffer.toString();
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'recommended_models': recommendedModels,
-      'recommended_strategy': recommendedStrategy,
-      'model_weights': modelWeights,
-      'model_confidences': modelConfidences,
-      'reasoning': reasoning,
-      'overall_confidence': overallConfidence,
-      'estimated_time_ms': estimatedTime.inMilliseconds,
-      'metadata': metadata,
-      'timestamp': timestamp.toIso8601String(),
-    };
-  }
+  Map<String, dynamic> toJson() => {
+    'recommended_models': recommendedModels,
+    'recommended_strategy': recommendedStrategy,
+    'model_confidence_scores': modelConfidenceScores,
+    'recommended_weights': recommendedWeights,
+    'overall_confidence': overallConfidence,
+    'decision_reasoning': decisionReasoning,
+    'decision_tree': decisionTree.map((node) => node.toJson()).toList(),
+    'decision_time_ms': decisionTime.inMilliseconds,
+    'metadata': metadata,
+  };
 }
 
-/// 🎯 ATHENA INTELLIGENCE STATE
-class AthenaIntelligenceState {
-  final bool isInitialized;
-  final bool isAnalyzing;
-  final bool autoSelectionEnabled;
-  final PromptAnalysis? currentAnalysis;
-  final AthenaRecommendation? currentRecommendation;
-  final List<AthenaRecommendation> recommendationHistory;
-  final Map<String, double> modelPerformanceScores;
-  final Map<String, int> modelUsageCount;
-  final Map<String, double> strategySuccessRates;
-  final DateTime? lastAnalysisTime;
-  final String? lastError;
+/// 🌳 DECISION TREE NODE - For transparency
+class DecisionTreeNode {
+  final String id;
+  final String question;
+  final String answer;
+  final double confidence;
+  final List<DecisionTreeNode> children;
+  final Map<String, dynamic> data;
 
-  const AthenaIntelligenceState({
-    this.isInitialized = false,
-    this.isAnalyzing = false,
-    this.autoSelectionEnabled = false,
-    this.currentAnalysis,
-    this.currentRecommendation,
-    this.recommendationHistory = const [],
-    this.modelPerformanceScores = const {},
-    this.modelUsageCount = const {},
-    this.strategySuccessRates = const {},
-    this.lastAnalysisTime,
-    this.lastError,
+  const DecisionTreeNode({
+    required this.id,
+    required this.question,
+    required this.answer,
+    required this.confidence,
+    required this.children,
+    required this.data,
   });
 
-  AthenaIntelligenceState copyWith({
-    bool? isInitialized,
-    bool? isAnalyzing,
-    bool? autoSelectionEnabled,
-    PromptAnalysis? currentAnalysis,
-    AthenaRecommendation? currentRecommendation,
-    List<AthenaRecommendation>? recommendationHistory,
-    Map<String, double>? modelPerformanceScores,
-    Map<String, int>? modelUsageCount,
-    Map<String, double>? strategySuccessRates,
-    DateTime? lastAnalysisTime,
-    String? lastError,
-  }) {
-    return AthenaIntelligenceState(
-      isInitialized: isInitialized ?? this.isInitialized,
-      isAnalyzing: isAnalyzing ?? this.isAnalyzing,
-      autoSelectionEnabled: autoSelectionEnabled ?? this.autoSelectionEnabled,
-      currentAnalysis: currentAnalysis ?? this.currentAnalysis,
-      currentRecommendation: currentRecommendation ?? this.currentRecommendation,
-      recommendationHistory: recommendationHistory ?? this.recommendationHistory,
-      modelPerformanceScores: modelPerformanceScores ?? this.modelPerformanceScores,
-      modelUsageCount: modelUsageCount ?? this.modelUsageCount,
-      strategySuccessRates: strategySuccessRates ?? this.strategySuccessRates,
-      lastAnalysisTime: lastAnalysisTime ?? this.lastAnalysisTime,
-      lastError: lastError ?? this.lastError,
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'question': question,
+    'answer': answer,
+    'confidence': confidence,
+    'children': children.map((child) => child.toJson()).toList(),
+    'data': data,
+  };
+
+  factory DecisionTreeNode.fromJson(Map<String, dynamic> json) {
+    return DecisionTreeNode(
+      id: json['id'] as String,
+      question: json['question'] as String,
+      answer: json['answer'] as String,
+      confidence: (json['confidence'] as num).toDouble(),
+      children: (json['children'] as List<dynamic>)
+          .map((child) => DecisionTreeNode.fromJson(child as Map<String, dynamic>))
+          .toList(),
+      data: Map<String, dynamic>.from(json['data'] as Map),
     );
   }
 }
 
-/// 🧠 ATHENA INTELLIGENCE SERVICE
-/// Revolutionary AI autonomy engine that intelligently orchestrates other AI systems
+/// 📈 AI LEARNING PATTERN
+class AILearningPattern {
+  final String patternId;
+  final String promptType;
+  final List<String> successfulModels;
+  final String successfulStrategy;
+  final double successScore;
+  final int usageCount;
+  final DateTime createdAt;
+  final DateTime lastUsedAt;
+  final Map<String, dynamic> context;
+
+  const AILearningPattern({
+    required this.patternId,
+    required this.promptType,
+    required this.successfulModels,
+    required this.successfulStrategy,
+    required this.successScore,
+    required this.usageCount,
+    required this.createdAt,
+    required this.lastUsedAt,
+    required this.context,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'pattern_id': patternId,
+    'prompt_type': promptType,
+    'successful_models': successfulModels,
+    'successful_strategy': successfulStrategy,
+    'success_score': successScore,
+    'usage_count': usageCount,
+    'created_at': createdAt.toIso8601String(),
+    'last_used_at': lastUsedAt.toIso8601String(),
+    'context': context,
+  };
+
+  factory AILearningPattern.fromJson(Map<String, dynamic> json) {
+    return AILearningPattern(
+      patternId: json['pattern_id'] as String,
+      promptType: json['prompt_type'] as String,
+      successfulModels: List<String>.from(json['successful_models'] as List),
+      successfulStrategy: json['successful_strategy'] as String,
+      successScore: (json['success_score'] as num).toDouble(),
+      usageCount: json['usage_count'] as int,
+      createdAt: DateTime.parse(json['created_at'] as String),
+      lastUsedAt: DateTime.parse(json['last_used_at'] as String),
+      context: Map<String, dynamic>.from(json['context'] as Map),
+    );
+  }
+}
+
+/// 🧠 ATHENA INTELLIGENCE SERVICE - WORLD'S FIRST AI AUTONOMY ENGINE
 class AthenaIntelligenceService extends ChangeNotifier {
-  final MiniLLMAnalyzerService _analyzerService;
-  final AIService _aiService;
   final ConfigService _configService;
   final StorageService _storageService;
-  final AnalyticsService _analyticsService;
+  final MiniLLMAnalyzerService _miniLLMAnalyzer;
   final Logger _logger;
 
-  // 📊 STATE
-  AthenaIntelligenceState _state = const AthenaIntelligenceState();
-  AthenaIntelligenceState get state => _state;
+  // 🧠 AI Decision State
+  bool _isAutoModeEnabled = false;
+  AIRecommendationResult? _lastRecommendation;
+  final List<AILearningPattern> _learningPatterns = [];
+  final Map<String, double> _modelPerformanceHistory = {};
 
-  // 🎯 LEARNING SYSTEM
-  final Map<String, List<double>> _modelPerformanceHistory = {};
-  final Map<String, List<double>> _strategyPerformanceHistory = {};
-  static const int _maxHistoryLength = 100;
+  // 📊 Performance Tracking
+  int _totalRecommendations = 0;
+  int _autoAppliedRecommendations = 0;
+  int _userOverrides = 0;
+  final List<Duration> _decisionTimes = [];
+  final Map<String, int> _strategyUsageCount = {};
+  final Map<String, double> _strategySuccessRates = {};
 
-  // 📈 RECOMMENDATION STREAM
-  final StreamController<AthenaRecommendation> _recommendationController =
-  StreamController<AthenaRecommendation>.broadcast();
-  Stream<AthenaRecommendation> get recommendationStream => _recommendationController.stream;
+  // 🎯 Configuration
+  static const int _maxLearningPatterns = 1000;
+  static const Duration _patternExpiryDuration = Duration(days: 30);
+  static const double _confidenceThreshold = 0.7;
+  static const double _autoApplyThreshold = 0.85;
 
-  // ⚡ ANALYSIS STREAM
-  final StreamController<PromptAnalysis> _analysisController =
-  StreamController<PromptAnalysis>.broadcast();
-  Stream<PromptAnalysis> get analysisStream => _analysisController.stream;
+  // Getters
+  bool get isAutoModeEnabled => _isAutoModeEnabled;
+  AIRecommendationResult? get lastRecommendation => _lastRecommendation;
+  List<AILearningPattern> get learningPatterns => List.unmodifiable(_learningPatterns);
 
   AthenaIntelligenceService({
-    required MiniLLMAnalyzerService analyzerService,
-    required AIService aiService,
     required ConfigService configService,
     required StorageService storageService,
-    required AnalyticsService analyticsService,
+    required MiniLLMAnalyzerService miniLLMAnalyzer,
     required Logger logger,
-  })  : _analyzerService = analyzerService,
-        _aiService = aiService,
-        _configService = configService,
+  })  : _configService = configService,
         _storageService = storageService,
-        _analyticsService = analyticsService,
+        _miniLLMAnalyzer = miniLLMAnalyzer,
         _logger = logger {
-    _initialize();
+    _initializeAthenaSystem();
+    _logger.i('🧠 AthenaIntelligenceService initialized - World\'s first AI Autonomy Engine ready');
   }
 
-  /// 🚀 INITIALIZE ATHENA INTELLIGENCE
-  Future<void> _initialize() async {
+  /// 🚀 INITIALIZATION
+  Future<void> _initializeAthenaSystem() async {
     try {
-      _logger.i('🧠 Initializing Athena Intelligence Engine...');
-
-      // Load historical performance data
+      await _loadLearningPatterns();
       await _loadPerformanceHistory();
+      await _loadUserPreferences();
 
-      // Load recommendation history
-      await _loadRecommendationHistory();
-
-      // Initialize model performance scores
-      await _initializeModelScores();
-
-      _state = _state.copyWith(
-        isInitialized: true,
-        lastAnalysisTime: DateTime.now(),
-      );
-
-      _logger.i('✅ Athena Intelligence Engine initialized successfully');
-      _logger.i('🎯 Auto-selection: ${_state.autoSelectionEnabled ? 'ENABLED' : 'DISABLED'}');
-      _logger.i('📊 Historical recommendations: ${_state.recommendationHistory.length}');
-
-      notifyListeners();
-
-    } catch (e, stackTrace) {
-      _logger.e('❌ Failed to initialize Athena Intelligence', error: e, stackTrace: stackTrace);
-      _state = _state.copyWith(
-        isInitialized: false,
-        lastError: 'Initialization failed: ${e.toString()}',
-      );
-      notifyListeners();
+      _logger.i('✅ Athena Intelligence System initialized with ${_learningPatterns.length} learning patterns');
+    } catch (e) {
+      _logger.e('❌ Failed to initialize Athena system: $e');
     }
   }
 
-  /// 🎯 ANALYZE PROMPT AND GENERATE RECOMMENDATIONS
-  /// Main method for intelligent AI orchestration
-  Future<AthenaRecommendation> analyzeAndRecommend(String prompt) async {
-    if (!_state.isInitialized) {
-      throw Exception('Athena Intelligence not initialized');
-    }
+  /// 🎯 CORE AI RECOMMENDATION ENGINE
+  Future<AIRecommendationResult> generateAIRecommendation(
+      String prompt, {
+        required List<String> availableModels,
+        List<String>? currentActiveModels,
+        String? currentStrategy,
+        Map<String, double>? currentWeights,
+        Map<String, dynamic>? context,
+      }) async {
+    final stopwatch = Stopwatch()..start();
 
     try {
-      _logger.d('🧠 Athena analyzing prompt: "${prompt.substring(0, prompt.length > 50 ? 50 : prompt.length)}..."');
+      _logger.d('🧠 Generating AI recommendation for prompt: "${_truncatePrompt(prompt)}"');
+      _totalRecommendations++;
 
-      _state = _state.copyWith(
-        isAnalyzing: true,
-        lastError: null,
-      );
-      notifyListeners();
-
-      // Step 1: Analyze prompt
-      final analysis = await _analyzerService.analyzePrompt(prompt);
-
-      _state = _state.copyWith(currentAnalysis: analysis);
-      _analysisController.add(analysis);
-      notifyListeners();
-
-      // Step 2: Enhance with performance history
-      final enhancedAnalysis = await _enhanceWithPerformanceHistory(analysis);
-
-      // Step 3: Generate final recommendation
-      final recommendation = await _generateRecommendation(enhancedAnalysis);
-
-      // Step 4: Update state and history
-      _state = _state.copyWith(
-        isAnalyzing: false,
-        currentRecommendation: recommendation,
-        recommendationHistory: [..._state.recommendationHistory, recommendation],
-        lastAnalysisTime: DateTime.now(),
+      // 🔍 Step 1: Analyze prompt with Mini-LLM
+      final promptAnalysis = await _miniLLMAnalyzer.analyzePrompt(
+        prompt,
+        availableModels: availableModels,
+        context: context,
       );
 
-      // Step 5: Save recommendation
-      await _saveRecommendation(recommendation);
+      // 🧬 Step 2: Check learning patterns
+      final learningInsights = _getLearningInsights(promptAnalysis, availableModels);
 
-      // Step 6: Track analytics
-      _trackRecommendationAnalytics(recommendation);
+      // 🎯 Step 3: Generate decision tree
+      final decisionTree = _buildDecisionTree(
+        promptAnalysis,
+        learningInsights,
+        availableModels,
+        currentActiveModels,
+        currentStrategy,
+      );
 
-      _recommendationController.add(recommendation);
+      // 🚀 Step 4: Make final recommendations
+      final recommendation = _makeIntelligentRecommendation(
+        promptAnalysis,
+        learningInsights,
+        decisionTree,
+        availableModels,
+        context,
+      );
+
+      stopwatch.stop();
+      final decisionTime = stopwatch.elapsed;
+
+      // 📊 Track performance
+      _decisionTimes.add(decisionTime);
+      if (_decisionTimes.length > 100) {
+        _decisionTimes.removeAt(0);
+      }
+
+      final finalRecommendation = AIRecommendationResult(
+        recommendedModels: recommendation['models'] as List<String>,
+        recommendedStrategy: recommendation['strategy'] as String,
+        modelConfidenceScores: Map<String, double>.from(recommendation['confidence_scores'] as Map),
+        recommendedWeights: Map<String, double>.from(recommendation['weights'] as Map),
+        overallConfidence: recommendation['overall_confidence'] as double,
+        decisionReasoning: recommendation['reasoning'] as String,
+        decisionTree: decisionTree,
+        decisionTime: decisionTime,
+        metadata: {
+          'prompt_analysis': promptAnalysis.toJson(),
+          'learning_patterns_used': learningInsights.length,
+          'decision_method': 'athena_intelligence',
+          'available_models_count': availableModels.length,
+          'total_recommendations': _totalRecommendations,
+          'auto_mode_enabled': _isAutoModeEnabled,
+        },
+      );
+
+      _lastRecommendation = finalRecommendation;
       notifyListeners();
 
-      _logger.i('✅ Athena recommendation generated successfully');
-      _logger.d('🎯 Recommended: ${recommendation.recommendedModels.join(', ')}');
-      _logger.d('📊 Strategy: ${recommendation.recommendedStrategy}');
-      _logger.d('🔮 Confidence: ${(recommendation.overallConfidence * 100).round()}%');
+      _logger.i('🎯 AI recommendation generated in ${decisionTime.inMilliseconds}ms');
+      _logger.d('📊 Recommended: ${finalRecommendation.recommendedModels.join(', ')} with ${finalRecommendation.recommendedStrategy} strategy');
 
-      return recommendation;
+      return finalRecommendation;
 
     } catch (e, stackTrace) {
-      _logger.e('❌ Athena analysis failed', error: e, stackTrace: stackTrace);
+      stopwatch.stop();
+      _logger.e('❌ AI recommendation generation failed after ${stopwatch.elapsedMilliseconds}ms',
+          error: e, stackTrace: stackTrace);
 
-      _state = _state.copyWith(
-        isAnalyzing: false,
-        lastError: 'Analysis failed: ${e.toString()}',
-      );
-      notifyListeners();
-
-      rethrow;
+      return _getFallbackRecommendation(prompt, availableModels, stopwatch.elapsed);
     }
   }
 
-  /// 🚀 AUTO-APPLY RECOMMENDATIONS
-  /// Automatically apply Athena recommendations to orchestration
-  Future<void> autoApplyRecommendations(WidgetRef ref) async {
-    if (!_state.autoSelectionEnabled || _state.currentRecommendation == null) {
-      return;
-    }
+  /// 🧬 GET LEARNING INSIGHTS
+  List<AILearningPattern> _getLearningInsights(
+      PromptAnalysisResult promptAnalysis,
+      List<String> availableModels,
+      ) {
+    final relevantPatterns = _learningPatterns.where((pattern) {
+      // Match by prompt type
+      if (pattern.promptType != promptAnalysis.promptType) return false;
 
-    try {
-      final recommendation = _state.currentRecommendation!;
+      // Check if any of the successful models are available
+      final hasAvailableModels = pattern.successfulModels
+          .any((model) => availableModels.contains(model));
 
-      _logger.i('🤖 Auto-applying Athena recommendations...');
+      return hasAvailableModels;
+    }).toList();
 
-      // Update active models
-      ref.read(activeModelsProvider.notifier).state = recommendation.recommendedModels;
+    // Sort by success score and usage count
+    relevantPatterns.sort((a, b) {
+      final scoreComparison = b.successScore.compareTo(a.successScore);
+      if (scoreComparison != 0) return scoreComparison;
+      return b.usageCount.compareTo(a.usageCount);
+    });
 
-      // Update strategy
-      ref.read(currentStrategyProvider.notifier).state = recommendation.recommendedStrategy;
-
-      // Update model weights
-      ref.read(modelWeightsProvider.notifier).state = recommendation.modelWeights;
-
-      _logger.i('✅ Athena recommendations applied automatically');
-      _logger.d('🎯 Models: ${recommendation.recommendedModels.join(', ')}');
-      _logger.d('📊 Strategy: ${recommendation.recommendedStrategy}');
-
-      // Track achievement
-      _trackAutoApplyAchievement();
-
-    } catch (e, stackTrace) {
-      _logger.e('❌ Failed to auto-apply recommendations', error: e, stackTrace: stackTrace);
-    }
+    return relevantPatterns.take(5).toList(); // Top 5 relevant patterns
   }
 
-  /// 📈 ENHANCE WITH PERFORMANCE HISTORY
-  Future<PromptAnalysis> _enhanceWithPerformanceHistory(PromptAnalysis analysis) async {
-    final enhancedScores = <String, double>{};
+  /// 🌳 BUILD DECISION TREE
+  List<DecisionTreeNode> _buildDecisionTree(
+      PromptAnalysisResult promptAnalysis,
+      List<AILearningPattern> learningInsights,
+      List<String> availableModels,
+      List<String>? currentActiveModels,
+      String? currentStrategy,
+      ) {
+    final decisionTree = <DecisionTreeNode>[];
 
-    for (final modelName in analysis.modelScores.keys) {
-      final baseScore = analysis.modelScores[modelName]!;
-      final performanceScore = _state.modelPerformanceScores[modelName] ?? 0.5;
+    // Root: Prompt Type Analysis
+    decisionTree.add(DecisionTreeNode(
+      id: 'prompt_type',
+      question: 'What type of prompt is this?',
+      answer: '${promptAnalysis.promptType} (complexity: ${(promptAnalysis.complexity * 100).round()}%)',
+      confidence: 0.95,
+      children: [],
+      data: {
+        'prompt_type': promptAnalysis.promptType,
+        'complexity': promptAnalysis.complexity,
+        'analysis_method': promptAnalysis.metadata['analysis_method'],
+      },
+    ));
 
-      // Combine analysis score with historical performance
-      final enhancedScore = (baseScore * 0.7) + (performanceScore * 0.3);
-      enhancedScores[modelName] = enhancedScore.clamp(0.0, 1.0);
+    // Learning Patterns Branch
+    if (learningInsights.isNotEmpty) {
+      final bestPattern = learningInsights.first;
+      decisionTree.add(DecisionTreeNode(
+        id: 'learning_pattern',
+        question: 'What do past successful patterns suggest?',
+        answer: 'Pattern found: ${bestPattern.successfulModels.join(', ')} with ${bestPattern.successfulStrategy} (success: ${(bestPattern.successScore * 100).round()}%)',
+        confidence: bestPattern.successScore,
+        children: [],
+        data: {
+          'pattern_id': bestPattern.patternId,
+          'usage_count': bestPattern.usageCount,
+          'success_score': bestPattern.successScore,
+        },
+      ));
     }
 
-    // Re-rank models based on enhanced scores
-    final rankedModels = enhancedScores.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
+    // Model Specialization Branch
+    final topModels = promptAnalysis.recommendedModels.take(3).toList();
+    decisionTree.add(DecisionTreeNode(
+      id: 'model_specialization',
+      question: 'Which models are specialized for this task?',
+      answer: 'Top matches: ${topModels.join(', ')} based on specialization analysis',
+      confidence: topModels.isNotEmpty ? 0.85 : 0.5,
+      children: topModels.map((model) => DecisionTreeNode(
+        id: 'model_$model',
+        question: 'Why $model?',
+        answer: 'Confidence: ${((promptAnalysis.modelConfidenceScores[model] ?? 0.5) * 100).round()}%',
+        confidence: promptAnalysis.modelConfidenceScores[model] ?? 0.5,
+        children: [],
+        data: {'model': model, 'specialization_score': promptAnalysis.modelConfidenceScores[model]},
+      )).toList(),
+      data: {'recommended_models': topModels},
+    ));
 
-    final enhancedRecommendedModels = rankedModels
-        .take(3)
-        .map((e) => e.key)
-        .toList();
+    // Strategy Selection Branch
+    final recommendedStrategy = _selectOptimalStrategy(promptAnalysis, learningInsights);
+    decisionTree.add(DecisionTreeNode(
+      id: 'strategy_selection',
+      question: 'What orchestration strategy is best?',
+      answer: '$recommendedStrategy based on prompt complexity and model count',
+      confidence: 0.8,
+      children: [],
+      data: {
+        'strategy': recommendedStrategy,
+        'reasoning': _getStrategyReasoning(recommendedStrategy, promptAnalysis.complexity, availableModels.length),
+      },
+    ));
 
-    return PromptAnalysis(
-      promptType: analysis.promptType,
-      complexity: analysis.complexity,
-      creativityRequired: analysis.creativityRequired,
-      technicalDepth: analysis.technicalDepth,
-      reasoningComplexity: analysis.reasoningComplexity,
-      recommendedModels: enhancedRecommendedModels,
-      keyTopics: analysis.keyTopics,
-      modelScores: enhancedScores,
-      recommendedStrategy: _enhanceStrategyWithHistory(analysis.recommendedStrategy),
-      confidence: analysis.confidence,
-      estimatedTime: analysis.estimatedTime,
+    return decisionTree;
+  }
+
+  /// 🚀 MAKE INTELLIGENT RECOMMENDATION
+  Map<String, dynamic> _makeIntelligentRecommendation(
+      PromptAnalysisResult promptAnalysis,
+      List<AILearningPattern> learningInsights,
+      List<DecisionTreeNode> decisionTree,
+      List<String> availableModels,
+      Map<String, dynamic>? context,
+      ) {
+    // 🎯 Model Selection Logic
+    List<String> recommendedModels;
+    Map<String, double> confidenceScores;
+
+    if (learningInsights.isNotEmpty && learningInsights.first.successScore > 0.8) {
+      // Use learning pattern if highly successful
+      final bestPattern = learningInsights.first;
+      recommendedModels = bestPattern.successfulModels
+          .where((model) => availableModels.contains(model))
+          .take(3)
+          .toList();
+      confidenceScores = {
+        for (final model in recommendedModels) model: bestPattern.successScore
+      };
+    } else {
+      // Use prompt analysis recommendations
+      recommendedModels = promptAnalysis.recommendedModels
+          .where((model) => availableModels.contains(model))
+          .take(3)
+          .toList();
+      confidenceScores = Map<String, double>.from(promptAnalysis.modelConfidenceScores);
+    }
+
+    // Ensure at least one model is recommended
+    if (recommendedModels.isEmpty && availableModels.isNotEmpty) {
+      recommendedModels = [availableModels.first];
+      confidenceScores[availableModels.first] = 0.6;
+    }
+
+    // 🎯 Strategy Selection
+    final recommendedStrategy = learningInsights.isNotEmpty && learningInsights.first.successScore > 0.8
+        ? learningInsights.first.successfulStrategy
+        : _selectOptimalStrategy(promptAnalysis, learningInsights);
+
+    // 🎯 Weight Calculation
+    final recommendedWeights = _calculateOptimalWeights(
+      recommendedModels,
+      confidenceScores,
+      promptAnalysis.complexity,
     );
+
+    // 🎯 Overall Confidence
+    final overallConfidence = _calculateOverallConfidence(
+      confidenceScores,
+      learningInsights,
+      promptAnalysis.complexity,
+    );
+
+    // 🎯 Decision Reasoning
+    final reasoning = _generateDecisionReasoning(
+      promptAnalysis,
+      learningInsights,
+      recommendedModels,
+      recommendedStrategy,
+      overallConfidence,
+    );
+
+    return {
+      'models': recommendedModels,
+      'strategy': recommendedStrategy,
+      'confidence_scores': confidenceScores,
+      'weights': recommendedWeights,
+      'overall_confidence': overallConfidence,
+      'reasoning': reasoning,
+    };
   }
 
-  /// 🎯 ENHANCE STRATEGY WITH HISTORY
-  String _enhanceStrategyWithHistory(String baseStrategy) {
-    final strategyScores = <String, double>{};
+  /// 🎯 STRATEGY SELECTION LOGIC
+  String _selectOptimalStrategy(PromptAnalysisResult promptAnalysis, List<AILearningPattern> insights) {
+    final complexity = promptAnalysis.complexity;
+    final promptType = promptAnalysis.promptType;
 
-    for (final strategy in ['parallel', 'consensus', 'weighted', 'adaptive', 'sequential']) {
-      final successRate = _state.strategySuccessRates[strategy] ?? 0.5;
-      strategyScores[strategy] = successRate;
+    // Check learning patterns first
+    if (insights.isNotEmpty) {
+      final topPattern = insights.first;
+      if (topPattern.successScore > 0.8) {
+        return topPattern.successfulStrategy;
+      }
     }
 
-    // If base strategy has good success rate, keep it
-    final baseSuccessRate = strategyScores[baseStrategy] ?? 0.5;
-    if (baseSuccessRate > 0.7) {
-      return baseStrategy;
+    // Rule-based strategy selection
+    switch (promptType) {
+      case 'complex':
+        return 'consensus'; // Complex prompts benefit from consensus
+      case 'creative':
+        return 'parallel'; // Creative tasks benefit from diverse perspectives
+      case 'technical':
+        return complexity > 0.7 ? 'weighted' : 'parallel';
+      case 'analytical':
+        return 'weighted'; // Analytical tasks benefit from weighted expertise
+      case 'mathematical':
+        return 'consensus'; // Math needs agreement
+      default:
+        return complexity > 0.6 ? 'weighted' : 'parallel';
+    }
+  }
+
+  /// ⚖️ CALCULATE OPTIMAL WEIGHTS
+  Map<String, double> _calculateOptimalWeights(
+      List<String> models,
+      Map<String, double> confidenceScores,
+      double complexity,
+      ) {
+    final weights = <String, double>{};
+    final totalConfidence = confidenceScores.values.fold(0.0, (sum, score) => sum + score);
+
+    if (totalConfidence > 0) {
+      for (final model in models) {
+        final confidence = confidenceScores[model] ?? 0.5;
+        weights[model] = confidence / totalConfidence;
+      }
+    } else {
+      // Equal weights fallback
+      final equalWeight = 1.0 / models.length;
+      for (final model in models) {
+        weights[model] = equalWeight;
+      }
     }
 
-    // Otherwise, suggest the best performing strategy
-    final bestStrategy = strategyScores.entries
-        .reduce((a, b) => a.value > b.value ? a : b)
-        .key;
+    // Adjust weights based on complexity
+    if (complexity > 0.8) {
+      // Higher complexity: increase weight for high-confidence models
+      final sortedEntries = weights.entries.toList()
+        ..sort((a, b) => b.value.compareTo(a.value));
 
-    return bestStrategy;
+      if (sortedEntries.isNotEmpty) {
+        final topModel = sortedEntries.first.key;
+        weights[topModel] = (weights[topModel]! * 1.2).clamp(0.0, 1.0);
+
+        // Normalize weights
+        final totalWeight = weights.values.fold(0.0, (sum, weight) => sum + weight);
+        for (final model in weights.keys) {
+          weights[model] = weights[model]! / totalWeight;
+        }
+      }
+    }
+
+    return weights;
   }
 
-  /// 🏆 GENERATE RECOMMENDATION
-  Future<AthenaRecommendation> _generateRecommendation(PromptAnalysis analysis) async {
-    return AthenaRecommendation.fromAnalysis(analysis);
+  /// 📊 CALCULATE OVERALL CONFIDENCE
+  double _calculateOverallConfidence(
+      Map<String, double> confidenceScores,
+      List<AILearningPattern> insights,
+      double complexity,
+      ) {
+    double baseConfidence = 0.0;
+
+    if (confidenceScores.isNotEmpty) {
+      baseConfidence = confidenceScores.values.reduce((a, b) => a + b) / confidenceScores.length;
+    }
+
+    // Boost confidence if we have good learning patterns
+    if (insights.isNotEmpty) {
+      final bestPatternScore = insights.first.successScore;
+      baseConfidence = (baseConfidence + bestPatternScore) / 2;
+    }
+
+    // Adjust for complexity
+    if (complexity > 0.8) {
+      baseConfidence *= 0.9; // Slightly reduce confidence for very complex prompts
+    }
+
+    return baseConfidence.clamp(0.0, 1.0);
   }
 
-  /// 📊 RECORD ORCHESTRATION PERFORMANCE
-  /// Called after orchestration completes to learn from results
-  Future<void> recordOrchestrationPerformance({
+  /// 📝 GENERATE DECISION REASONING
+  String _generateDecisionReasoning(
+      PromptAnalysisResult promptAnalysis,
+      List<AILearningPattern> insights,
+      List<String> recommendedModels,
+      String recommendedStrategy,
+      double overallConfidence,
+      ) {
+    final reasoning = StringBuffer();
+
+    reasoning.write('🧠 AI Analysis: Detected ${promptAnalysis.promptType} prompt with ');
+    reasoning.write('${(promptAnalysis.complexity * 100).round()}% complexity. ');
+
+    if (insights.isNotEmpty) {
+      final pattern = insights.first;
+      reasoning.write('📈 Learning Pattern: Found successful pattern with ');
+      reasoning.write('${(pattern.successScore * 100).round()}% success rate (used ${pattern.usageCount} times). ');
+    }
+
+    reasoning.write('🎯 Recommendations: ${recommendedModels.join(', ')} using $recommendedStrategy strategy. ');
+    reasoning.write('🔍 Confidence: ${(overallConfidence * 100).round()}% based on ');
+    reasoning.write('${insights.isNotEmpty ? 'historical patterns and ' : ''}model specializations.');
+
+    return reasoning.toString();
+  }
+
+  /// 🎯 AUTO-APPLY LOGIC
+  bool shouldAutoApply(AIRecommendationResult recommendation) {
+    if (!_isAutoModeEnabled) return false;
+
+    return recommendation.overallConfidence >= _autoApplyThreshold;
+  }
+
+  /// 📚 LEARNING METHODS
+
+  Future<void> recordOrchestrationOutcome({
+    required String prompt,
     required List<String> usedModels,
     required String usedStrategy,
     required double qualityScore,
-    required Duration actualTime,
-    required bool wasSuccessful,
+    Map<String, dynamic>? context,
   }) async {
     try {
-      _logger.d('📊 Recording orchestration performance...');
+      final promptAnalysis = await _miniLLMAnalyzer.analyzePrompt(prompt);
 
-      // Update model performance scores
-      for (final modelName in usedModels) {
-        _updateModelPerformance(modelName, qualityScore);
-      }
-
-      // Update strategy performance
-      _updateStrategyPerformance(usedStrategy, qualityScore);
-
-      // Update model usage counts
-      final updatedUsageCount = Map<String, int>.from(_state.modelUsageCount);
-      for (final modelName in usedModels) {
-        updatedUsageCount[modelName] = (updatedUsageCount[modelName] ?? 0) + 1;
-      }
-
-      _state = _state.copyWith(
-        modelUsageCount: updatedUsageCount,
+      final pattern = AILearningPattern(
+        patternId: _generatePatternId(prompt, usedModels, usedStrategy),
+        promptType: promptAnalysis.promptType,
+        successfulModels: usedModels,
+        successfulStrategy: usedStrategy,
+        successScore: qualityScore,
+        usageCount: 1,
+        createdAt: DateTime.now(),
+        lastUsedAt: DateTime.now(),
+        context: context ?? {},
       );
 
-      // Save performance data
-      await _savePerformanceData();
+      await _addOrUpdateLearningPattern(pattern);
+      _logger.d('📚 Learning pattern recorded: ${pattern.patternId}');
 
-      notifyListeners();
-
-      _logger.i('✅ Performance recorded successfully');
-
-    } catch (e, stackTrace) {
-      _logger.e('❌ Failed to record performance', error: e, stackTrace: stackTrace);
+    } catch (e) {
+      _logger.e('❌ Failed to record orchestration outcome: $e');
     }
   }
 
-  /// 📈 UPDATE MODEL PERFORMANCE
-  void _updateModelPerformance(String modelName, double score) {
-    // Add to history
-    _modelPerformanceHistory.putIfAbsent(modelName, () => []);
-    _modelPerformanceHistory[modelName]!.add(score);
-
-    // Keep history limited
-    if (_modelPerformanceHistory[modelName]!.length > _maxHistoryLength) {
-      _modelPerformanceHistory[modelName]!.removeAt(0);
-    }
-
-    // Calculate average performance
-    final history = _modelPerformanceHistory[modelName]!;
-    final averageScore = history.reduce((a, b) => a + b) / history.length;
-
-    // Update performance scores
-    final updatedScores = Map<String, double>.from(_state.modelPerformanceScores);
-    updatedScores[modelName] = averageScore;
-
-    _state = _state.copyWith(modelPerformanceScores: updatedScores);
-  }
-
-  /// 🎯 UPDATE STRATEGY PERFORMANCE
-  void _updateStrategyPerformance(String strategy, double score) {
-    // Add to history
-    _strategyPerformanceHistory.putIfAbsent(strategy, () => []);
-    _strategyPerformanceHistory[strategy]!.add(score);
-
-    // Keep history limited
-    if (_strategyPerformanceHistory[strategy]!.length > _maxHistoryLength) {
-      _strategyPerformanceHistory[strategy]!.removeAt(0);
-    }
-
-    // Calculate success rate
-    final history = _strategyPerformanceHistory[strategy]!;
-    final successRate = history.where((s) => s > 0.7).length / history.length;
-
-    // Update success rates
-    final updatedRates = Map<String, double>.from(_state.strategySuccessRates);
-    updatedRates[strategy] = successRate;
-
-    _state = _state.copyWith(strategySuccessRates: updatedRates);
-  }
-
-  /// ⚙️ TOGGLE AUTO-SELECTION
-  void toggleAutoSelection() {
-    _state = _state.copyWith(
-      autoSelectionEnabled: !_state.autoSelectionEnabled,
+  Future<void> _addOrUpdateLearningPattern(AILearningPattern newPattern) async {
+    final existingIndex = _learningPatterns.indexWhere(
+          (pattern) => pattern.patternId == newPattern.patternId,
     );
 
-    notifyListeners();
+    if (existingIndex >= 0) {
+      // Update existing pattern
+      final existing = _learningPatterns[existingIndex];
+      final updatedPattern = AILearningPattern(
+        patternId: existing.patternId,
+        promptType: existing.promptType,
+        successfulModels: existing.successfulModels,
+        successfulStrategy: existing.successfulStrategy,
+        successScore: (existing.successScore * existing.usageCount + newPattern.successScore) /
+            (existing.usageCount + 1),
+        usageCount: existing.usageCount + 1,
+        createdAt: existing.createdAt,
+        lastUsedAt: DateTime.now(),
+        context: newPattern.context,
+      );
 
-    _logger.i('🤖 Auto-selection ${_state.autoSelectionEnabled ? 'ENABLED' : 'DISABLED'}');
+      _learningPatterns[existingIndex] = updatedPattern;
+    } else {
+      // Add new pattern
+      _learningPatterns.add(newPattern);
 
-    // Track achievement
-    if (_state.autoSelectionEnabled) {
-      _trackAutoSelectionAchievement();
+      // Maintain maximum pattern count
+      if (_learningPatterns.length > _maxLearningPatterns) {
+        // Remove oldest patterns with lowest success scores
+        _learningPatterns.sort((a, b) {
+          final scoreComparison = a.successScore.compareTo(b.successScore);
+          if (scoreComparison != 0) return scoreComparison;
+          return a.lastUsedAt.compareTo(b.lastUsedAt);
+        });
+        _learningPatterns.removeAt(0);
+      }
     }
+
+    await _saveLearningPatterns();
+    notifyListeners();
   }
 
   /// 💾 PERSISTENCE METHODS
+
+  Future<void> _loadLearningPatterns() async {
+    try {
+      final patternsJson = await _storageService.getString('athena_learning_patterns');
+      if (patternsJson != null) {
+        final patternsList = jsonDecode(patternsJson) as List<dynamic>;
+        _learningPatterns.clear();
+        _learningPatterns.addAll(
+            patternsList.map((json) => AILearningPattern.fromJson(json as Map<String, dynamic>))
+        );
+
+        // Remove expired patterns
+        _learningPatterns.removeWhere((pattern) {
+          return DateTime.now().difference(pattern.lastUsedAt) > _patternExpiryDuration;
+        });
+      }
+    } catch (e) {
+      _logger.w('⚠️ Failed to load learning patterns: $e');
+    }
+  }
+
+  Future<void> _saveLearningPatterns() async {
+    try {
+      final patternsJson = jsonEncode(_learningPatterns.map((p) => p.toJson()).toList());
+      await _storageService.setString('athena_learning_patterns', patternsJson);
+    } catch (e) {
+      _logger.w('⚠️ Failed to save learning patterns: $e');
+    }
+  }
+
   Future<void> _loadPerformanceHistory() async {
     try {
-      // Load from storage (implement based on storage service)
-      _logger.d('💾 Loading performance history...');
-      // TODO: Implement storage loading
+      final historyJson = await _storageService.getString('athena_performance_history');
+      if (historyJson != null) {
+        final history = Map<String, double>.from(jsonDecode(historyJson) as Map);
+        _modelPerformanceHistory.addAll(history);
+      }
     } catch (e) {
       _logger.w('⚠️ Failed to load performance history: $e');
     }
   }
 
-  Future<void> _loadRecommendationHistory() async {
+  Future<void> _loadUserPreferences() async {
     try {
-      _logger.d('💾 Loading recommendation history...');
-      // TODO: Implement recommendation history loading
+      _isAutoModeEnabled = await _storageService.getBool('athena_auto_mode') ?? false;
     } catch (e) {
-      _logger.w('⚠️ Failed to load recommendation history: $e');
+      _logger.w('⚠️ Failed to load user preferences: $e');
     }
   }
 
-  Future<void> _saveRecommendation(AthenaRecommendation recommendation) async {
-    try {
-      _logger.d('💾 Saving recommendation...');
-      // TODO: Implement recommendation saving
-    } catch (e) {
-      _logger.w('⚠️ Failed to save recommendation: $e');
-    }
+  /// 🎛️ CONTROL METHODS
+
+  Future<void> setAutoMode(bool enabled) async {
+    _isAutoModeEnabled = enabled;
+    await _storageService.setBool('athena_auto_mode', enabled);
+    notifyListeners();
+
+    _logger.i('🎛️ Auto mode ${enabled ? 'enabled' : 'disabled'}');
   }
 
-  Future<void> _savePerformanceData() async {
-    try {
-      _logger.d('💾 Saving performance data...');
-      // TODO: Implement performance data saving
-    } catch (e) {
-      _logger.w('⚠️ Failed to save performance data: $e');
-    }
+  void recordUserOverride() {
+    _userOverrides++;
+    _logger.d('👤 User override recorded (total: $_userOverrides)');
   }
 
-  /// 🏆 INITIALIZE MODEL SCORES
-  Future<void> _initializeModelScores() async {
-    final initialScores = <String, double>{
-      'claude': 0.85,
-      'gpt': 0.80,
-      'deepseek': 0.75,
-      'gemini': 0.80,
-      'mistral': 0.70,
+  void recordAutoApplication() {
+    _autoAppliedRecommendations++;
+    _logger.d('🤖 Auto-application recorded (total: $_autoAppliedRecommendations)');
+  }
+
+  /// 📊 ANALYTICS
+
+  Map<String, dynamic> getAthenaAnalytics() {
+    final avgDecisionTime = _decisionTimes.isNotEmpty
+        ? _decisionTimes.fold<int>(0, (sum, time) => sum + time.inMilliseconds) / _decisionTimes.length
+        : 0.0;
+
+    return {
+      'total_recommendations': _totalRecommendations,
+      'auto_applied_recommendations': _autoAppliedRecommendations,
+      'user_overrides': _userOverrides,
+      'auto_mode_enabled': _isAutoModeEnabled,
+      'learning_patterns_count': _learningPatterns.length,
+      'average_decision_time_ms': avgDecisionTime,
+      'auto_apply_rate': _totalRecommendations > 0 ? _autoAppliedRecommendations / _totalRecommendations : 0.0,
+      'user_override_rate': _totalRecommendations > 0 ? _userOverrides / _totalRecommendations : 0.0,
+      'strategy_usage': Map<String, int>.from(_strategyUsageCount),
+      'strategy_success_rates': Map<String, double>.from(_strategySuccessRates),
+      'last_recommendation_confidence': _lastRecommendation?.overallConfidence ?? 0.0,
     };
-
-    _state = _state.copyWith(modelPerformanceScores: initialScores);
   }
 
-  /// 📊 ANALYTICS TRACKING
-  void _trackRecommendationAnalytics(AthenaRecommendation recommendation) {
-    _analyticsService.trackEvent('athena_recommendation_generated', data: {
-      'models_count': recommendation.recommendedModels.length,
-      'strategy': recommendation.recommendedStrategy,
-      'confidence': recommendation.overallConfidence,
-      'estimated_time_ms': recommendation.estimatedTime.inMilliseconds,
-    });
+  /// 🔧 UTILITY METHODS
+
+  String _truncatePrompt(String prompt, {int maxLength = 50}) {
+    return prompt.length > maxLength ? '${prompt.substring(0, maxLength)}...' : prompt;
   }
 
-  void _trackAutoApplyAchievement() {
-    // TODO: Track achievement for auto-apply
+  String _generatePatternId(String prompt, List<String> models, String strategy) {
+    final content = '$prompt|${models.join(',')}|$strategy';
+    return content.hashCode.abs().toString();
   }
 
-  void _trackAutoSelectionAchievement() {
-    // TODO: Track achievement for enabling auto-selection
+  String _getStrategyReasoning(String strategy, double complexity, int modelCount) {
+    switch (strategy) {
+      case 'parallel':
+        return 'Parallel execution for diverse perspectives';
+      case 'consensus':
+        return 'Consensus needed for high complexity/accuracy';
+      case 'weighted':
+        return 'Weighted approach based on model strengths';
+      case 'adaptive':
+        return 'Adaptive strategy for optimal performance';
+      default:
+        return 'Standard orchestration approach';
+    }
   }
 
-  /// 📊 GETTERS FOR UI
-  bool get isReady => _state.isInitialized && !_state.isAnalyzing;
-  bool get hasRecommendation => _state.currentRecommendation != null;
-  bool get hasError => _state.lastError != null;
-
-  String get statusText {
-    if (!_state.isInitialized) return 'Initializing...';
-    if (_state.isAnalyzing) return 'Analyzing...';
-    if (_state.lastError != null) return 'Error: ${_state.lastError}';
-    if (_state.currentRecommendation != null) return 'Ready';
-    return 'Waiting for prompt';
+  AIRecommendationResult _getFallbackRecommendation(String prompt, List<String> availableModels, Duration elapsed) {
+    return AIRecommendationResult(
+      recommendedModels: availableModels.take(2).toList(),
+      recommendedStrategy: 'parallel',
+      modelConfidenceScores: {
+        for (final model in availableModels.take(3)) model: 0.6
+      },
+      recommendedWeights: {
+        for (final model in availableModels.take(2)) model: 0.5
+      },
+      overallConfidence: 0.5,
+      decisionReasoning: 'Fallback recommendation due to analysis error. Using conservative approach.',
+      decisionTree: [
+        DecisionTreeNode(
+          id: 'fallback',
+          question: 'System Error',
+          answer: 'Using fallback recommendation system',
+          confidence: 0.5,
+          children: [],
+          data: {'error_recovery': true},
+        ),
+      ],
+      decisionTime: elapsed,
+      metadata: {
+        'analysis_method': 'fallback',
+        'error_recovery': true,
+        'available_models': availableModels.length,
+      },
+    );
   }
 
   /// 🧹 CLEANUP
+
   @override
-  void dispose() {
-    _recommendationController.close();
-    _analysisController.close();
+  Future<void> dispose() async {
+    try {
+      await _saveLearningPatterns();
+      _logger.i('✅ AthenaIntelligenceService disposed successfully');
+    } catch (e) {
+      _logger.e('❌ Error disposing AthenaIntelligenceService: $e');
+    }
     super.dispose();
   }
 }

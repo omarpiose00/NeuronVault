@@ -1,449 +1,703 @@
-// 🧬 NEURONVAULT - ENHANCED MODEL GRID WITH ATHENA INTELLIGENCE
-// PHASE 3.4: Revolutionary AI Autonomy Integration
-// Real-time intelligent recommendations + Neural confidence visualization + Auto-suggestions
+// lib/widgets/core/model_grid.dart - PHASE 3.2 ENHANCED
+// 🧬 REVOLUTIONARY MODEL CARDS PROCESSING ENHANCEMENT
+// Real-time processing indicators + Neural connection animations + Achievement integration
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'dart:math' as math;
 
 import '../../core/design_system.dart';
 import '../../core/accessibility/accessibility_manager.dart';
 import '../../core/state/state_models.dart';
 import '../../core/providers/providers_main.dart';
-import '../../core/controllers/athena_controller.dart';
-import '../../core/services/mini_llm_analyzer_service.dart';
+// For AIModel
 
-/// 🧠 ATHENA RECOMMENDATION OVERLAY
-class AthenaRecommendationOverlay extends StatelessWidget {
-  final String modelName;
-  final double confidence;
-  final bool isRecommended;
-  final VoidCallback? onTap;
+/// 🧬 PROCESSING STATUS ENUM
+enum ProcessingStatus {
+  idle,
+  analyzing,
+  generating,
+  synthesizing,
+  completed,
+  error,
+}
 
-  const AthenaRecommendationOverlay({
-    super.key,
-    required this.modelName,
-    required this.confidence,
-    required this.isRecommended,
-    this.onTap,
+/// 📊 PROCESSING STAGE DATA
+class ProcessingStage {
+  final ProcessingStatus status;
+  final double progress;
+  final int tokensUsed;
+  final Duration elapsedTime;
+  final String? errorMessage;
+
+  const ProcessingStage({
+    required this.status,
+    required this.progress,
+    required this.tokensUsed,
+    required this.elapsedTime,
+    this.errorMessage,
   });
 
-  @override
-  Widget build(BuildContext context) {
-    final ds = context.ds;
-
-    if (!isRecommended && confidence < 0.6) return const SizedBox.shrink();
-
-    return Positioned(
-      top: 8,
-      right: 8,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: isRecommended
-                  ? [ds.colors.neuralPrimary, ds.colors.neuralSecondary]
-                  : [ds.colors.neuralSecondary.withOpacity(0.8), ds.colors.neuralPrimary.withOpacity(0.6)],
-            ),
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: isRecommended
-                    ? ds.colors.neuralPrimary.withOpacity(0.4)
-                    : ds.colors.neuralSecondary.withOpacity(0.3),
-                blurRadius: 8,
-                spreadRadius: 1,
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                isRecommended ? Icons.recommend : Icons.psychology,
-                color: Colors.white,
-                size: 12,
-              ),
-              const SizedBox(width: 4),
-              Text(
-                isRecommended ? 'AI Pick' : '${(confidence * 100).round()}%',
-                style: ds.typography.caption.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 9,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+  ProcessingStage copyWith({
+    ProcessingStatus? status,
+    double? progress,
+    int? tokensUsed,
+    Duration? elapsedTime,
+    String? errorMessage,
+  }) {
+    return ProcessingStage(
+      status: status ?? this.status,
+      progress: progress ?? this.progress,
+      tokensUsed: tokensUsed ?? this.tokensUsed,
+      elapsedTime: elapsedTime ?? this.elapsedTime,
+      errorMessage: errorMessage ?? this.errorMessage,
     );
   }
 }
 
-/// 🎯 CONFIDENCE VISUALIZATION WIDGET
-class ConfidenceVisualization extends StatefulWidget {
-  final double confidence;
-  final Color color;
-  final bool isAnimated;
+/// 🤖 ENHANCED MODEL GRID - PHASE 3.2 REVOLUTIONARY
+/// Real-time processing transparency + Neural connection animations
+class ModelGrid extends ConsumerStatefulWidget {
+  final List<AIModel> models;
+  final ValueChanged<String> onModelToggle;
+  final bool showDetailedMetrics;
 
-  const ConfidenceVisualization({
+  const ModelGrid({
     super.key,
-    required this.confidence,
-    required this.color,
-    this.isAnimated = true,
+    required this.models,
+    required this.onModelToggle,
+    this.showDetailedMetrics = false,
   });
 
   @override
-  State<ConfidenceVisualization> createState() => _ConfidenceVisualizationState();
+  ConsumerState<ModelGrid> createState() => _ModelGridState();
 }
 
-class _ConfidenceVisualizationState extends State<ConfidenceVisualization>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _animation;
+class _ModelGridState extends ConsumerState<ModelGrid> with TickerProviderStateMixin {
+  // 🎨 EXISTING ANIMATIONS
+  late AnimationController _pulseController;
+  late Animation<double> _pulseAnimation;
+  late AnimationController _healthController;
+  late Animation<double> _healthAnimation;
+
+  // 🧬 NEW: PROCESSING ANIMATIONS
+  late AnimationController _processController;
+  late Animation<double> _processAnimation;
+  late AnimationController _connectionController;
+  late Animation<double> _connectionAnimation;
+  late AnimationController _tokenController;
+  late Animation<double> _tokenAnimation;
+
+  // 📊 PROCESSING STATE
+  final Map<String, ProcessingStage> _processingStages = {};
+  final Map<String, int> _realtimeTokens = {};
+  bool _isOrchestrationActive = false;
+
+  // 🎯 UI STATE
+  bool _isGridView = true;
+  final FocusNode _containerFocus = FocusNode();
+  int _focusedModelIndex = 0;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
+    _initializeAnimations();
+    _setupKeyboardHandling();
+    _initializeProcessingState();
+    _listenToOrchestrationStreams();
+  }
+
+  void _initializeAnimations() {
+    // 🎨 EXISTING ANIMATIONS
+    _pulseController = AnimationController(
+      duration: const Duration(milliseconds: 2000),
+      vsync: this,
+    );
+    _pulseAnimation = Tween<double>(
+      begin: 0.8,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _pulseController,
+      curve: Curves.easeInOut,
+    ));
+    _pulseController.repeat(reverse: true);
+
+    _healthController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    );
+    _healthAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _healthController,
+      curve: Curves.easeOut,
+    ));
+    _healthController.forward();
+
+    // 🧬 NEW: PROCESSING ANIMATIONS
+    _processController = AnimationController(
       duration: const Duration(milliseconds: 1200),
       vsync: this,
     );
-    _animation = Tween<double>(
+    _processAnimation = Tween<double>(
       begin: 0.0,
-      end: widget.confidence,
+      end: 1.0,
     ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeOutCubic,
+      parent: _processController,
+      curve: Curves.easeInOut,
     ));
 
-    if (widget.isAnimated) {
-      _controller.forward();
+    _connectionController = AnimationController(
+      duration: const Duration(milliseconds: 2500),
+      vsync: this,
+    );
+    _connectionAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _connectionController,
+      curve: Curves.easeInOut,
+    ));
+
+    _tokenController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    _tokenAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _tokenController,
+      curve: Curves.elasticOut,
+    ));
+  }
+
+  void _initializeProcessingState() {
+    // Initialize processing stages for all models
+    for (final model in widget.models) {
+      _processingStages[model.name] = const ProcessingStage(
+        status: ProcessingStatus.idle,
+        progress: 0.0,
+        tokensUsed: 0,
+        elapsedTime: Duration.zero,
+      );
+      _realtimeTokens[model.name] = model.tokensUsed;
     }
   }
 
-  @override
-  void didUpdateWidget(ConfidenceVisualization oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.confidence != widget.confidence) {
-      _animation = Tween<double>(
-        begin: _animation.value,
-        end: widget.confidence,
-      ).animate(CurvedAnimation(
-        parent: _controller,
-        curve: Curves.easeOutCubic,
-      ));
-      _controller.forward(from: 0);
+  void _setupKeyboardHandling() {
+    _containerFocus.addListener(() {
+      if (_containerFocus.hasFocus) {
+        AccessibilityManager().announce(
+          'AI models grid. ${widget.models.length} models available. Use arrow keys to navigate.',
+        );
+      }
+    });
+  }
+
+  // 🧬 LISTEN TO ORCHESTRATION STREAMS
+  void _listenToOrchestrationStreams() {
+    // 📊 Listen to orchestration activity
+    ref.listen<bool>(isOrchestrationActiveProvider, (previous, next) {
+      if (mounted) {
+        setState(() {
+          _isOrchestrationActive = next;
+        });
+
+        if (next) {
+          _startProcessingAnimations();
+          _trackAchievementOrchestrationStart();
+        } else {
+          _stopProcessingAnimations();
+        }
+      }
+    });
+
+    // 📥 Listen to individual responses
+    ref.listen(individualResponsesProvider, (previous, next) {
+      next.whenData((responses) {
+        if (mounted) {
+          _updateProcessingStages(responses);
+        }
+      });
+    });
+
+    // ✨ Listen to synthesis completion
+    ref.listen(synthesizedResponseProvider, (previous, next) {
+      next.whenData((synthesis) {
+        if (mounted && synthesis.isNotEmpty) {
+          _handleSynthesisComplete();
+        }
+      });
+    });
+  }
+
+  // 🚀 START PROCESSING ANIMATIONS
+  void _startProcessingAnimations() {
+    final activeModels = ref.read(activeModelsProvider);
+
+    // Start processing for active models
+    for (final modelName in activeModels) {
+      _processingStages[modelName] = _processingStages[modelName]!.copyWith(
+        status: ProcessingStatus.analyzing,
+        progress: 0.0,
+      );
+    }
+
+    // Start animations
+    _processController.repeat();
+    _connectionController.repeat();
+
+    // Simulate progressive processing stages
+    _simulateProcessingProgression(activeModels);
+  }
+
+  // 🛑 STOP PROCESSING ANIMATIONS
+  void _stopProcessingAnimations() {
+    _processController.stop();
+    _connectionController.stop();
+
+    // Reset all processing states
+    for (final modelName in _processingStages.keys) {
+      _processingStages[modelName] = _processingStages[modelName]!.copyWith(
+        status: ProcessingStatus.idle,
+        progress: 0.0,
+      );
+    }
+    setState(() {});
+  }
+
+  // 📊 UPDATE PROCESSING STAGES
+  void _updateProcessingStages(List<dynamic> responses) {
+    for (final response in responses) {
+      final modelName = response.modelName as String;
+
+      if (_processingStages.containsKey(modelName)) {
+        _processingStages[modelName] = _processingStages[modelName]!.copyWith(
+          status: ProcessingStatus.completed,
+          progress: 1.0,
+          tokensUsed: _realtimeTokens[modelName]! + 50, // Simulate token usage
+        );
+
+        // Animate token counter
+        _realtimeTokens[modelName] = _realtimeTokens[modelName]! + 50;
+        _tokenController.forward().then((_) => _tokenController.reset());
+
+        // Track achievement
+        _trackAchievementModelUsage(modelName);
+      }
+    }
+    setState(() {});
+  }
+
+  // ✨ HANDLE SYNTHESIS COMPLETE
+  void _handleSynthesisComplete() {
+    // Mark all active models as completed synthesis
+    final activeModels = ref.read(activeModelsProvider);
+
+    for (final modelName in activeModels) {
+      if (_processingStages.containsKey(modelName)) {
+        _processingStages[modelName] = _processingStages[modelName]!.copyWith(
+          status: ProcessingStatus.completed,
+          progress: 1.0,
+        );
+      }
+    }
+
+    // Track achievement for synthesis completion
+    _trackAchievementSynthesisComplete();
+
+    setState(() {});
+  }
+
+  // 🎯 SIMULATE PROCESSING PROGRESSION
+  void _simulateProcessingProgression(List<String> activeModels) async {
+    if (!_isOrchestrationActive) return;
+
+    // Analyzing phase (0-30%)
+    await Future.delayed(const Duration(milliseconds: 500));
+    if (!_isOrchestrationActive || !mounted) return;
+
+    for (final modelName in activeModels) {
+      _processingStages[modelName] = _processingStages[modelName]!.copyWith(
+        status: ProcessingStatus.analyzing,
+        progress: 0.3,
+      );
+    }
+    setState(() {});
+
+    // Generating phase (30-80%)
+    await Future.delayed(const Duration(milliseconds: 800));
+    if (!_isOrchestrationActive || !mounted) return;
+
+    for (final modelName in activeModels) {
+      _processingStages[modelName] = _processingStages[modelName]!.copyWith(
+        status: ProcessingStatus.generating,
+        progress: 0.8,
+      );
+    }
+    setState(() {});
+
+    // Synthesizing phase (80-100%)
+    await Future.delayed(const Duration(milliseconds: 600));
+    if (!_isOrchestrationActive || !mounted) return;
+
+    for (final modelName in activeModels) {
+      _processingStages[modelName] = _processingStages[modelName]!.copyWith(
+        status: ProcessingStatus.synthesizing,
+        progress: 1.0,
+      );
+    }
+    setState(() {});
+  }
+
+  // 🏆 ACHIEVEMENT TRACKING
+  void _trackAchievementOrchestrationStart() {
+    try {
+      final tracker = ref.read(achievementTrackerProvider);
+      tracker.trackOrchestration(
+        ref.read(activeModelsProvider),
+        ref.read(currentStrategyProvider),
+      );
+    } catch (e) {
+      debugPrint('⚠️ Achievement tracking error: $e');
+    }
+  }
+
+  void _trackAchievementModelUsage(String modelName) {
+    try {
+      final tracker = ref.read(achievementTrackerProvider);
+      tracker.trackFeatureUsage('model_$modelName');
+    } catch (e) {
+      debugPrint('⚠️ Achievement tracking error: $e');
+    }
+  }
+
+  void _trackAchievementSynthesisComplete() {
+    try {
+      final tracker = ref.read(achievementTrackerProvider);
+      tracker.trackFeatureUsage('synthesis_complete');
+    } catch (e) {
+      debugPrint('⚠️ Achievement tracking error: $e');
     }
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _pulseController.dispose();
+    _healthController.dispose();
+    _processController.dispose();
+    _connectionController.dispose();
+    _tokenController.dispose();
+    _containerFocus.dispose();
     super.dispose();
+  }
+
+  // ⌨️ KEYBOARD NAVIGATION (EXISTING)
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is KeyDownEvent) {
+      switch (event.logicalKey) {
+        case LogicalKeyboardKey.arrowUp:
+          _navigateModel(-2);
+          return KeyEventResult.handled;
+        case LogicalKeyboardKey.arrowDown:
+          _navigateModel(2);
+          return KeyEventResult.handled;
+        case LogicalKeyboardKey.arrowLeft:
+          _navigateModel(-1);
+          return KeyEventResult.handled;
+        case LogicalKeyboardKey.arrowRight:
+          _navigateModel(1);
+          return KeyEventResult.handled;
+        case LogicalKeyboardKey.space:
+        case LogicalKeyboardKey.enter:
+          _toggleCurrentModel();
+          return KeyEventResult.handled;
+        case LogicalKeyboardKey.keyV:
+          _toggleViewMode();
+          return KeyEventResult.handled;
+      }
+    }
+    return KeyEventResult.ignored;
+  }
+
+  void _navigateModel(int direction) {
+    setState(() {
+      _focusedModelIndex = (_focusedModelIndex + direction) % widget.models.length;
+      if (_focusedModelIndex < 0) _focusedModelIndex = widget.models.length - 1;
+    });
+
+    final model = widget.models[_focusedModelIndex];
+    AccessibilityManager().announce(
+      'Focused on ${model.name} model. ${model.isActive ? 'Active' : 'Inactive'}. Health: ${(model.health * 100).round()}%',
+    );
+
+    HapticFeedback.selectionClick();
+  }
+
+  void _toggleCurrentModel() {
+    final model = widget.models[_focusedModelIndex];
+    widget.onModelToggle(model.name);
+    HapticFeedback.mediumImpact();
+  }
+
+  void _toggleViewMode() {
+    setState(() {
+      _isGridView = !_isGridView;
+    });
+
+    AccessibilityManager().announce(
+      'Switched to ${_isGridView ? 'grid' : 'list'} view',
+    );
+
+    HapticFeedback.lightImpact();
   }
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _animation,
-      builder: (context, child) {
-        return Container(
-          height: 4,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(2),
-            color: Colors.grey.withOpacity(0.2),
-          ),
-          child: FractionallySizedBox(
-            alignment: Alignment.centerLeft,
-            widthFactor: widget.isAnimated ? _animation.value : widget.confidence,
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    widget.color,
-                    widget.color.withOpacity(0.7),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(2),
-                boxShadow: [
-                  BoxShadow(
-                    color: widget.color.withOpacity(0.3),
-                    blurRadius: 3,
-                    spreadRadius: 1,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-/// 🤖 ATHENA SUGGESTIONS PANEL
-class AthenaSuggestionsPanel extends ConsumerWidget {
-  final VoidCallback? onApplyRecommendations;
-  final VoidCallback? onToggleDecisionTree;
-
-  const AthenaSuggestionsPanel({
-    super.key,
-    this.onApplyRecommendations,
-    this.onToggleDecisionTree,
-  });
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
     final ds = context.ds;
-    final recommendation = ref.watch(athenaCurrentRecommendationProvider);
-    final isReady = ref.watch(athenaIsReadyProvider);
-    final hasNewRecommendation = ref.watch(athenaHasNewRecommendationProvider);
-    final autoApplyEnabled = ref.watch(athenaAutoApplyEnabledProvider);
 
-    if (recommendation == null || !isReady) {
-      return const SizedBox.shrink();
-    }
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            ds.colors.neuralPrimary.withOpacity(0.1),
-            ds.colors.neuralSecondary.withOpacity(0.05),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: hasNewRecommendation
-              ? ds.colors.neuralAccent.withOpacity(0.6)
-              : ds.colors.neuralPrimary.withOpacity(0.3),
-          width: hasNewRecommendation ? 2 : 1,
-        ),
-        boxShadow: hasNewRecommendation ? [
-          BoxShadow(
-            color: ds.colors.neuralAccent.withOpacity(0.2),
-            blurRadius: 12,
-            spreadRadius: 2,
-          ),
-        ] : null,
-      ),
+    return Focus(
+      focusNode: _containerFocus,
+      onKeyEvent: _handleKeyEvent,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 🧠 ATHENA HEADER
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [ds.colors.neuralPrimary, ds.colors.neuralSecondary],
-                  ),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: const Icon(
-                  Icons.psychology,
-                  color: Colors.white,
-                  size: 16,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Athena Intelligence',
-                      style: ds.typography.h4.copyWith(
-                        color: ds.colors.colorScheme.onSurface,
-                      ),
-                    ),
-                    Text(
-                      'Confidence: ${(recommendation.overallConfidence * 100).round()}%',
-                      style: ds.typography.caption.copyWith(
-                        color: ds.colors.neuralAccent,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (hasNewRecommendation)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: ds.colors.neuralAccent,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    'NEW',
-                    style: ds.typography.caption.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 8,
-                    ),
-                  ),
-                ),
-            ],
-          ),
+          // 🎯 ENHANCED HEADER
+          _buildEnhancedHeader(ds),
 
-          const SizedBox(height: 12),
+          const SizedBox(height: 20),
 
-          // 📊 RECOMMENDATION SUMMARY
-          Text(
-            recommendation.reasoning,
-            style: ds.typography.caption.copyWith(
-              color: ds.colors.colorScheme.onSurface.withOpacity(0.8),
-              height: 1.3,
+          // 💫 NEURAL CONNECTION OVERLAY + 🧬 ENHANCED MODELS GRID/LIST
+          // Wrapped Grid/List and Overlay in a Stack for correct positioning
+          Expanded(
+            child: Stack(
+              children: [
+                _isGridView
+                    ? _buildEnhancedGridView(ds)
+                    : _buildEnhancedListView(ds),
+                if (_isOrchestrationActive && _isGridView)
+                  _buildNeuralConnectionOverlay(ds),
+              ],
             ),
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-          ),
-
-          const SizedBox(height: 12),
-
-          // 🎯 RECOMMENDED MODELS
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: recommendation.recommendedModels.map((model) {
-              return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: _getModelColor(model).withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: _getModelColor(model).withOpacity(0.5),
-                    width: 1,
-                  ),
-                ),
-                child: Text(
-                  model.toUpperCase(),
-                  style: ds.typography.caption.copyWith(
-                    color: _getModelColor(model),
-                    fontWeight: FontWeight.w700,
-                    fontSize: 10,
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-
-          const SizedBox(height: 12),
-
-          // 🎮 ACTION BUTTONS
-          Row(
-            children: [
-              // 🤖 APPLY BUTTON
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: autoApplyEnabled ? null : onApplyRecommendations,
-                  icon: Icon(
-                    autoApplyEnabled ? Icons.autorenew : Icons.check,
-                    size: 16,
-                  ),
-                  label: Text(
-                    autoApplyEnabled ? 'Auto-Applied' : 'Apply Now',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: autoApplyEnabled
-                        ? ds.colors.connectionGreen.withOpacity(0.8)
-                        : ds.colors.neuralPrimary,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                ),
-              ),
-
-              const SizedBox(width: 8),
-
-              // 🌳 DECISION TREE BUTTON
-              IconButton(
-                onPressed: onToggleDecisionTree,
-                icon: const Icon(Icons.account_tree, size: 16),
-                style: IconButton.styleFrom(
-                  backgroundColor: ds.colors.colorScheme.surfaceContainer,
-                  foregroundColor: ds.colors.colorScheme.onSurface,
-                  padding: const EdgeInsets.all(8),
-                ),
-                tooltip: 'Show Decision Tree',
-              ),
-            ],
           ),
         ],
       ),
     );
   }
 
-  Color _getModelColor(String modelName) {
-    switch (modelName.toLowerCase()) {
-      case 'claude':
-        return Colors.orange;
-      case 'gpt':
-        return Colors.green;
-      case 'deepseek':
-        return Colors.blue;
-      case 'gemini':
-        return Colors.purple;
-      case 'mistral':
-        return Colors.red;
-      default:
-        return Colors.grey;
-    }
+  // 🎯 BUILD ENHANCED HEADER
+  Widget _buildEnhancedHeader(DesignSystemData ds) {
+    final activeModels = ref.watch(activeModelsProvider);
+    final isActive = ref.watch(isOrchestrationActiveProvider);
+
+    return Row(
+      children: [
+        // 🤖 ICON WITH ORCHESTRATION PULSE
+        Container(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            boxShadow: isActive ? [
+              BoxShadow(
+                color: ds.colors.neuralPrimary.withOpacity(0.5),
+                blurRadius: 15,
+                spreadRadius: 2,
+              ),
+            ] : null,
+          ),
+          child: Icon(
+            Icons.smart_toy,
+            color: isActive ? ds.colors.neuralPrimary : ds.colors.neuralSecondary,
+            size: 24,
+          ),
+        ),
+
+        const SizedBox(width: 12),
+
+        // 📊 TITLE WITH LIVE STATUS
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'AI Models',
+              style: ds.typography.h2.copyWith(
+                color: ds.colors.colorScheme.onSurface,
+              ),
+            ),
+            if (isActive) ...[
+              const SizedBox(height: 2),
+              Text(
+                'ORCHESTRATING • ${activeModels.length} models active',
+                style: ds.typography.caption.copyWith(
+                  color: ds.colors.neuralAccent,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 10,
+                ),
+              ),
+            ],
+          ],
+        ),
+
+        const Spacer(),
+
+        // 🏆 LIVE PROCESSING METRICS
+        if (isActive)
+          _buildLiveProcessingMetrics(ds),
+
+        const SizedBox(width: 16),
+
+        // 🔄 VIEW TOGGLE
+        _buildViewToggle(ds),
+      ],
+    );
   }
-}
 
-/// 🧬 ENHANCED MODEL CARD WITH ATHENA INTELLIGENCE
-class EnhancedModelCardWithAthena extends ConsumerWidget {
-  final AIModel model;
-  final int index;
-  final bool isFocused;
-  final VoidCallback onToggle;
+  // 📊 BUILD LIVE PROCESSING METRICS
+  Widget _buildLiveProcessingMetrics(DesignSystemData ds) {
+    final totalTokens = _realtimeTokens.values.fold(0, (sum, tokens) => sum + tokens);
+    final activeCount = _processingStages.values
+        .where((stage) => stage.status != ProcessingStatus.idle)
+        .length;
 
-  const EnhancedModelCardWithAthena({
-    super.key,
-    required this.model,
-    required this.index,
-    required this.isFocused,
-    required this.onToggle,
-  });
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            ds.colors.neuralPrimary.withOpacity(0.2),
+            ds.colors.neuralSecondary.withOpacity(0.1),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: ds.colors.neuralPrimary.withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.flash_on,
+            color: ds.colors.neuralAccent,
+            size: 14,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            '$activeCount processing • ${_formatNumber(totalTokens)} tokens',
+            style: ds.typography.caption.copyWith(
+              color: ds.colors.colorScheme.onSurface,
+              fontWeight: FontWeight.w600,
+              fontSize: 11,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final ds = context.ds;
-    final recommendation = ref.watch(athenaCurrentRecommendationProvider);
-    final liveScores = ref.watch(athenaLiveModelScoresProvider);
-    final isAnalyzing = ref.watch(athenaControllerProvider.select((state) => state.isAnalyzing));
+  // 🔄 BUILD VIEW TOGGLE
+  Widget _buildViewToggle(DesignSystemData ds) {
+    return GestureDetector(
+      onTap: _toggleViewMode,
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: ds.colors.colorScheme.surfaceContainer,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: ds.colors.neuralPrimary.withOpacity(0.2),
+            width: 1,
+          ),
+        ),
+        child: Icon(
+          _isGridView ? Icons.view_list : Icons.grid_view,
+          color: ds.colors.colorScheme.onSurface,
+          size: 20,
+        ),
+      ),
+    );
+  }
 
-    // 🧠 ATHENA INTELLIGENCE CALCULATIONS
-    final isRecommended = recommendation?.recommendedModels.contains(model.name) ?? false;
-    final confidence = liveScores[model.name] ?? (recommendation?.modelScores[model.name] ?? 0.5);
-    final modelWeight = recommendation?.modelWeights[model.name] ?? 0.0;
+  // 💫 BUILD NEURAL CONNECTION OVERLAY
+  Widget _buildNeuralConnectionOverlay(DesignSystemData ds) {
+    return Positioned.fill(
+      child: AnimatedBuilder(
+        animation: _connectionAnimation,
+        builder: (context, child) {
+          return CustomPaint(
+            painter: NeuralConnectionPainter(
+              animation: _connectionAnimation.value,
+              activeModels: ref.watch(activeModelsProvider),
+              neuralColor: ds.colors.neuralPrimary,
+              isActive: _isOrchestrationActive,
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // 🏗️ BUILD ENHANCED GRID VIEW
+  Widget _buildEnhancedGridView(DesignSystemData ds) {
+    return GridView.builder(
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 16,
+        mainAxisSpacing: 16,
+        childAspectRatio: 1.1, // Slightly taller for processing indicators
+      ),
+      itemCount: widget.models.length,
+      itemBuilder: (context, index) {
+        return _buildEnhancedModelCard(widget.models[index], index, ds);
+      },
+    );
+  }
+
+  // 📋 BUILD ENHANCED LIST VIEW
+  Widget _buildEnhancedListView(DesignSystemData ds) {
+    return ListView.builder(
+      itemCount: widget.models.length,
+      itemBuilder: (context, index) {
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: _buildEnhancedModelCard(widget.models[index], index, ds),
+        );
+      },
+    );
+  }
+
+  // 🧬 BUILD ENHANCED MODEL CARD
+  Widget _buildEnhancedModelCard(AIModel model, int index, DesignSystemData ds) {
+    final isFocused = index == _focusedModelIndex && _containerFocus.hasFocus;
+    final processingStage = _processingStages[model.name] ?? const ProcessingStage(
+      status: ProcessingStatus.idle,
+      progress: 0.0,
+      tokensUsed: 0,
+      elapsedTime: Duration.zero,
+    );
+    final realtimeTokens = _realtimeTokens[model.name] ?? model.tokensUsed;
+    final isProcessing = processingStage.status != ProcessingStatus.idle;
 
     return GestureDetector(
-      onTap: onToggle,
-      child: Stack(
-        children: [
-          // 🎨 BASE MODEL CARD
-          Container(
+      onTap: () => widget.onModelToggle(model.name),
+      child: AnimatedBuilder(
+        animation: Listenable.merge([
+          _pulseAnimation,
+          _healthAnimation,
+          _processAnimation,
+          _tokenAnimation,
+        ]),
+        builder: (context, child) {
+          return Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               gradient: model.isActive
                   ? LinearGradient(
                 colors: [
-                  model.color.withOpacity(isRecommended ? 0.4 : 0.2),
-                  model.color.withOpacity(isRecommended ? 0.3 : 0.1),
+                  model.color.withOpacity(isProcessing ? 0.3 : 0.2),
+                  model.color.withOpacity(isProcessing ? 0.2 : 0.1),
                 ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -454,22 +708,24 @@ class EnhancedModelCardWithAthena extends ConsumerWidget {
               border: Border.all(
                 color: isFocused
                     ? ds.colors.neuralAccent
-                    : isRecommended
-                    ? ds.colors.neuralPrimary.withOpacity(0.8)
                     : model.isActive
-                    ? model.color.withOpacity(0.5)
+                    ? model.color.withOpacity(isProcessing ? 0.8 : 0.5)
                     : ds.colors.colorScheme.outline.withOpacity(0.3),
-                width: isFocused ? 2 : (isRecommended ? 2 : 1),
+                width: isFocused ? 2 : 1,
               ),
-              boxShadow: [
-                if (model.isActive || isRecommended)
-                  BoxShadow(
-                    color: isRecommended
-                        ? ds.colors.neuralPrimary.withOpacity(0.3)
-                        : model.color.withOpacity(0.2),
-                    blurRadius: isRecommended ? 15 : 12,
-                    spreadRadius: isRecommended ? 2 : 1,
+              boxShadow: model.isActive
+                  ? [
+                BoxShadow(
+                  color: model.color.withOpacity(
+                      isProcessing
+                          ? _processAnimation.value * 0.5
+                          : _pulseAnimation.value * 0.3
                   ),
+                  blurRadius: isProcessing ? 20 : 12,
+                  spreadRadius: isProcessing ? 3 : 1,
+                ),
+              ]
+                  : [
                 BoxShadow(
                   color: ds.colors.colorScheme.shadow.withOpacity(0.05),
                   blurRadius: 4,
@@ -480,94 +736,55 @@ class EnhancedModelCardWithAthena extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 🎯 ENHANCED HEADER WITH INTELLIGENCE
-                _buildIntelligentHeader(ds, isRecommended, isAnalyzing),
+                // 🎯 ENHANCED HEADER ROW
+                _buildEnhancedHeaderRow(model, ds, isProcessing),
 
                 const SizedBox(height: 12),
 
-                // 🧠 ATHENA CONFIDENCE VISUALIZATION
-                if (recommendation != null)
-                  _buildConfidenceSection(ds, confidence, modelWeight),
+                // 🧬 PROCESSING STATUS INDICATOR
+                if (isProcessing)
+                  _buildProcessingStatusIndicator(processingStage, ds),
 
                 const SizedBox(height: 12),
 
                 // 💚 HEALTH INDICATOR (EXISTING)
-                _buildHealthIndicator(ds),
+                _buildHealthIndicator(model, ds),
 
                 const SizedBox(height: 12),
 
                 // 📊 ENHANCED PERFORMANCE METRICS
-                _buildEnhancedMetrics(ds),
+                _buildEnhancedPerformanceMetrics(model, realtimeTokens, ds),
               ],
             ),
-          ),
-
-          // 🧠 ATHENA RECOMMENDATION OVERLAY
-          AthenaRecommendationOverlay(
-            modelName: model.name,
-            confidence: confidence,
-            isRecommended: isRecommended,
-            onTap: () {
-              // Show detailed recommendation info
-              _showRecommendationDetails(context, ref);
-            },
-          ),
-
-          // ⚡ NEURAL PULSE ANIMATION
-          if (isRecommended && recommendation != null)
-            _buildNeuralPulseEffect(ds),
-        ],
+          );
+        },
       ),
     );
   }
 
-  /// 🎯 BUILD INTELLIGENT HEADER
-  Widget _buildIntelligentHeader(DesignSystemData ds, bool isRecommended, bool isAnalyzing) {
+  // 🎯 BUILD ENHANCED HEADER ROW
+  Widget _buildEnhancedHeaderRow(AIModel model, DesignSystemData ds, bool isProcessing) {
     return Row(
       children: [
-        // 🤖 MODEL ICON WITH INTELLIGENCE INDICATOR
-        Stack(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: model.color.withOpacity(isRecommended ? 0.3 : 0.2),
-                borderRadius: BorderRadius.circular(8),
-                boxShadow: isRecommended ? [
-                  BoxShadow(
-                    color: model.color.withOpacity(0.4),
-                    blurRadius: 8,
-                    spreadRadius: 1,
-                  ),
-                ] : null,
+        // 🤖 MODEL ICON WITH PROCESSING PULSE
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: model.color.withOpacity(isProcessing ? 0.3 : 0.2),
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: isProcessing ? [
+              BoxShadow(
+                color: model.color.withOpacity(0.4),
+                blurRadius: 8,
+                spreadRadius: 1,
               ),
-              child: Icon(
-                model.icon,
-                color: model.color,
-                size: 20,
-              ),
-            ),
-            // 🧠 INTELLIGENCE INDICATOR
-            if (isRecommended)
-              Positioned(
-                right: -2,
-                top: -2,
-                child: Container(
-                  width: 12,
-                  height: 12,
-                  decoration: BoxDecoration(
-                    color: ds.colors.neuralAccent,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 1),
-                  ),
-                  child: const Icon(
-                    Icons.psychology,
-                    color: Colors.white,
-                    size: 8,
-                  ),
-                ),
-              ),
-          ],
+            ] : null,
+          ),
+          child: Icon(
+            model.icon,
+            color: model.color,
+            size: 20,
+          ),
         ),
 
         const SizedBox(width: 12),
@@ -591,16 +808,16 @@ class EnhancedModelCardWithAthena extends ConsumerWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
                       color: model.isActive
-                          ? (isRecommended
+                          ? (isProcessing
                           ? ds.colors.neuralAccent.withOpacity(0.2)
                           : ds.colors.connectionGreen.withOpacity(0.2))
                           : ds.colors.connectionRed.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      isRecommended ? 'AI Recommended' : (model.isActive ? 'Active' : 'Inactive'),
+                      isProcessing ? 'Processing' : (model.isActive ? 'Active' : 'Inactive'),
                       style: ds.typography.caption.copyWith(
-                        color: isRecommended
+                        color: isProcessing
                             ? ds.colors.neuralAccent
                             : (model.isActive
                             ? ds.colors.connectionGreen
@@ -611,11 +828,11 @@ class EnhancedModelCardWithAthena extends ConsumerWidget {
                     ),
                   ),
 
-                  // 🧠 ATHENA BRAIN ICON
-                  if (isRecommended) ...[
+                  // 🔥 PROCESSING FIRE ICON
+                  if (isProcessing) ...[
                     const SizedBox(width: 6),
                     Icon(
-                      Icons.psychology,
+                      Icons.flash_on,
                       color: ds.colors.neuralAccent,
                       size: 12,
                     ),
@@ -631,59 +848,94 @@ class EnhancedModelCardWithAthena extends ConsumerWidget {
           scale: 0.8,
           child: Switch(
             value: model.isActive,
-            onChanged: (_) => onToggle(),
-            activeColor: isRecommended ? ds.colors.neuralAccent : model.color,
+            onChanged: (_) => widget.onModelToggle(model.name),
+            activeColor: model.color,
           ),
         ),
       ],
     );
   }
 
-  /// 🧠 BUILD CONFIDENCE SECTION
-  Widget _buildConfidenceSection(DesignSystemData ds, double confidence, double weight) {
+  // 🧬 BUILD PROCESSING STATUS INDICATOR
+  Widget _buildProcessingStatusIndicator(ProcessingStage stage, DesignSystemData ds) {
+    final statusText = _getProcessingStatusText(stage.status);
+    final statusColor = _getProcessingStatusColor(stage.status, ds);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // 📊 STATUS TEXT
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
+            Icon(
+              _getProcessingStatusIcon(stage.status),
+              color: statusColor,
+              size: 14,
+            ),
+            const SizedBox(width: 6),
             Text(
-              'Athena Confidence',
+              statusText,
+              style: ds.typography.caption.copyWith(
+                color: statusColor,
+                fontWeight: FontWeight.w700,
+                fontSize: 11,
+              ),
+            ),
+            const Spacer(),
+            Text(
+              '${(stage.progress * 100).round()}%',
               style: ds.typography.caption.copyWith(
                 color: ds.colors.colorScheme.onSurface.withOpacity(0.7),
                 fontWeight: FontWeight.w600,
-              ),
-            ),
-            Text(
-              '${(confidence * 100).round()}%',
-              style: ds.typography.caption.copyWith(
-                color: ds.colors.neuralAccent,
-                fontWeight: FontWeight.w700,
+                fontSize: 10,
               ),
             ),
           ],
         ),
-        const SizedBox(height: 4),
-        ConfidenceVisualization(
-          confidence: confidence,
-          color: ds.colors.neuralPrimary,
-        ),
-        if (weight > 0) ...[
-          const SizedBox(height: 6),
-          Text(
-            'Weight: ${(weight * 100).round()}%',
-            style: ds.typography.caption.copyWith(
-              color: ds.colors.colorScheme.onSurface.withOpacity(0.6),
-              fontSize: 10,
-            ),
+
+        const SizedBox(height: 6),
+
+        // 📈 PROGRESS BAR
+        Container(
+          height: 4,
+          decoration: BoxDecoration(
+            color: ds.colors.colorScheme.outline.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(2),
           ),
-        ],
+          child: AnimatedBuilder(
+            animation: _processAnimation,
+            builder: (context, child) {
+              return FractionallySizedBox(
+                alignment: Alignment.centerLeft,
+                widthFactor: stage.progress,
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        statusColor,
+                        statusColor.withOpacity(0.7),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: statusColor.withOpacity(0.3),
+                        blurRadius: 4,
+                        spreadRadius: 1,
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
       ],
     );
   }
 
-  /// 💚 BUILD HEALTH INDICATOR
-  Widget _buildHealthIndicator(DesignSystemData ds) {
+  // 💚 BUILD HEALTH INDICATOR (EXISTING - Enhanced)
+  Widget _buildHealthIndicator(AIModel model, DesignSystemData ds) {
     final healthColor = _getHealthColor(model.health, ds);
 
     return Column(
@@ -706,32 +958,41 @@ class EnhancedModelCardWithAthena extends ConsumerWidget {
             ),
           ],
         ),
+
         const SizedBox(height: 8),
+
+        // 📊 HEALTH PROGRESS BAR
         Container(
           height: 6,
           decoration: BoxDecoration(
             color: ds.colors.colorScheme.outline.withOpacity(0.2),
             borderRadius: BorderRadius.circular(3),
           ),
-          child: FractionallySizedBox(
-            alignment: Alignment.centerLeft,
-            widthFactor: model.health,
-            child: Container(
-              decoration: BoxDecoration(
-                color: healthColor,
-                borderRadius: BorderRadius.circular(3),
-              ),
-            ),
+          child: AnimatedBuilder(
+            animation: _healthAnimation,
+            builder: (context, child) {
+              return FractionallySizedBox(
+                alignment: Alignment.centerLeft,
+                widthFactor: model.health * _healthAnimation.value,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: healthColor,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+              );
+            },
           ),
         ),
       ],
     );
   }
 
-  /// 📊 BUILD ENHANCED METRICS
-  Widget _buildEnhancedMetrics(DesignSystemData ds) {
+  // 📊 BUILD ENHANCED PERFORMANCE METRICS
+  Widget _buildEnhancedPerformanceMetrics(AIModel model, int realtimeTokens, DesignSystemData ds) {
     return Row(
       children: [
+        // 🔢 ANIMATED TOKEN COUNTER
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -743,16 +1004,26 @@ class EnhancedModelCardWithAthena extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 2),
-              Text(
-                _formatNumber(model.tokensUsed),
-                style: ds.typography.body2.copyWith(
-                  color: ds.colors.colorScheme.onSurface,
-                  fontWeight: FontWeight.w600,
-                ),
+              AnimatedBuilder(
+                animation: _tokenAnimation,
+                builder: (context, child) {
+                  return Transform.scale(
+                    scale: 1.0 + (_tokenAnimation.value * 0.1),
+                    child: Text(
+                      _formatNumber(realtimeTokens),
+                      style: ds.typography.body2.copyWith(
+                        color: ds.colors.colorScheme.onSurface,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  );
+                },
               ),
             ],
           ),
         ),
+
+        // ⏱️ RESPONSE TIME
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -778,61 +1049,7 @@ class EnhancedModelCardWithAthena extends ConsumerWidget {
     );
   }
 
-  /// ⚡ BUILD NEURAL PULSE EFFECT
-  Widget _buildNeuralPulseEffect(DesignSystemData ds) {
-    return Positioned.fill(
-      child: IgnorePointer(
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: ds.colors.neuralAccent.withOpacity(0.3),
-              width: 1,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// 📋 SHOW RECOMMENDATION DETAILS
-  void _showRecommendationDetails(BuildContext context, WidgetRef ref) {
-    final recommendation = ref.read(athenaCurrentRecommendationProvider);
-    if (recommendation == null) return;
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Athena Recommendation Details'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Model: ${model.name.toUpperCase()}'),
-            const SizedBox(height: 8),
-            Text('Confidence: ${(recommendation.modelConfidences[model.name]! * 100).round()}%'),
-            const SizedBox(height: 8),
-            Text('Weight: ${(recommendation.modelWeights[model.name]! * 100).round()}%'),
-            const SizedBox(height: 8),
-            const Text('Reasoning:'),
-            const SizedBox(height: 4),
-            Text(
-              recommendation.reasoning,
-              style: const TextStyle(fontSize: 12),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// 🎨 UTILITY METHODS
+  // 🎨 UTILITY METHODS
   Color _getHealthColor(double health, DesignSystemData ds) {
     if (health >= 0.8) return ds.colors.connectionGreen;
     if (health >= 0.6) return ds.colors.tokenWarning;
@@ -847,381 +1064,120 @@ class EnhancedModelCardWithAthena extends ConsumerWidget {
     }
     return number.toString();
   }
+
+  // 🧬 PROCESSING STATUS UTILITIES
+  String _getProcessingStatusText(ProcessingStatus status) {
+    switch (status) {
+      case ProcessingStatus.idle:
+        return 'Idle';
+      case ProcessingStatus.analyzing:
+        return 'Analyzing';
+      case ProcessingStatus.generating:
+        return 'Generating';
+      case ProcessingStatus.synthesizing:
+        return 'Synthesizing';
+      case ProcessingStatus.completed:
+        return 'Completed';
+      case ProcessingStatus.error:
+        return 'Error';
+    }
+  }
+
+  Color _getProcessingStatusColor(ProcessingStatus status, DesignSystemData ds) {
+    switch (status) {
+      case ProcessingStatus.idle:
+        return ds.colors.colorScheme.onSurface.withOpacity(0.5);
+      case ProcessingStatus.analyzing:
+        return ds.colors.neuralPrimary;
+      case ProcessingStatus.generating:
+        return ds.colors.neuralSecondary;
+      case ProcessingStatus.synthesizing:
+        return ds.colors.neuralAccent;
+      case ProcessingStatus.completed:
+        return ds.colors.connectionGreen;
+      case ProcessingStatus.error:
+        return ds.colors.connectionRed;
+    }
+  }
+
+  IconData _getProcessingStatusIcon(ProcessingStatus status) {
+    switch (status) {
+      case ProcessingStatus.idle:
+        return Icons.circle_outlined;
+      case ProcessingStatus.analyzing:
+        return Icons.search;
+      case ProcessingStatus.generating:
+        return Icons.auto_awesome;
+      case ProcessingStatus.synthesizing:
+        return Icons.merge_type;
+      case ProcessingStatus.completed:
+        return Icons.check_circle;
+      case ProcessingStatus.error:
+        return Icons.error;
+    }
+  }
 }
 
-/// 🧬 ENHANCED MODEL GRID WITH FULL ATHENA INTEGRATION
-class EnhancedModelGridWithAthena extends ConsumerStatefulWidget {
-  final List<AIModel> models;
-  final ValueChanged<String> onModelToggle;
-  final bool showDetailedMetrics;
+/// 💫 NEURAL CONNECTION PAINTER
+/// Custom painter for animated connections between model cards
+class NeuralConnectionPainter extends CustomPainter {
+  final double animation;
+  final List<String> activeModels;
+  final Color neuralColor;
+  final bool isActive;
 
-  const EnhancedModelGridWithAthena({
-    super.key,
-    required this.models,
-    required this.onModelToggle,
-    this.showDetailedMetrics = false,
+  NeuralConnectionPainter({
+    required this.animation,
+    required this.activeModels,
+    required this.neuralColor,
+    required this.isActive,
   });
 
   @override
-  ConsumerState<EnhancedModelGridWithAthena> createState() => _EnhancedModelGridWithAthenaState();
-}
+  void paint(Canvas canvas, Size size) {
+    if (!isActive || activeModels.length < 2) return;
 
-class _EnhancedModelGridWithAthenaState extends ConsumerState<EnhancedModelGridWithAthena>
-    with TickerProviderStateMixin {
+    final paint = Paint()
+      ..color = neuralColor.withOpacity(0.3 + (animation * 0.4))
+      ..strokeWidth = 2.0
+      ..style = PaintingStyle.stroke;
 
-  // 🎨 ANIMATION CONTROLLERS
-  late AnimationController _athenaController;
-  late Animation<double> _athenaAnimation;
+    final cardWidth = size.width / 2;
+    final numRows = (activeModels.length / 2.0).ceil();
+    final cardHeight = size.height / numRows;
 
-  // 🎯 UI STATE
-  bool _isGridView = true;
-  final FocusNode _containerFocus = FocusNode();
-  int _focusedModelIndex = 0;
+    for (int i = 0; i < activeModels.length - 1; i++) {
+      final startX = (i % 2) * cardWidth + (cardWidth / 2);
+      final startY = (i ~/ 2) * cardHeight + (cardHeight / 2);
 
-  @override
-  void initState() {
-    super.initState();
-    _initializeAnimations();
-    _setupKeyboardHandling();
-  }
+      final endX = ((i + 1) % 2) * cardWidth + (cardWidth / 2);
+      final endY = ((i + 1) ~/ 2) * cardHeight + (cardHeight / 2);
 
-  void _initializeAnimations() {
-    _athenaController = AnimationController(
-      duration: const Duration(milliseconds: 1500),
-      vsync: this,
-    );
-    _athenaAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _athenaController,
-      curve: Curves.easeOutQuart,
-    ));
-  }
+      // Animated connection line
+      final animatedEndX = startX + ((endX - startX) * animation);
+      final animatedEndY = startY + ((endY - startY) * animation);
 
-  void _setupKeyboardHandling() {
-    _containerFocus.addListener(() {
-      if (_containerFocus.hasFocus) {
-        AccessibilityManager().announce(
-          'Enhanced AI models grid with Athena Intelligence. ${widget.models.length} models available.',
-        );
-      }
-    });
-  }
+      canvas.drawLine(
+        Offset(startX, startY),
+        Offset(animatedEndX, animatedEndY),
+        paint,
+      );
 
-  @override
-  void dispose() {
-    _athenaController.dispose();
-    _containerFocus.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final ds = context.ds;
-    final athenaController = ref.watch(athenaControllerProvider.notifier);
-    final showDecisionTree = ref.watch(athenaShowDecisionTreeProvider);
-
-    return Focus(
-      focusNode: _containerFocus,
-      onKeyEvent: _handleKeyEvent,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 🧠 ATHENA SUGGESTIONS PANEL
-          Consumer(
-            builder: (context, ref, child) {
-              return AthenaSuggestionsPanel(
-                onApplyRecommendations: () {
-                  athenaController.applyRecommendations(force: true);
-                },
-                onToggleDecisionTree: () {
-                  athenaController.toggleDecisionTree();
-                },
-              );
-            },
-          ),
-
-          // 🎯 ENHANCED HEADER
-          _buildEnhancedHeader(ds),
-
-          const SizedBox(height: 20),
-
-          // 💫 ENHANCED MODELS GRID/LIST
-          Expanded(
-            child: _isGridView
-                ? _buildEnhancedGridView(ds)
-                : _buildEnhancedListView(ds),
-          ),
-
-          // 🌳 DECISION TREE (if enabled)
-          if (showDecisionTree)
-            Container(
-              margin: const EdgeInsets.only(top: 16),
-              height: 300,
-              child: const VisualDecisionTree(),
-            ),
-        ],
-      ),
-    );
-  }
-
-  /// 🎯 BUILD ENHANCED HEADER
-  Widget _buildEnhancedHeader(DesignSystemData ds) {
-    final activeModels = ref.watch(activeModelsProvider);
-    final isActive = ref.watch(isOrchestrationActiveProvider);
-    final athenaStatus = ref.watch(athenaStatusTextProvider);
-
-    return Row(
-      children: [
-        // 🧠 ENHANCED ICON WITH ATHENA INDICATOR
-        Stack(
-          children: [
-            Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                boxShadow: isActive ? [
-                  BoxShadow(
-                    color: ds.colors.neuralPrimary.withOpacity(0.5),
-                    blurRadius: 15,
-                    spreadRadius: 2,
-                  ),
-                ] : null,
-              ),
-              child: Icon(
-                Icons.smart_toy,
-                color: isActive ? ds.colors.neuralPrimary : ds.colors.neuralSecondary,
-                size: 24,
-              ),
-            ),
-            // 🧠 ATHENA BRAIN OVERLAY
-            Positioned(
-              right: -2,
-              bottom: -2,
-              child: Container(
-                width: 16,
-                height: 16,
-                decoration: BoxDecoration(
-                  color: ds.colors.neuralAccent,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 1),
-                ),
-                child: const Icon(
-                  Icons.psychology,
-                  color: Colors.white,
-                  size: 10,
-                ),
-              ),
-            ),
-          ],
-        ),
-
-        const SizedBox(width: 12),
-
-        // 📊 ENHANCED TITLE WITH ATHENA STATUS
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'AI Models + Athena',
-                style: ds.typography.h2.copyWith(
-                  color: ds.colors.colorScheme.onSurface,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                athenaStatus,
-                style: ds.typography.caption.copyWith(
-                  color: ds.colors.neuralAccent,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 10,
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        // 🤖 AUTO-APPLY TOGGLE
-        Consumer(
-          builder: (context, ref, child) {
-            final autoApplyEnabled = ref.watch(athenaAutoApplyEnabledProvider);
-            final athenaController = ref.watch(athenaControllerProvider.notifier);
-
-            return GestureDetector(
-              onTap: () => athenaController.toggleAutoApply(),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: autoApplyEnabled
-                      ? ds.colors.neuralAccent.withOpacity(0.2)
-                      : ds.colors.colorScheme.surfaceContainer,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: autoApplyEnabled
-                        ? ds.colors.neuralAccent
-                        : ds.colors.colorScheme.outline.withOpacity(0.3),
-                    width: 1,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      autoApplyEnabled ? Icons.autorenew : Icons.touch_app,
-                      color: autoApplyEnabled
-                          ? ds.colors.neuralAccent
-                          : ds.colors.colorScheme.onSurface,
-                      size: 16,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      autoApplyEnabled ? 'Auto' : 'Manual',
-                      style: ds.typography.caption.copyWith(
-                        color: autoApplyEnabled
-                            ? ds.colors.neuralAccent
-                            : ds.colors.colorScheme.onSurface,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        ),
-
-        const SizedBox(width: 12),
-
-        // 🔄 VIEW TOGGLE
-        _buildViewToggle(ds),
-      ],
-    );
-  }
-
-  /// 🔄 BUILD VIEW TOGGLE
-  Widget _buildViewToggle(DesignSystemData ds) {
-    return GestureDetector(
-      onTap: _toggleViewMode,
-      child: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: ds.colors.colorScheme.surfaceContainer,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: ds.colors.neuralPrimary.withOpacity(0.2),
-            width: 1,
-          ),
-        ),
-        child: Icon(
-          _isGridView ? Icons.view_list : Icons.grid_view,
-          color: ds.colors.colorScheme.onSurface,
-          size: 20,
-        ),
-      ),
-    );
-  }
-
-  /// 🏗️ BUILD ENHANCED GRID VIEW
-  Widget _buildEnhancedGridView(DesignSystemData ds) {
-    return GridView.builder(
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-        childAspectRatio: 1.0, // Adjusted for Athena information
-      ),
-      itemCount: widget.models.length,
-      itemBuilder: (context, index) {
-        return EnhancedModelCardWithAthena(
-          model: widget.models[index],
-          index: index,
-          isFocused: index == _focusedModelIndex && _containerFocus.hasFocus,
-          onToggle: () => widget.onModelToggle(widget.models[index].name),
-        );
-      },
-    );
-  }
-
-  /// 📋 BUILD ENHANCED LIST VIEW
-  Widget _buildEnhancedListView(DesignSystemData ds) {
-    return ListView.builder(
-      itemCount: widget.models.length,
-      itemBuilder: (context, index) {
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 16),
-          child: EnhancedModelCardWithAthena(
-            model: widget.models[index],
-            index: index,
-            isFocused: index == _focusedModelIndex && _containerFocus.hasFocus,
-            onToggle: () => widget.onModelToggle(widget.models[index].name),
-          ),
-        );
-      },
-    );
-  }
-
-  /// ⌨️ KEYBOARD NAVIGATION
-  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
-    if (event is KeyDownEvent) {
-      switch (event.logicalKey) {
-        case LogicalKeyboardKey.arrowUp:
-          _navigateModel(-2);
-          return KeyEventResult.handled;
-        case LogicalKeyboardKey.arrowDown:
-          _navigateModel(2);
-          return KeyEventResult.handled;
-        case LogicalKeyboardKey.arrowLeft:
-          _navigateModel(-1);
-          return KeyEventResult.handled;
-        case LogicalKeyboardKey.arrowRight:
-          _navigateModel(1);
-          return KeyEventResult.handled;
-        case LogicalKeyboardKey.space:
-        case LogicalKeyboardKey.enter:
-          _toggleCurrentModel();
-          return KeyEventResult.handled;
-        case LogicalKeyboardKey.keyV:
-          _toggleViewMode();
-          return KeyEventResult.handled;
-        case LogicalKeyboardKey.keyA:
-          ref.read(athenaControllerProvider.notifier).toggleAutoApply();
-          return KeyEventResult.handled;
-      }
+      // Pulse effect
+      canvas.drawCircle(
+        Offset(animatedEndX, animatedEndY),
+        3.0 + (animation * 2.0),
+        Paint()
+          ..color = neuralColor.withOpacity(0.6 - (animation * 0.4))
+          ..style = PaintingStyle.fill,
+      );
     }
-    return KeyEventResult.ignored;
   }
 
-  void _navigateModel(int direction) {
-    setState(() {
-      _focusedModelIndex = (_focusedModelIndex + direction) % widget.models.length;
-      if (_focusedModelIndex < 0) _focusedModelIndex = widget.models.length - 1;
-    });
-
-    final model = widget.models[_focusedModelIndex];
-    AccessibilityManager().announce(
-      'Focused on ${model.name} model. ${model.isActive ? 'Active' : 'Inactive'}.',
-    );
-
-    HapticFeedback.selectionClick();
-  }
-
-  void _toggleCurrentModel() {
-    final model = widget.models[_focusedModelIndex];
-    widget.onModelToggle(model.name);
-    HapticFeedback.mediumImpact();
-  }
-
-  void _toggleViewMode() {
-    setState(() {
-      _isGridView = !_isGridView;
-    });
-
-    AccessibilityManager().announce(
-      'Switched to ${_isGridView ? 'grid' : 'list'} view',
-    );
-
-    HapticFeedback.lightImpact();
+  @override
+  bool shouldRepaint(covariant NeuralConnectionPainter oldDelegate) {
+    return animation != oldDelegate.animation ||
+        activeModels != oldDelegate.activeModels ||
+        isActive != oldDelegate.isActive;
   }
 }
