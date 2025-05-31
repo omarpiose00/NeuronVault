@@ -1,19 +1,19 @@
-// 🌐 NEURONVAULT - CONNECTION CONTROLLER - FINAL WORKING VERSION
+// 🌐 NEURONVAULT - CONNECTION CONTROLLER - PHASE 3.4 FIXED VERSION
 // SOSTITUISCE: lib/core/controllers/connection_controller.dart
-// All issues fixed: trackEvent calls, extensions compatibility
+// FIX: Removed duplicate provider that was causing connection sync issues
 
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logger/logger.dart';
 
+import '../providers/providers_main.dart';
 import '../state/state_models.dart';
 import '../services/config_service.dart';
 import '../services/analytics_service.dart';
 import '../services/websocket_orchestration_service.dart';
-import '../providers/providers_main.dart';
 
-// 🌐 ENHANCED CONNECTION CONTROLLER (MANTIENE NOME ORIGINALE)
+// 🌐 ENHANCED CONNECTION CONTROLLER - PHASE 3.4 FIXED
 class ConnectionController extends Notifier<ConnectionState> {
   late final ConfigService _configService;
   late final AnalyticsService _analyticsService;
@@ -33,19 +33,36 @@ class ConnectionController extends Notifier<ConnectionState> {
 
   @override
   ConnectionState build() {
-    // Initialize services
+    // Initialize services - USE SHARED INSTANCE FROM PROVIDERS
     _configService = ref.read(configServiceProvider);
     _analyticsService = ref.read(analyticsServiceProvider);
     _logger = ref.read(loggerProvider);
+
+    // 🔧 CRITICAL FIX: Use the SHARED orchestration service instance
+    // This is the same instance that auto-connects in providers_main.dart
     _orchestrationService = ref.read(webSocketOrchestrationServiceProvider);
 
-    // Listen to orchestration service connection state
+    // Listen to orchestration service connection state changes
     _orchestrationService.addListener(_onOrchestrationServiceChanged);
 
-    // Load configuration and auto-connect
+    // Start with current orchestration service state
+    final currentConnectionState = _orchestrationService.isConnected
+        ? ConnectionStatus.connected
+        : ConnectionStatus.disconnected;
+
+    // Load configuration
     _loadConnectionConfig();
 
-    return const ConnectionState();
+    // Return initial state based on actual orchestration service state
+    return ConnectionState(
+      status: currentConnectionState,
+      serverUrl: 'localhost',
+      port: _orchestrationService.currentPort,
+      latencyMs: currentConnectionState == ConnectionStatus.connected ? 50 : 0,
+      lastConnectionTime: currentConnectionState == ConnectionStatus.connected
+          ? DateTime.now()
+          : null,
+    );
   }
 
   // 🔄 LOAD CONNECTION CONFIGURATION
@@ -55,20 +72,24 @@ class ConnectionController extends Notifier<ConnectionState> {
 
       final savedConnection = await _configService.getConnectionConfig();
       if (savedConnection != null) {
+        // Update state but preserve current connection status
         state = savedConnection.copyWith(
-          status: ConnectionStatus.disconnected,
+          status: _orchestrationService.isConnected
+              ? ConnectionStatus.connected
+              : ConnectionStatus.disconnected,
+          port: _orchestrationService.currentPort,
           reconnectAttempts: 0,
-          latencyMs: 0,
+          latencyMs: _orchestrationService.isConnected ? state.latencyMs : 0,
         );
         _logger.i('✅ Connection configuration loaded: ${savedConnection.serverUrl}:${savedConnection.port}');
       } else {
-        _logger.d('ℹ️ No saved connection found, using defaults');
+        _logger.d('ℹ️ No saved connection found, using current state');
       }
 
-      // Auto-connect if we have configuration
-      if (state.serverUrl.isNotEmpty) {
-        await Future.delayed(const Duration(milliseconds: 500));
-        await connect();
+      // Setup monitoring if already connected
+      if (_orchestrationService.isConnected) {
+        _setupEnhancedConnectionMonitoring();
+        _logger.i('🔗 Connection monitoring started for existing connection');
       }
 
     } catch (e, stackTrace) {
@@ -76,15 +97,20 @@ class ConnectionController extends Notifier<ConnectionState> {
     }
   }
 
-  // 🔗 ENHANCED CONNECT WITH LATENCY MONITORING
+  // 🔗 ENHANCED CONNECT WITH SHARED SERVICE
   Future<void> connect() async {
-    if (state.status == ConnectionStatus.connecting ||
-        state.status == ConnectionStatus.connected) {
+    if (_orchestrationService.isConnected) {
+      _logger.i('✅ Already connected via shared orchestration service');
+      _syncStateWithOrchestrationService();
+      return;
+    }
+
+    if (state.status == ConnectionStatus.connecting) {
       return;
     }
 
     try {
-      _logger.i('🔗 Connecting to backend...');
+      _logger.i('🔗 Connecting to backend via shared orchestration service...');
 
       state = state.copyWith(
         status: ConnectionStatus.connecting,
@@ -94,7 +120,7 @@ class ConnectionController extends Notifier<ConnectionState> {
 
       final connectionStart = DateTime.now();
 
-      // Use orchestration service to connect
+      // Use shared orchestration service to connect
       final success = await _orchestrationService.connect(
         host: state.serverUrl.isNotEmpty ? state.serverUrl : null,
         port: state.port > 0 ? state.port : null,
@@ -113,8 +139,6 @@ class ConnectionController extends Notifier<ConnectionState> {
 
         _setupEnhancedConnectionMonitoring();
         await _configService.saveConnectionConfig(state);
-
-        // 🔧 FIXED: Single parameter for trackEvent
         _analyticsService.trackEvent('connection_established');
 
         _logger.i('✅ Connected successfully to port ${_orchestrationService.currentPort} in ${connectionTime}ms');
@@ -128,10 +152,10 @@ class ConnectionController extends Notifier<ConnectionState> {
     }
   }
 
-  // 🔌 ENHANCED DISCONNECT WITH CLEANUP
+  // 🔌 ENHANCED DISCONNECT WITH SHARED SERVICE
   Future<void> disconnect() async {
     try {
-      _logger.i('🔌 Disconnecting...');
+      _logger.i('🔌 Disconnecting via shared orchestration service...');
 
       _reconnectTimer?.cancel();
       _statusCheckTimer?.cancel();
@@ -169,7 +193,6 @@ class ConnectionController extends Notifier<ConnectionState> {
         reconnectAttempts: state.reconnectAttempts + 1,
       );
 
-      // 🔧 FIXED: Single parameter for trackEvent
       _analyticsService.trackEvent('connection_reconnect_attempt');
 
       final backoffDelay = Duration(seconds: math.min(state.reconnectAttempts * 2, 30));
@@ -209,6 +232,8 @@ class ConnectionController extends Notifier<ConnectionState> {
     _latencyTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
       _performLatencyCheck();
     });
+
+    _logger.d('📡 Enhanced connection monitoring started');
   }
 
   // 🔍 CHECK CONNECTION STATUS
@@ -220,22 +245,44 @@ class ConnectionController extends Notifier<ConnectionState> {
       _handleConnectionError('Connection lost');
     } else if (state.status != ConnectionStatus.connected && isOrchestrationConnected) {
       _logger.i('✅ Connection restored');
+      _syncStateWithOrchestrationService();
+    }
+  }
+
+  // 🔥 NEW: SYNC STATE WITH ORCHESTRATION SERVICE
+  void _syncStateWithOrchestrationService() {
+    if (_orchestrationService.isConnected) {
       state = state.copyWith(
         status: ConnectionStatus.connected,
         lastConnectionTime: DateTime.now(),
         reconnectAttempts: 0,
+        port: _orchestrationService.currentPort,
+        latencyMs: _currentLatency > 0 ? _currentLatency : 50,
       );
+
+      if (_statusCheckTimer == null || !_statusCheckTimer!.isActive) {
+        _setupEnhancedConnectionMonitoring();
+      }
+
+      _logger.i('🔄 State synced with orchestration service - Connected on port ${_orchestrationService.currentPort}');
+    } else {
+      state = state.copyWith(
+        status: ConnectionStatus.disconnected,
+        latencyMs: 0,
+      );
+      _resetLatencyTracking();
+      _logger.d('🔄 State synced with orchestration service - Disconnected');
     }
   }
 
   // 🔥 NEW: LATENCY MONITORING SYSTEM
   Future<void> _performLatencyCheck() async {
-    if (!state.isConnected) return;
+    if (!_orchestrationService.isConnected) return;
 
     try {
       final startTime = DateTime.now();
 
-      // Simulate latency check (in real implementation, this would be actual ping)
+      // Simulate latency check with more realistic timing
       await Future.delayed(Duration(milliseconds: 20 + math.Random().nextInt(80)));
 
       final latency = DateTime.now().difference(startTime).inMilliseconds;
@@ -304,9 +351,11 @@ class ConnectionController extends Notifier<ConnectionState> {
     _failedLatencyChecks = 0;
   }
 
-  // 📡 LISTEN TO ORCHESTRATION SERVICE CHANGES
+  // 📡 CRITICAL FIX: LISTEN TO SHARED ORCHESTRATION SERVICE CHANGES
   void _onOrchestrationServiceChanged() {
     final isOrchestrationConnected = _orchestrationService.isConnected;
+
+    _logger.d('🔄 Orchestration service state changed: connected=$isOrchestrationConnected');
 
     if (state.status == ConnectionStatus.connected && !isOrchestrationConnected) {
       state = state.copyWith(
@@ -319,14 +368,7 @@ class ConnectionController extends Notifier<ConnectionState> {
         _scheduleReconnect();
       }
     } else if (state.status != ConnectionStatus.connected && isOrchestrationConnected) {
-      state = state.copyWith(
-        status: ConnectionStatus.connected,
-        lastConnectionTime: DateTime.now(),
-        reconnectAttempts: 0,
-        port: _orchestrationService.currentPort,
-      );
-
-      _setupEnhancedConnectionMonitoring();
+      _syncStateWithOrchestrationService();
     }
   }
 
@@ -341,8 +383,6 @@ class ConnectionController extends Notifier<ConnectionState> {
     );
 
     _resetLatencyTracking();
-
-    // 🔧 FIXED: Use trackError with single description parameter
     _analyticsService.trackError('connection_error', description: error);
 
     if (state.canReconnect) {
@@ -358,7 +398,7 @@ class ConnectionController extends Notifier<ConnectionState> {
     try {
       _logger.d('🔧 Configuring connection: $serverUrl:$port');
 
-      if (state.status == ConnectionStatus.connected) {
+      if (_orchestrationService.isConnected) {
         await disconnect();
       }
 
@@ -370,8 +410,6 @@ class ConnectionController extends Notifier<ConnectionState> {
       );
 
       await _configService.saveConnectionConfig(state);
-
-      // 🔧 FIXED: Single parameter for trackEvent
       _analyticsService.trackEvent('connection_configured');
 
       _logger.i('✅ Connection configured');
@@ -393,9 +431,7 @@ class ConnectionController extends Notifier<ConnectionState> {
         final testLatency = DateTime.now().difference(startTime).inMilliseconds;
         await _orchestrationService.disconnect();
 
-        // 🔧 FIXED: Single parameter for trackEvent
         _analyticsService.trackEvent('connection_test_success');
-
         _logger.i('✅ Connection test successful (${testLatency}ms)');
         return true;
       } else {
@@ -437,6 +473,7 @@ class ConnectionController extends Notifier<ConnectionState> {
       'failed_latency_checks': _failedLatencyChecks,
       'last_error': state.lastError,
       'orchestration_connected': _orchestrationService.isConnected,
+      'orchestration_port': _orchestrationService.currentPort,
     };
   }
 
@@ -490,12 +527,12 @@ class ConnectionController extends Notifier<ConnectionState> {
   }
 }
 
-// 🌐 CONNECTION CONTROLLER PROVIDER (MANTIENE NOME ORIGINALE)
+// 🌐 CONNECTION CONTROLLER PROVIDER
 final connectionControllerProvider = NotifierProvider<ConnectionController, ConnectionState>(
       () => ConnectionController(),
 );
 
-// 📊 COMPUTED PROVIDERS (MANTENGONO NOMI ORIGINALI)
+// 📊 COMPUTED PROVIDERS
 final connectionStatusProvider = Provider<ConnectionStatus>((ref) {
   return ref.watch(connectionControllerProvider).status;
 });
@@ -529,7 +566,9 @@ final connectionQualityProvider = Provider<Map<String, dynamic>>((ref) {
   return ref.read(connectionControllerProvider.notifier).getConnectionQualityInfo();
 });
 
-// 🧠 ORCHESTRATION SERVICE PROVIDER (MANTIENE IMPLEMENTAZIONE ESISTENTE)
-final webSocketOrchestrationServiceProvider = Provider<WebSocketOrchestrationService>((ref) {
-  return WebSocketOrchestrationService();
-});
+// 🎯 IMPORT PROVIDERS FROM MAIN (NO DUPLICATE PROVIDERS)
+// These imports come from providers_main.dart - no duplication needed:
+// - webSocketOrchestrationServiceProvider
+// - configServiceProvider
+// - analyticsServiceProvider
+// - loggerProvider

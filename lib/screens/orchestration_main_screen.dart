@@ -19,6 +19,8 @@ import '../widgets/core/neural_theme_selector.dart';
 import '../widgets/core/achievement_notification.dart';
 import '../widgets/core/achievement_progress_panel.dart';
 import '../widgets/core/revolutionary_connection_status.dart';
+import '../widgets/core/athena_intelligence_panel.dart';
+import '../widgets/core/visual_decision_tree.dart'; // Aggiunto per Decision Tree
 
 
 class OrchestrationMainScreen extends ConsumerStatefulWidget {
@@ -44,8 +46,8 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
   // UI State
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  bool _isLeftPanelOpen = true;
-  bool _isRightPanelOpen = true;
+  final bool _isLeftPanelOpen = true;
+  final bool _isRightPanelOpen = true;
   bool _isModelProfilingExpanded = false;
   final List<ChatMessage> _messages = [];
 
@@ -64,6 +66,10 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
   double _leftPanelWidth = 350;
   double _rightPanelWidth = 320;
   static const double _minScreenWidth = 1000;
+
+  // ATHENA INTELLIGENCE STATE (aggiungere vicino alle altre variabili di stato)
+  bool _isAthenaIntelligenceExpanded = false;
+  bool _showDecisionTreeOverlay = false;
 
   WS.OrchestrationStrategy _convertToWebSocketStrategy(OrchestrationStrategy strategy) {
     switch (strategy) {
@@ -215,7 +221,7 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
     }
   }
 
-  void _trackFeatureInteraction(String feature, {Map<String, dynamic>? additionalData}) {
+  void _trackFeatureInteraction(String feature) {
     final tracker = ref.read(achievementServiceProvider);
     tracker.trackFeatureUsage(feature);
   }
@@ -283,6 +289,10 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
                     if (_showAchievementPanel)
                       _buildAchievementPanelOverlay(constraints),
 
+                    // 🌳 DECISION TREE OVERLAY
+                    if (_showDecisionTreeOverlay)
+                      _buildDecisionTreeOverlay(constraints),
+
                     // 📊 PERFORMANCE OVERLAY (FIXED positioning)
                     if (!isMobile && !isTablet)
                       _buildPerformanceOverlay(ds, constraints),
@@ -314,7 +324,7 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
       child: Container(
         color: Colors.black.withOpacity(0.5),
         child: Center(
-          child: Container(
+          child: SizedBox(
             width: (constraints.maxWidth * 0.8).clamp(300.0, 900.0),
             height: (constraints.maxHeight * 0.8).clamp(400.0, 700.0),
             child: Stack(
@@ -332,6 +342,105 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
                   ),
                 ),
               ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // 🌳 METODO DECISION TREE OVERLAY
+  Widget _buildDecisionTreeOverlay(BoxConstraints constraints) {
+    final ds = context.ds;
+
+    return Positioned.fill(
+      child: Container(
+        color: Colors.black.withOpacity(0.6),
+        child: Center(
+          child: Container(
+            width: (constraints.maxWidth * 0.9).clamp(400.0, 1000.0),
+            height: (constraints.maxHeight * 0.8).clamp(300.0, 600.0),
+            margin: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  ds.colors.colorScheme.surfaceContainer.withOpacity(0.95),
+                  ds.colors.colorScheme.surfaceContainer.withOpacity(0.85),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: ds.colors.neuralPrimary.withOpacity(0.3),
+                width: 2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: ds.colors.neuralPrimary.withOpacity(0.2),
+                  blurRadius: 30,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: BackdropFilter(
+                filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                child: Stack(
+                  children: [
+                    // Header
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        border: Border(
+                          bottom: BorderSide(
+                            color: ds.colors.neuralPrimary.withOpacity(0.2),
+                            width: 1,
+                          ),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.account_tree,
+                            color: ds.colors.neuralPrimary,
+                            size: 24,
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            'Athena Decision Tree',
+                            style: ds.typography.h2.copyWith(
+                              color: ds.colors.colorScheme.onSurface,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const Spacer(),
+                          IconButton(
+                            onPressed: () {
+                              setState(() => _showDecisionTreeOverlay = false);
+                              _trackFeatureInteraction('decision_tree_close');
+                            },
+                            icon: Icon(
+                              Icons.close,
+                              color: ds.colors.colorScheme.onSurface,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Decision Tree Content
+                    Positioned.fill(
+                      top: 80,
+                      child: Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: const VisualDecisionTree(),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
@@ -774,6 +883,50 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
             ),
 
             const SizedBox(height: 32),
+
+            // 🧠 ATHENA INTELLIGENCE SECTION (NEW - PHASE 3.4)
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  _isAthenaIntelligenceExpanded = !_isAthenaIntelligenceExpanded;
+                });
+                _trackFeatureInteraction('athena_intelligence');
+              },
+              child: AthenaIntelligencePanel(
+                isExpanded: _isAthenaIntelligenceExpanded,
+                onToggleExpanded: () {
+                  setState(() {
+                    _isAthenaIntelligenceExpanded = !_isAthenaIntelligenceExpanded;
+                  });
+                  _trackFeatureInteraction('athena_intelligence_toggle');
+                },
+                onShowDecisionTree: () {
+                  setState(() {
+                    _showDecisionTreeOverlay = true;
+                  });
+                  _trackFeatureInteraction('athena_decision_tree');
+                },
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            // 🔗 DIVIDER
+            Container(
+              height: 1,
+              margin: const EdgeInsets.symmetric(vertical: 8),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.transparent,
+                    ds.colors.neuralPrimary.withOpacity(0.3),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 24),
 
             _buildSectionHeader('Strategy', Icons.psychology, ds),
             const SizedBox(height: 16),
@@ -1356,7 +1509,7 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
     );
   }
 
-  void _sendMessage(String message) {
+  void _sendMessage(String message) async {
     if (message.trim().isEmpty) return;
 
     final startTime = DateTime.now();
@@ -1373,6 +1526,7 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
 
     _messageController.clear();
 
+    // Scroll to bottom
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
@@ -1383,24 +1537,80 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
       }
     });
 
-    final orchestrationService = ref.read(webSocketOrchestrationServiceProvider);
-    final activeModels = ref.read(activeModelsProvider);
-    final currentStrategy = ref.read(currentStrategyProvider);
+    // 🧠 ATHENA INTEGRATION: Check if Athena is enabled and analyze prompt
+    try {
+      final athenaEnabled = ref.read(athenaEnabledProvider);
 
+      if (athenaEnabled) {
+        print('🧠 Athena is enabled - analyzing prompt for intelligent orchestration');
+
+        // Get current orchestration settings
+        final activeModels = ref.read(activeModelsProvider);
+        final currentStrategy = ref.read(currentStrategyProvider);
+        final modelWeights = ref.read(modelWeightsProvider);
+
+        // Get Athena controller safely
+        try {
+          final athenaController = ref.read(athenaControllerProvider.notifier);
+
+          // Analyze prompt with Athena Intelligence
+          await athenaController.analyzePrompt(
+            message.trim(),
+            currentModels: activeModels,
+            currentStrategy: currentStrategy,
+            currentWeights: modelWeights,
+          );
+
+          print('✅ Athena analysis completed successfully');
+
+          // Check if Athena has a recommendation and auto-apply is enabled
+          final hasRecommendation = ref.read(athenaHasRecommendationProvider);
+          final canApply = ref.read(athenaCanApplyRecommendationProvider);
+
+          if (hasRecommendation && canApply) {
+            print('🤖 Auto-applying Athena recommendations');
+            await athenaController.applyRecommendation();
+          }
+        } catch (athenaError) {
+          print('⚠️ Athena controller error: $athenaError, continuing with current settings');
+        }
+
+      } else {
+        print('ℹ️ Athena Intelligence is disabled - using current orchestration settings');
+      }
+
+    } catch (e, stackTrace) {
+      print('❌ Athena analysis failed, continuing with current settings: $e');
+      // Continue with normal orchestration even if Athena fails
+    }
+
+    // Mark orchestration as active
+    ref.read(orchestrationActivityProvider.notifier).state = true;
+
+    // Get final orchestration settings (may have been updated by Athena)
+    final finalModels = ref.read(activeModelsProvider);
+    final finalStrategy = ref.read(currentStrategyProvider);
+
+    // Track orchestration completion
     Future.delayed(const Duration(seconds: 1), () {
       final responseTime = DateTime.now().difference(startTime).inMilliseconds / 1000.0;
       _trackOrchestrationCompletion(
-        activeModels,
-        currentStrategy,
+        finalModels,
+        finalStrategy,
         responseTime: responseTime,
         tokenCount: message.length,
         qualityScore: 0.9,
       );
+
+      // Mark orchestration as inactive
+      ref.read(orchestrationActivityProvider.notifier).state = false;
     });
 
+    // Start orchestration
+    final orchestrationService = ref.read(webSocketOrchestrationServiceProvider);
     orchestrationService.orchestrateAIRequest(
       prompt: message.trim(),
-      selectedModels: activeModels,
+      selectedModels: finalModels,
       strategy: _convertToWebSocketStrategy(OrchestrationStrategy.parallel),
     );
   }

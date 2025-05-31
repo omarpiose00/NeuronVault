@@ -39,6 +39,9 @@ class EnhancedAchievementService extends ChangeNotifier {
   Map<String, dynamic> _liveAnalytics = {};
   List<AchievementEvent> _eventHistory = [];
 
+  // Flag per controllare lo stato di disposizione
+  bool _isDisposed = false;
+
   EnhancedAchievementService({
     required SharedPreferences prefs,
     required Logger logger,
@@ -499,6 +502,12 @@ class EnhancedAchievementService extends ChangeNotifier {
   /// 🎮 Performance tracking for achievements
   void _startPerformanceTracking() {
     _performanceTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      // Verifica se il servizio è stato disposto
+      if (_isDisposed) {
+        timer.cancel();
+        return;
+      }
+
       // Track high performance maintenance
       _maintainedHighPerformance = true; // This would come from actual FPS monitoring
 
@@ -512,6 +521,12 @@ class EnhancedAchievementService extends ChangeNotifier {
   /// ⏰ Session tracking for achievements
   void _startSessionTracking() {
     _sessionTimer = Timer.periodic(const Duration(minutes: 1), (timer) {
+      // Verifica se il servizio è stato disposto
+      if (_isDisposed) {
+        timer.cancel();
+        return;
+      }
+
       _currentSessionMinutes++;
 
       // Track daily usage
@@ -773,16 +788,39 @@ class EnhancedAchievementService extends ChangeNotifier {
       notifyListeners();
     }
   }
-
-  /// 🧹 Enhanced cleanup
   @override
   void dispose() {
+    if (_isDisposed) return;
+
+    _isDisposed = true;
+
+    // Ferma i timer
     _performanceTimer.cancel();
     _sessionTimer.cancel();
+
+    // Chiudi lo stream controller
     _notificationController.close();
+
+    // Pulisci lo stato interno
+    _eventHistory.clear();
+    _liveAnalytics.clear();
+    _sessionStats.clear();
+
+    // Chiama il dispose della classe base
     super.dispose();
   }
+
+// Aggiungi questo metodo per prevenire notifiche dopo la disposizione
+  @override
+  void notifyListeners() {
+    if (!_isDisposed) {
+      super.notifyListeners();
+    }
+  }
 }
+
+
+
 
 /// 📊 Achievement Event for analytics
 class AchievementEvent {

@@ -1,5 +1,5 @@
 # 🧠 NeuronVault - CLEAN BUILD CONFIGURATION
-# Versione semplificata per eliminare 580 errori di build
+# Versioni COMPATIBILI per eliminare errori Freezed
 
 name: neuronvault
 description: "Neural Luxury AI Orchestration Platform"
@@ -20,21 +20,20 @@ dependencies:
 
   # 🔄 STATE MANAGEMENT - FREEZED COMPATIBLE
   flutter_riverpod: ^2.4.9
-  # REMOVED: riverpod_annotation (causes custom_lint conflicts)
 
   # 💾 STORAGE & PERSISTENCE
   shared_preferences: ^2.2.2
-  flutter_secure_storage: ^9.0.0
+  flutter_secure_storage: ^10.0.0-beta.4
   path_provider: ^2.1.2
 
   # 🌐 NETWORKING & WEBSOCKETS
   http: ^1.1.2
-  web_socket_channel: ^2.4.0
+  web_socket_channel: ^3.0.3
   dio: ^5.4.0
-  socket_io_client: ^2.0.3+1
+  socket_io_client: ^3.1.2
 
-  # 📊 JSON & SERIALIZATION - FIXED COMPATIBLE VERSIONS
-  json_annotation: ^4.9.0
+  # 📊 JSON & SERIALIZATION - VERSIONI STABILI COMPATIBILI
+  json_annotation: ^4.8.1
   freezed_annotation: ^2.4.1
 
   # 🔐 SECURITY & ENCRYPTION
@@ -44,39 +43,33 @@ dependencies:
   # 🔧 UTILITIES
   logger: ^2.0.2+1
   uuid: ^4.2.1
-  intl: ^0.19.0
+  intl: ^0.20.2
   equatable: ^2.0.5
 
   # 🖥️ DESKTOP SUPPORT
-  window_manager: ^0.3.7
+  window_manager: ^0.5.0
 
   # 🎨 ANIMATIONS & UI ENHANCEMENTS
   flutter_animate: ^4.5.0
 
   # 🔊 AUDIO & HAPTICS
   audioplayers: ^6.0.0
-  vibration: ^1.8.4
+  vibration: ^3.1.3
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
 
-  # 📊 CODE GENERATION - COMPATIBLE VERSIONS
+  # 📊 CODE GENERATION - VERSIONI STABILI COMPATIBILI
   build_runner: ^2.4.7
   json_serializable: ^6.7.1
   freezed: ^2.4.6
-  # REMOVED: riverpod_generator (causes custom_lint conflicts)
 
-  # 🧹 LINTING & ANALYSIS - FIXED VERSION
-  flutter_lints: ^3.0.1
+  # 🧹 LINTING & ANALYSIS
+  flutter_lints: ^6.0.0
+  test: ^1.25.15
 
-# 🔧 DEPENDENCY OVERRIDES - CRITICAL FOR FREEZED COMPATIBILITY
-dependency_overrides:
-  # Fix analyzer version conflicts
-  analyzer: ^6.2.0
-  analyzer_plugin: ^0.11.2
-
-  # Remove problematic packages entirely
+  # 🧪 TESTING
   mockito: ^5.4.2
 
 # 🎯 FLUTTER CONFIGURATION

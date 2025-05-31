@@ -7,17 +7,22 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logger/logger.dart';
 import 'package:uuid/uuid.dart';
 
-import '../state/state_models.dart';
+import '../state/state_models.dart' hide OrchestrationStrategy;
 import '../services/ai_service.dart';
 import '../services/storage_service.dart';
 import '../services/analytics_service.dart';
 import '../providers/providers_main.dart';
+// ATHENA INTEGRATION IMPORTS
+import '../services/athena_intelligence_service.dart';
+import '../services/websocket_orchestration_service.dart';
+import '../controllers/athena_controller.dart';
 
 // 💬 CHAT CONTROLLER
 class ChatController extends Notifier<ChatState> {
   late final AIService _aiService;
   late final StorageService _storageService;
   late final AnalyticsService _analyticsService;
+  late final WebSocketOrchestrationService _orchestrationService;
   late final Logger _logger;
 
   final Uuid _uuid = const Uuid();
@@ -29,6 +34,7 @@ class ChatController extends Notifier<ChatState> {
     _aiService = ref.read(aiServiceProvider);
     _storageService = ref.read(storageServiceProvider);
     _analyticsService = ref.read(analyticsServiceProvider);
+    _orchestrationService = ref.read(webSocketOrchestrationServiceProvider);
     _logger = ref.read(loggerProvider);
 
     // Load chat history
@@ -80,7 +86,7 @@ class ChatController extends Notifier<ChatState> {
     }
   }
 
-  // 📤 SEND MESSAGE
+  // 📤 SEND MESSAGE WITH ATHENA INTEGRATION
   Future<void> sendMessage(String content) async {
     if (content.trim().isEmpty || state.isGenerating) return;
 
@@ -117,8 +123,46 @@ class ChatController extends Notifier<ChatState> {
         'request_id': requestId,
       });
 
-      // Generate AI response
-      await _generateAIResponse(content, requestId);
+      // 🧠 ATHENA INTEGRATION: Check if Athena is enabled and analyze prompt
+      final athenaController = ref.read(athenaControllerProvider.notifier);
+      final athenaState = ref.read(athenaControllerProvider);
+
+      if (athenaState.isEnabled) {
+        _logger.i('🧠 Athena is enabled - analyzing prompt for intelligent orchestration');
+
+        try {
+          // Get current orchestration settings
+          final currentModels = ref.read(activeModelsProvider);
+          final currentStrategy = ref.read(currentStrategyProvider);
+          final currentWeights = ref.read(modelWeightsProvider);
+
+          // Analyze prompt with Athena Intelligence
+          await athenaController.analyzePrompt(
+            content.trim(),
+            currentModels: currentModels,
+            currentStrategy: currentStrategy,
+            currentWeights: currentWeights,
+          );
+
+          _logger.i('✅ Athena analysis completed successfully');
+
+          // Check if Athena has a recommendation
+          final updatedAthenaState = ref.read(athenaControllerProvider);
+          if (updatedAthenaState.hasRecommendation && updatedAthenaState.autoApplyEnabled) {
+            _logger.i('🤖 Auto-applying Athena recommendations');
+            await athenaController.applyRecommendation();
+          }
+
+        } catch (e, stackTrace) {
+          _logger.e('❌ Athena analysis failed, continuing with current settings', error: e, stackTrace: stackTrace);
+          // Continue with normal orchestration even if Athena fails
+        }
+      } else {
+        _logger.d('ℹ️ Athena Intelligence is disabled - using current orchestration settings');
+      }
+
+      // Generate AI response using WebSocket orchestration
+      await _generateAIResponseWithOrchestration(content, requestId);
 
     } catch (e, stackTrace) {
       _logger.e('❌ Failed to send message', error: e, stackTrace: stackTrace);
@@ -126,7 +170,58 @@ class ChatController extends Notifier<ChatState> {
     }
   }
 
-  // 🤖 GENERATE AI RESPONSE
+  // 🧬 GENERATE AI RESPONSE WITH WEBSOCKET ORCHESTRATION
+  Future<void> _generateAIResponseWithOrchestration(String prompt, String requestId) async {
+    try {
+      _logger.d('🧬 Starting WebSocket orchestration for request: $requestId');
+
+      // Get current orchestration settings
+      final selectedModels = ref.read(activeModelsProvider);
+      final strategy = ref.read(currentStrategyProvider);
+      final weights = ref.read(modelWeightsProvider);
+
+      // Convert strategy string to enum
+      final strategyEnum = OrchestrationStrategy.values.firstWhere(
+            (e) => e.name == strategy,
+        orElse: () => OrchestrationStrategy.parallel,
+      );
+
+      // Create initial assistant message
+      final assistantMessage = ChatMessage(
+        id: _uuid.v4(),
+        content: '',
+        type: MessageType.assistant,
+        timestamp: DateTime.now(),
+        requestId: requestId,
+      );
+
+      // Add initial message to state
+      final updatedMessages = [...state.messages, assistantMessage];
+      state = state.copyWith(messages: updatedMessages);
+
+      // Start WebSocket orchestration
+      _logger.i('🚀 Starting AI orchestration with models: ${selectedModels.join(", ")}');
+      await _orchestrationService.orchestrateAIRequest(
+        prompt: prompt,
+        selectedModels: selectedModels,
+        strategy: strategyEnum,
+        modelWeights: weights,
+        conversationId: requestId,
+      );
+
+      // Listen to orchestration streams
+      _setupOrchestrationStreams(assistantMessage.id, requestId);
+
+    } catch (e, stackTrace) {
+      _logger.e('❌ Failed to start orchestration', error: e, stackTrace: stackTrace);
+
+      // Fallback to original AI service if orchestration fails
+      _logger.w('⚠️ Falling back to single AI service');
+      await _generateAIResponse(prompt, requestId);
+    }
+  }
+
+  // 🤖 GENERATE AI RESPONSE (ORIGINAL - USED AS FALLBACK)
   Future<void> _generateAIResponse(String prompt, String requestId) async {
     try {
       _logger.d('🤖 Generating AI response for request: $requestId');
@@ -178,6 +273,73 @@ class ChatController extends Notifier<ChatState> {
 
     } catch (e) {
       _logger.w('⚠️ Failed to handle stream chunk: $e');
+    }
+  }
+
+  // 📡 SETUP ORCHESTRATION STREAMS
+  void _setupOrchestrationStreams(String messageId, String requestId) {
+    try {
+      // Listen to synthesized response stream
+      final synthesizedSubscription = _orchestrationService.synthesizedResponseStream.listen(
+            (response) {
+          _logger.d('📥 Received synthesized response: ${response.length} chars');
+          _handleOrchestrationResponse(messageId, response);
+          _handleStreamComplete(requestId);
+        },
+        onError: (error) {
+          _logger.e('❌ Synthesized response stream error: $error');
+          _handleStreamError(error);
+        },
+      );
+
+      // Listen to individual responses for partial updates
+      final individualSubscription = _orchestrationService.individualResponsesStream.listen(
+            (responses) {
+          if (responses.isNotEmpty) {
+            _logger.d('📊 Received ${responses.length} individual AI responses');
+            // Update with partial content from latest response
+            final latestResponse = responses.last;
+            _handleStreamChunk(messageId, latestResponse.content);
+          }
+        },
+        onError: (error) {
+          _logger.e('❌ Individual responses stream error: $error');
+        },
+      );
+
+      // Store subscriptions for cleanup
+      _currentStreamSubscription = synthesizedSubscription;
+      _currentStreamSubscription?.onDone(() {
+        individualSubscription.cancel();
+      });
+
+    } catch (e, stackTrace) {
+      _logger.e('❌ Failed to setup orchestration streams', error: e, stackTrace: stackTrace);
+      _handleStreamError(e);
+    }
+  }
+
+  // 🧬 HANDLE ORCHESTRATION RESPONSE
+  void _handleOrchestrationResponse(String messageId, String response) {
+    try {
+      final messageIndex = state.messages.indexWhere((msg) => msg.id == messageId);
+      if (messageIndex == -1) return;
+
+      final currentMessage = state.messages[messageIndex];
+      final updatedMessage = currentMessage.copyWith(
+        content: response,
+        timestamp: DateTime.now(),
+      );
+
+      final updatedMessages = [...state.messages];
+      updatedMessages[messageIndex] = updatedMessage;
+
+      state = state.copyWith(messages: updatedMessages);
+
+      _logger.i('✅ Orchestration response updated successfully');
+
+    } catch (e, stackTrace) {
+      _logger.e('❌ Failed to handle orchestration response', error: e, stackTrace: stackTrace);
     }
   }
 
@@ -385,6 +547,11 @@ class ChatController extends Notifier<ChatState> {
 final chatControllerProvider = NotifierProvider<ChatController, ChatState>(
       () => ChatController(),
 );
+
+// 🧬 ORCHESTRATION SERVICE PROVIDER REFERENCE
+final orchestrationServiceProvider = Provider<WebSocketOrchestrationService>((ref) {
+  return ref.watch(webSocketOrchestrationServiceProvider);
+});
 
 // 📊 COMPUTED PROVIDERS
 final chatMessagesProvider = Provider<List<ChatMessage>>((ref) {

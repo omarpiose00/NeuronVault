@@ -1,6 +1,6 @@
-// lib/widgets/core/model_grid.dart - PHASE 3.2 ENHANCED
+// lib/widgets/core/model_grid.dart - PHASE 3.4 ENHANCED
 // 🧬 REVOLUTIONARY MODEL CARDS PROCESSING ENHANCEMENT
-// Real-time processing indicators + Neural connection animations + Achievement integration
+// Real-time processing indicators + Neural connection animations + Achievement integration + Athena AI
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,6 +10,8 @@ import '../../core/design_system.dart';
 import '../../core/accessibility/accessibility_manager.dart';
 import '../../core/state/state_models.dart';
 import '../../core/providers/providers_main.dart';
+// 🧠 ATHENA AI AUTONOMY IMPORTS - PHASE 3.4
+import '../../core/services/athena_intelligence_service.dart';
 // For AIModel
 
 /// 🧬 PROCESSING STATUS ENUM
@@ -55,8 +57,8 @@ class ProcessingStage {
   }
 }
 
-/// 🤖 ENHANCED MODEL GRID - PHASE 3.2 REVOLUTIONARY
-/// Real-time processing transparency + Neural connection animations
+/// 🤖 ENHANCED MODEL GRID - PHASE 3.4 REVOLUTIONARY
+/// Real-time processing transparency + Neural connection animations + Athena AI
 class ModelGrid extends ConsumerStatefulWidget {
   final List<AIModel> models;
   final ValueChanged<String> onModelToggle;
@@ -97,6 +99,12 @@ class _ModelGridState extends ConsumerState<ModelGrid> with TickerProviderStateM
   bool _isGridView = true;
   final FocusNode _containerFocus = FocusNode();
   int _focusedModelIndex = 0;
+
+  // 🧠 ATHENA INTEGRATION - PHASE 3.4
+  bool _athenaEnabled = false;
+  AthenaRecommendation? _currentRecommendation;
+  final Map<String, double> _athenaConfidenceScores = {};
+  final Map<String, bool> _athenaRecommendedModels = {};
 
   @override
   void initState() {
@@ -230,6 +238,24 @@ class _ModelGridState extends ConsumerState<ModelGrid> with TickerProviderStateM
           _handleSynthesisComplete();
         }
       });
+    });
+
+    // 🧠 ATHENA STREAMS - PHASE 3.4
+    ref.listen<bool>(athenaEnabledProvider, (previous, next) {
+      if (mounted) {
+        setState(() {
+          _athenaEnabled = next;
+        });
+      }
+    });
+
+    ref.listen(athenaCurrentRecommendationProvider, (previous, next) {
+      if (mounted && next != null) {
+        setState(() {
+          _currentRecommendation = next;
+          _updateAthenaRecommendations(next);
+        });
+      }
     });
   }
 
@@ -383,6 +409,30 @@ class _ModelGridState extends ConsumerState<ModelGrid> with TickerProviderStateM
     }
   }
 
+  // 🧠 ATHENA RECOMMENDATION HANDLING - PHASE 3.4
+  void _updateAthenaRecommendations(AthenaRecommendation recommendation) {
+    // Update confidence scores and recommendations
+    _athenaConfidenceScores.clear();
+    _athenaRecommendedModels.clear();
+
+    for (final model in recommendation.recommendedModels) {
+      _athenaRecommendedModels[model] = true;
+      _athenaConfidenceScores[model] = recommendation.modelWeights[model] ?? 0.5;
+    }
+
+    // Track achievement for Athena usage
+    _trackAchievementAthenaUsage();
+  }
+
+  void _trackAchievementAthenaUsage() {
+    try {
+      final tracker = ref.read(achievementTrackerProvider);
+      tracker.trackFeatureUsage('athena_recommendations');
+    } catch (e) {
+      debugPrint('⚠️ Achievement tracking error: $e');
+    }
+  }
+
   @override
   void dispose() {
     _pulseController.dispose();
@@ -527,13 +577,56 @@ class _ModelGridState extends ConsumerState<ModelGrid> with TickerProviderStateM
             ),
             if (isActive) ...[
               const SizedBox(height: 2),
-              Text(
-                'ORCHESTRATING • ${activeModels.length} models active',
-                style: ds.typography.caption.copyWith(
-                  color: ds.colors.neuralAccent,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 10,
-                ),
+              Row(
+                children: [
+                  Text(
+                    'ORCHESTRATING • ${activeModels.length} models active',
+                    style: ds.typography.caption.copyWith(
+                      color: ds.colors.neuralAccent,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 10,
+                    ),
+                  ),
+                  // 🧠 ATHENA STATUS BADGE
+                  if (_athenaEnabled && _currentRecommendation != null) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            ds.colors.neuralAccent.withOpacity(0.2),
+                            ds.colors.neuralPrimary.withOpacity(0.1),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: ds.colors.neuralAccent.withOpacity(0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.psychology,
+                            color: ds.colors.neuralAccent,
+                            size: 10,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'AI RECOMMENDATIONS ACTIVE',
+                            style: ds.typography.caption.copyWith(
+                              color: ds.colors.neuralAccent,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 9,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ],
           ],
@@ -559,6 +652,7 @@ class _ModelGridState extends ConsumerState<ModelGrid> with TickerProviderStateM
     final activeCount = _processingStages.values
         .where((stage) => stage.status != ProcessingStatus.idle)
         .length;
+    final recCount = _athenaRecommendedModels.length;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -585,7 +679,7 @@ class _ModelGridState extends ConsumerState<ModelGrid> with TickerProviderStateM
           ),
           const SizedBox(width: 6),
           Text(
-            '$activeCount processing • ${_formatNumber(totalTokens)} tokens',
+            '$activeCount processing${_athenaEnabled && recCount > 0 ? ' • $recCount recs' : ''} • ${_formatNumber(totalTokens)} tokens',
             style: ds.typography.caption.copyWith(
               color: ds.colors.colorScheme.onSurface,
               fontWeight: FontWeight.w600,
@@ -679,6 +773,8 @@ class _ModelGridState extends ConsumerState<ModelGrid> with TickerProviderStateM
     );
     final realtimeTokens = _realtimeTokens[model.name] ?? model.tokensUsed;
     final isProcessing = processingStage.status != ProcessingStatus.idle;
+    final isAthenaRecommended = _athenaEnabled &&
+        _athenaRecommendedModels[model.name] == true;
 
     return GestureDetector(
       onTap: () => widget.onModelToggle(model.name),
@@ -724,6 +820,13 @@ class _ModelGridState extends ConsumerState<ModelGrid> with TickerProviderStateM
                   blurRadius: isProcessing ? 20 : 12,
                   spreadRadius: isProcessing ? 3 : 1,
                 ),
+                // 🧠 Athena glow effect
+                if (isAthenaRecommended)
+                  BoxShadow(
+                    color: ds.colors.neuralAccent.withOpacity(0.4),
+                    blurRadius: 20,
+                    spreadRadius: 1,
+                  ),
               ]
                   : [
                 BoxShadow(
@@ -733,27 +836,35 @@ class _ModelGridState extends ConsumerState<ModelGrid> with TickerProviderStateM
                 ),
               ],
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Stack(
               children: [
-                // 🎯 ENHANCED HEADER ROW
-                _buildEnhancedHeaderRow(model, ds, isProcessing),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 🎯 ENHANCED HEADER ROW
+                    _buildEnhancedHeaderRow(model, ds, isProcessing),
 
-                const SizedBox(height: 12),
+                    const SizedBox(height: 12),
 
-                // 🧬 PROCESSING STATUS INDICATOR
-                if (isProcessing)
-                  _buildProcessingStatusIndicator(processingStage, ds),
+                    // 🧬 PROCESSING STATUS INDICATOR
+                    if (isProcessing)
+                      _buildProcessingStatusIndicator(processingStage, ds),
 
-                const SizedBox(height: 12),
+                    const SizedBox(height: 12),
 
-                // 💚 HEALTH INDICATOR (EXISTING)
-                _buildHealthIndicator(model, ds),
+                    // 💚 HEALTH INDICATOR (EXISTING)
+                    _buildHealthIndicator(model, ds),
 
-                const SizedBox(height: 12),
+                    const SizedBox(height: 12),
 
-                // 📊 ENHANCED PERFORMANCE METRICS
-                _buildEnhancedPerformanceMetrics(model, realtimeTokens, ds),
+                    // 📊 ENHANCED PERFORMANCE METRICS
+                    _buildEnhancedPerformanceMetrics(model, realtimeTokens, ds),
+                  ],
+                ),
+
+                // 🧠 ATHENA RECOMMENDATION OVERLAY
+                if (isAthenaRecommended)
+                  _buildAthenaRecommendationOverlay(model, ds),
               ],
             ),
           );
@@ -835,6 +946,45 @@ class _ModelGridState extends ConsumerState<ModelGrid> with TickerProviderStateM
                       Icons.flash_on,
                       color: ds.colors.neuralAccent,
                       size: 12,
+                    ),
+                  ],
+
+                  // 🧠 ATHENA RECOMMENDED BADGE
+                  if (_athenaEnabled && _athenaRecommendedModels[model.name] == true) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            ds.colors.neuralAccent.withOpacity(0.3),
+                            ds.colors.neuralPrimary.withOpacity(0.2),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: ds.colors.neuralAccent,
+                          width: 0.5,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.psychology,
+                            size: 10,
+                            color: ds.colors.neuralAccent,
+                          ),
+                          const SizedBox(width: 2),
+                          Text(
+                            'AI RECOMMENDED',
+                            style: ds.typography.caption.copyWith(
+                              color: ds.colors.neuralAccent,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 8,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ],
@@ -1046,6 +1196,54 @@ class _ModelGridState extends ConsumerState<ModelGrid> with TickerProviderStateM
           ),
         ),
       ],
+    );
+  }
+
+  // 🧠 BUILD ATHENA RECOMMENDATION OVERLAY
+  Widget _buildAthenaRecommendationOverlay(AIModel model, DesignSystemData ds) {
+    final confidence = _athenaConfidenceScores[model.name] ?? 0.5;
+
+    return Positioned(
+      top: 8,
+      right: 8,
+      child: Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              ds.colors.neuralAccent.withOpacity(0.9),
+              ds.colors.neuralPrimary.withOpacity(0.7),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: [
+            BoxShadow(
+              color: ds.colors.neuralAccent.withOpacity(0.4),
+              blurRadius: 8,
+              spreadRadius: 1,
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.psychology,
+              color: Colors.white,
+              size: 12,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              '${(confidence * 100).round()}%',
+              style: ds.typography.caption.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                fontSize: 10,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

@@ -1,3 +1,4 @@
+// lib/core/services/athena_intelligence_service.dart
 // 🧠 NEURONVAULT - ATHENA INTELLIGENCE SERVICE - PHASE 3.4
 // Core AI Autonomy Engine - World's first AI that intelligently orchestrates other AIs
 // Real-time decision transparency with neural luxury integration
@@ -6,7 +7,6 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
-
 
 import 'mini_llm_analyzer_service.dart';
 import 'websocket_orchestration_service.dart';
@@ -630,7 +630,7 @@ class AthenaIntelligenceService extends ChangeNotifier {
     }
   }
 
-  /// 🔄 Enable/disable Athena Intelligence
+  /// 🔄 Enable/disable Athena Intelligence - FIXED VERSION
   Future<void> setEnabled(bool enabled) async {
     try {
       _logger.i('🎛️ ${enabled ? "Enabling" : "Disabling"} Athena Intelligence...');
@@ -640,8 +640,14 @@ class AthenaIntelligenceService extends ChangeNotifier {
         lastUpdate: DateTime.now(),
       ));
 
-      // Save preference
-      await _storageService.clearAllData(); // Placeholder for saving preferences
+      // 🔧 CRITICAL FIX: Save preference properly using the new method
+      try {
+        await _configService.saveBoolPreference('athena_intelligence_enabled', enabled);
+        _logger.d('💾 Athena enabled state saved: $enabled');
+      } catch (storageError) {
+        _logger.w('⚠️ Failed to save Athena preference, continuing anyway: $storageError');
+        // Don't fail the operation if storage fails
+      }
 
       _logger.i('✅ Athena Intelligence ${enabled ? "enabled" : "disabled"}');
 
@@ -649,8 +655,6 @@ class AthenaIntelligenceService extends ChangeNotifier {
       _logger.e('❌ Failed to update Athena enabled state', error: e, stackTrace: stackTrace);
     }
   }
-
-  // 🔧 UTILITY METHODS
 
   void _updateState(AthenaState newState) {
     _state = newState;

@@ -1,8 +1,8 @@
+// lib/core/providers/providers_main.dart
 // 🎯 NEURONVAULT - CENTRAL PROVIDERS HUB - PHASE 3.4 ATHENA INTEGRATION
 // Enterprise-grade provider management and dependency injection
 // PHASE 3.4 COMPLETE: Athena AI Autonomy Intelligence Layer + Enhanced Achievement System + Live Analytics
 
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -18,7 +18,6 @@ import '../services/theme_service.dart';
 import '../services/websocket_orchestration_service.dart' as ws; // Alias for websocket service
 import '../services/spatial_audio_service.dart';
 import '../services/achievement_service.dart'; // 🏆 ENHANCED ACHIEVEMENT SERVICE
-import '../theme/neural_theme_system.dart';
 
 // 🧠 ATHENA AI AUTONOMY IMPORTS - PHASE 3.4
 import '../../core/services/mini_llm_analyzer_service.dart';   // 🔍 Mini-LLM Analysis
@@ -134,8 +133,8 @@ final miniLLMAnalyzerServiceProvider = Provider<MiniLLMAnalyzerService>((ref) {
   return service;
 });
 
-/// Athena Intelligence Service Provider - CORE AI AUTONOMY ENGINE
-final athenaIntelligenceServiceProvider = ChangeNotifierProvider<AthenaIntelligenceService>((ref) {
+/// 🧠 ATHENA INTELLIGENCE SERVICE PROVIDER - STABLE VERSION
+final athenaIntelligenceServiceProvider = ChangeNotifierProvider.autoDispose<AthenaIntelligenceService>((ref) {
   final logger = ref.watch(loggerProvider);
   logger.i('🧠 Initializing Athena Intelligence Service - WORLD\'S FIRST AI AUTONOMY ENGINE...');
 
@@ -147,19 +146,65 @@ final athenaIntelligenceServiceProvider = ChangeNotifierProvider<AthenaIntellige
     logger: logger,
   );
 
+  // 🔧 CRITICAL FIX: Keep service alive during orchestration
+  ref.keepAlive();
+
+  // Listen to orchestration state
+  ref.listen(isOrchestrationActiveProvider, (previous, next) {
+    if (next) {
+      logger.d('🔒 Orchestration active - keeping Athena Service alive');
+      ref.keepAlive();
+    }
+  });
+
+  ref.onDispose(() {
+    logger.d('🧹 Athena Intelligence Service disposal requested');
+    final isActive = ref.read(isOrchestrationActiveProvider);
+    if (!isActive) {
+      logger.d('✅ Athena Intelligence Service disposed safely');
+      service.dispose();
+    } else {
+      logger.w('⚠️ Athena Service disposal blocked - orchestration active');
+    }
+  });
+
   logger.i('✅ Athena Intelligence Service initialized - AI AUTONOMY CORE READY');
   return service;
 });
 
-/// Athena Controller Provider - AI AUTONOMY STATE MANAGEMENT
-final athenaControllerProvider = StateNotifierProvider<AthenaController, AthenaControllerState>((ref) {
+/// 🧠 ATHENA CONTROLLER PROVIDER - LIFECYCLE STABLE VERSION
+final athenaControllerProvider = StateNotifierProvider.autoDispose<AthenaController, AthenaControllerState>((ref) {
   final logger = ref.watch(loggerProvider);
-  logger.i('🎮 Initializing Athena Controller - AI Autonomy State Management...');
+  logger.i('🎮 Creating new Athena Controller instance...');
 
   final controller = AthenaController(
     ref.watch(athenaIntelligenceServiceProvider),
     logger,
   );
+
+  // 🔧 CRITICAL FIX: Keep alive during orchestration
+  ref.keepAlive();
+
+  // Listen to orchestration state to prevent disposal during active operations
+  ref.listen(isOrchestrationActiveProvider, (previous, next) {
+    if (next) {
+      logger.d('🔒 Orchestration active - keeping Athena Controller alive');
+      ref.keepAlive();
+    }
+  });
+
+  // Override auto-dispose behavior
+  ref.onDispose(() {
+    logger.d('🧹 Athena Controller disposal requested');
+    // Only dispose if orchestration is not active
+    final isActive = ref.read(isOrchestrationActiveProvider);
+    if (!isActive) {
+      logger.d('✅ Athena Controller disposed safely');
+      controller.dispose();
+    } else {
+      logger.w('⚠️ Athena Controller disposal blocked - orchestration active');
+    }
+  });
 
   logger.i('✅ Athena Controller initialized - Neural luxury reactive state ready');
   return controller;
@@ -213,6 +258,11 @@ final webSocketOrchestrationServiceProvider = ChangeNotifierProvider<ws.WebSocke
 // 📊 ORCHESTRATION STATE PROVIDERS
 final currentOrchestrationProvider = StateProvider<String?>((ref) => null);
 final isOrchestrationActiveProvider = StateProvider<bool>((ref) => false);
+
+// 🔧 ORCHESTRATION ACTIVITY MONITOR - NEW PROVIDER
+final orchestrationActivityProvider = StateProvider<bool>((ref) {
+  return false; // Default to inactive
+});
 
 // 🔧 FIXED: Use websocket service types to match return types
 final individualResponsesProvider = StreamProvider<List<ws.AIResponse>>((ref) {
@@ -277,10 +327,15 @@ final athenaServiceStateStreamProvider = StreamProvider<AthenaState>((ref) {
 
 // 🎯 ATHENA COMPUTED STATE PROVIDERS
 
-/// Athena Enabled State Provider
-final athenaEnabledProvider = Provider<bool>((ref) {
-  final controllerState = ref.watch(athenaControllerProvider);
-  return controllerState.isEnabled;
+/// Athena Enabled State Provider - Safe Version
+final athenaEnabledProvider = Provider.autoDispose<bool>((ref) {
+  ref.keepAlive();
+  try {
+    final controllerState = ref.watch(athenaControllerProvider);
+    return controllerState.isEnabled;
+  } catch (e) {
+    return false;
+  }
 });
 
 /// Athena UI State Provider
@@ -295,16 +350,26 @@ final athenaCurrentRecommendationProvider = Provider<AthenaRecommendation?>((ref
   return controllerState.currentRecommendation;
 });
 
-/// Athena Has Recommendation Provider
-final athenaHasRecommendationProvider = Provider<bool>((ref) {
-  final controllerState = ref.watch(athenaControllerProvider);
-  return controllerState.hasRecommendation;
+/// Athena Has Recommendation Provider - Safe Version
+final athenaHasRecommendationProvider = Provider.autoDispose<bool>((ref) {
+  ref.keepAlive();
+  try {
+    final controllerState = ref.watch(athenaControllerProvider);
+    return controllerState.hasRecommendation;
+  } catch (e) {
+    return false;
+  }
 });
 
-/// Athena Can Apply Recommendation Provider
-final athenaCanApplyRecommendationProvider = Provider<bool>((ref) {
-  final controllerState = ref.watch(athenaControllerProvider);
-  return controllerState.canApplyRecommendation;
+/// Athena Can Apply Recommendation Provider - Safe Version
+final athenaCanApplyRecommendationProvider = Provider.autoDispose<bool>((ref) {
+  ref.keepAlive();
+  try {
+    final controllerState = ref.watch(athenaControllerProvider);
+    return controllerState.canApplyRecommendation;
+  } catch (e) {
+    return false;
+  }
 });
 
 /// Athena Is Analyzing Provider

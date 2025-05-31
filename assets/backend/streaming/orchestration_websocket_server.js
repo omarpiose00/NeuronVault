@@ -2,6 +2,7 @@
 const WebSocket = require('ws');
 const EventEmitter = require('events');
 const TransparentAISynthesizer = require('../ai-handlers/enhanced_transparent_synthesizer');
+const { integrateAthenaWithWebSocket } = require('./athena_websocket_extension'); // Aggiunto import Athena
 
 /**
  * 🧠 NeuronVault WebSocket Orchestration Server
@@ -18,6 +19,9 @@ class OrchestrationWebSocketServer extends EventEmitter {
 
         this.setupSynthesizerEvents();
         this.loadAIHandlers();
+
+        // Initialize Athena WebSocket Extension
+        this.athenaExtension = null; // Aggiunta inizializzazione Athena
     }
 
     /**
@@ -70,6 +74,9 @@ class OrchestrationWebSocketServer extends EventEmitter {
                 }
             });
         });
+
+        // Initialize Athena extension
+        this.athenaExtension = integrateAthenaWithWebSocket(this); // Integrazione Athena
 
         console.log(`🚀 NeuronVault Orchestration Server running on ws://localhost:${this.port}`);
 
@@ -377,13 +384,19 @@ class OrchestrationWebSocketServer extends EventEmitter {
      * Stop server
      */
     stop() {
-        return new Promise((resolve) => {
+        return new Promise(async (resolve) => {
+            // Shutdown Athena extension if exists
+            if (this.athenaExtension) {
+                await this.athenaExtension.shutdown();
+            }
+
             if (this.wss) {
                 this.wss.close(() => {
                     console.log('🛑 Orchestration WebSocket server stopped');
                     resolve();
                 });
             } else {
+                console.log('🛑 Orchestration WebSocket server stopped (was not running)');
                 resolve();
             }
         });
@@ -398,7 +411,8 @@ class OrchestrationWebSocketServer extends EventEmitter {
             active_orchestrations: Array.from(this.clients.values())
                 .reduce((sum, client) => sum + client.activeOrchestrations.size, 0),
             available_models: this.aiHandlers.size,
-            uptime: process.uptime()
+            uptime: process.uptime(),
+            athena: this.athenaExtension?.getStats() || {} // Aggiunta statistica Athena
         };
     }
 }
