@@ -363,6 +363,13 @@ class EnhancedAchievementService extends ChangeNotifier {
         bool playSound = true,
         bool triggerHaptic = true,
       }) async {
+    // AGGIUNGERE QUESTO CONTROLLO ALL'INIZIO DEL METODO:
+    if (_isDisposed) {
+      _logger.w('Service is disposed. Ignoring trackEnhancedProgress for $achievementId.');
+      return;
+    }
+    // FINE DELLA MODIFICA
+
     if (!_state.achievements.containsKey(achievementId)) {
       _logger.w('⚠️ Achievement not found: $achievementId');
       return;
@@ -623,13 +630,14 @@ class EnhancedAchievementService extends ChangeNotifier {
 
   /// Track profiling usage with time spent
   Future<void> trackProfilingUsage({Duration? timeSpent}) async {
-    await trackEnhancedProgress('data_explorer');
-    await trackEnhancedProgress('profiling_expert');
+    await trackEnhancedProgress('data_explorer', increment: 1); // 👈 FIX QUI
+    await trackEnhancedProgress('profiling_expert', increment: 1);
 
     if (timeSpent != null) {
       await trackEnhancedProgress('performance_analyst', increment: timeSpent.inSeconds);
     }
   }
+
 
   /// Track feature exploration
   Future<void> trackFeatureUsage(String feature) async {

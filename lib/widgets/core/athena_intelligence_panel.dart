@@ -8,9 +8,6 @@ import 'dart:ui' as ui;
 
 import '../../core/providers/providers_main.dart';
 import '../../core/design_system.dart';
-import '../../core/controllers/athena_controller.dart';
-import '../../core/services/athena_intelligence_service.dart';
-import 'visual_decision_tree.dart';
 
 /// 🧠 Athena Intelligence Panel Widget
 class AthenaIntelligencePanel extends ConsumerStatefulWidget {

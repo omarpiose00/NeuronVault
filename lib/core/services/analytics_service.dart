@@ -106,8 +106,10 @@ class AnalyticsService {
             _memoryUsageHistory.removeAt(0);
           }
           break;
-      }
 
+        default:
+          _logger.w('⚠️ Unknown performance metric: $metric');
+      }
     } catch (e) {
       _logger.w('⚠️ Failed to track performance $metric: $e');
     }
@@ -309,9 +311,11 @@ class AnalyticsService {
   }
 
   double _getMemoryUsageTrend() {
-    if (_memoryUsageHistory.length < 2) return 0.0;
+    if (_memoryUsageHistory.isEmpty) return 0.0;
 
-    final recent = _memoryUsageHistory.sublist(_memoryUsageHistory.length - 10);
+    final recent = _memoryUsageHistory.sublist(
+      _memoryUsageHistory.length > 10 ? _memoryUsageHistory.length - 10 : 0,
+    );
     return recent.reduce((a, b) => a + b) / recent.length;
   }
 

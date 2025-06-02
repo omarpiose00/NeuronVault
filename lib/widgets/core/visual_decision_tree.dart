@@ -8,7 +8,6 @@ import 'dart:ui' as ui;
 
 import '../../core/design_system.dart';
 import '../../core/providers/providers_main.dart';
-import '../../core/controllers/athena_controller.dart';
 
 /// 🧠 Decision Tree Node Types
 enum DecisionNodeType {

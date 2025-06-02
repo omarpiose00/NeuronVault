@@ -1579,7 +1579,7 @@ class _OrchestrationMainScreenState extends ConsumerState<OrchestrationMainScree
         print('ℹ️ Athena Intelligence is disabled - using current orchestration settings');
       }
 
-    } catch (e, stackTrace) {
+    } catch (e) {
       print('❌ Athena analysis failed, continuing with current settings: $e');
       // Continue with normal orchestration even if Athena fails
     }

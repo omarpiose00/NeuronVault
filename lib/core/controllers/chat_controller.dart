@@ -13,9 +13,7 @@ import '../services/storage_service.dart';
 import '../services/analytics_service.dart';
 import '../providers/providers_main.dart';
 // ATHENA INTEGRATION IMPORTS
-import '../services/athena_intelligence_service.dart';
 import '../services/websocket_orchestration_service.dart';
-import '../controllers/athena_controller.dart';
 
 // 💬 CHAT CONTROLLER
 class ChatController extends Notifier<ChatState> {

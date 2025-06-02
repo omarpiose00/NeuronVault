@@ -1,0 +1,99 @@
+📁 FRONTEND FLUTTER TESTING STRUCTURE
+test/
+├── unit/                          # 🔬 Test di unità
+│   ├── core/
+│   │   ├── controllers/           # 🧠 Controller di orchestrazione
+│   │   │   ├── athena_controller_test.dart
+│   │   │   ├── chat_controller_test.dart
+│   │   │   ├── connection_controller_test.dart
+│   │   │   ├── models_controller_test.dart
+│   │   │   └── strategy_controller_test.dart
+│   │   ├── services/              # 🔧 Servizi principali dell'app
+│   │   │   ├── achievement_service_test.dart
+│   │   │   ├── ai_service_test.dart
+│   │   │   ├── analytics_service_test.dart
+│   │   │   ├── athena_intelligence_service_test.dart
+│   │   │   ├── config_service_test.dart
+│   │   │   ├── mini_llm_analyzer_service_test.dart
+│   │   │   ├── spatial_audio_service_test.dart
+│   │   │   ├── storage_service_test.dart
+│   │   │   ├── theme_service_test.dart
+│   │   │   └── websocket_orchestration_service_test.dart
+│   │   ├── providers/             # 🧩 Riverpod & provider testing
+│   │   │   └── providers_main_test.dart
+│   │   ├── state/                 # 📦 Modelli di stato globale
+│   │   │   └── state_models_test.dart
+│   │   ├── theme/                 # 🎨 Temi e personalizzazioni
+│   │   │   ├── app_theme_test.dart
+│   │   │   ├── neural_theme_system_test.dart
+│   │   │   └── theme_extensions_test.dart
+│   │   ├── accessibility/         # ♿ Accessibilità
+│   │   │   ├── accessibility_manager_test.dart
+│   │   │   ├── accessible_widget_test.dart
+│   │   │   └── simple_tts_service_test.dart
+│   │   ├── design_system_test.dart
+│   │   └── font_helper_test.dart
+│   └── utils/                     # 🧪 Utility per test
+│       ├── test_helpers.dart
+│       ├── mock_data.dart
+│       └── test_constants.dart
+
+├── widget/                        # 🧱 Test UI
+│   ├── screens/                   # 📺 Schermate principali
+│   │   ├── error_screen_test.dart
+│   │   ├── loading_screen_test.dart
+│   │   ├── main_screen_test.dart
+│   │   └── orchestration_main_screen_test.dart
+│   ├── widgets/                   # 🔲 Componenti UI
+│   │   ├── neural_app_bar_test.dart
+│   │   ├── core/
+│   │   │   ├── achievement_notification_test.dart
+│   │   │   ├── achievement_progress_panel_test.dart
+│   │   │   ├── athena_intelligence_panel_test.dart
+│   │   │   ├── chat_input_bar_test.dart
+│   │   │   ├── message_bubble_test.dart
+│   │   │   ├── model_grid_test.dart
+│   │   │   ├── model_profiling_dashboard_test.dart
+│   │   │   ├── neural_3d_particle_system_test.dart
+│   │   │   ├── neural_brain_logo_test.dart
+│   │   │   ├── neural_theme_selector_test.dart
+│   │   │   ├── revolutionary_connection_status_test.dart
+│   │   │   ├── spatial_audio_controls_test.dart
+│   │   │   ├── strategy_selector_test.dart
+│   │   │   ├── token_cost_widget_test.dart
+│   │   │   └── visual_decision_tree_test.dart
+│   │   └── orchestration/
+│   │       └── transparent_orchestration_panel_test.dart
+│   └── shared/                    # 🧰 Helper condivisi per test
+│       ├── widget_test_helpers.dart
+│       ├── mock_providers.dart
+│       └── golden_test_helpers.dart
+
+├── integration/                   # 🔗 Test di integrazione
+│   ├── app_test.dart
+│   ├── orchestration_flow_test.dart
+│   ├── ai_connection_flow_test.dart
+│   ├── theme_switching_test.dart
+│   ├── achievement_system_test.dart
+│   ├── athena_intelligence_flow_test.dart
+│   └── end_to_end_user_journey_test.dart
+
+├── performance/                   # 🚀 Test prestazioni
+│   ├── neural_particles_performance_test.dart
+│   ├── websocket_performance_test.dart
+│   ├── memory_usage_test.dart
+│   └── ui_responsiveness_test.dart
+
+├── accessibility/                # ♿ Accessibilità globale
+│   ├── screen_reader_test.dart
+│   ├── keyboard_navigation_test.dart
+│   ├── contrast_ratio_test.dart
+│   └── focus_management_test.dart
+
+└── golden/                       # 📸 Golden test & snapshot
+    ├── screenshots/
+    │   ├── main_screen/
+    │   ├── orchestration_screen/
+    │   ├── themes/
+    │   └── widgets/
+    └── golden_test_runner.dart
