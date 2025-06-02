@@ -2,7 +2,6 @@
 // ANALYTICS SERVICE TESTING - ENTERPRISE GRADE 2025
 // Complete test suite for privacy-first analytics with 100% coverage
 
-import 'dart:async';
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -12,8 +11,6 @@ import 'package:neuronvault/core/services/analytics_service.dart';
 import 'package:neuronvault/core/services/storage_service.dart';
 import 'package:neuronvault/core/state/state_models.dart';
 
-import '../../utils/test_constants.dart';
-import '../../utils/test_helpers.dart';
 import '../../../../test_config/flutter_test_config.dart';
 
 // =============================================================================

@@ -3,8 +3,6 @@
 // World's first AI Meta-Analysis Engine testing suite
 // Comprehensive testing for intelligent AI model selection and prompt analysis
 
-import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -17,7 +15,6 @@ import 'package:neuronvault/core/services/storage_service.dart';
 import 'package:neuronvault/core/state/state_models.dart';
 
 import '../../utils/test_constants.dart';
-import '../../utils/mock_data.dart';
 
 // =============================================================================
 // 🎭 MOCK CLASSES

@@ -3,21 +3,16 @@
 // Comprehensive test suite for secure configuration management
 // 🎯 TARGET: 100% coverage of ConfigService public methods
 
-import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:fake_async/fake_async.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:logger/logger.dart';
 
-import '../../../../lib/core/services/config_service.dart';
-import '../../../../lib/core/state/state_models.dart';
-import '../../utils/mock_data.dart';
+import 'package:neuronvault/core/services/config_service.dart';
+import 'package:neuronvault/core/state/state_models.dart';
 import '../../utils/test_constants.dart';
-import '../../utils/test_helpers.dart';
 import '../../../../test_config/flutter_test_config.dart' hide TestConstants;
 
 /// 🎭 **MOCK CLASSES**

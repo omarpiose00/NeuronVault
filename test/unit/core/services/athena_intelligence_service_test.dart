@@ -15,9 +15,6 @@ import 'package:neuronvault/core/services/storage_service.dart';
 import 'package:neuronvault/core/services/config_service.dart';
 
 import '../../../../test_config/flutter_test_config.dart';
-import '../../utils/test_constants.dart';
-import '../../utils/test_helpers.dart';
-import '../../../../test_config/flutter_test_config.dart';
 
 // =============================================================================
 // 🎭 MOCK CLASSES
@@ -35,22 +32,14 @@ class MockLogger extends Mock implements Logger {}
 
 class TestableAthenaIntelligenceService extends AthenaIntelligenceService {
   TestableAthenaIntelligenceService({
-    required MiniLLMAnalyzerService analyzer,
-    required WebSocketOrchestrationService orchestrationService,
-    required StorageService storageService,
-    required ConfigService configService,
-    required Logger logger,
-  }) : super(
-    analyzer: analyzer,
-    orchestrationService: orchestrationService,
-    storageService: storageService,
-    configService: configService,
-    logger: logger,
-  );
+    required super.analyzer,
+    required super.orchestrationService,
+    required super.storageService,
+    required super.configService,
+    required super.logger,
+  });
 
   // Expose protected methods for testing
-  @override
-  AthenaState get state => super.state;
 }
 
 // =============================================================================
@@ -58,9 +47,9 @@ class TestableAthenaIntelligenceService extends AthenaIntelligenceService {
 // =============================================================================
 
 class AthenaTestData {
-  static const String testPrompt = "Analyze the performance of quantum computing algorithms";
-  static const String simplePrompt = "Hello";
-  static const String complexPrompt = "Write a comprehensive analysis of machine learning algorithms, including neural networks, decision trees, and support vector machines, with performance comparisons and use case recommendations for enterprise applications";
+  static const String testPrompt = 'Analyze the performance of quantum computing algorithms';
+  static const String simplePrompt = 'Hello';
+  static const String complexPrompt = 'Write a comprehensive analysis of machine learning algorithms, including neural networks, decision trees, and support vector machines, with performance comparisons and use case recommendations for enterprise applications';
 
   static PromptAnalysis createMockAnalysis({
     String? prompt,
